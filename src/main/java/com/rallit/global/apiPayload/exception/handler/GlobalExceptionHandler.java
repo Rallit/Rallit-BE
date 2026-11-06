@@ -18,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @Slf4j
@@ -64,6 +65,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			String message = error.getDefaultMessage() != null ? error.getDefaultMessage() : "유효하지 않은 값입니다.";
 			errors.merge(field, message, (existing, additional) -> existing + ", " + additional);
 		}
+		ErrorReasonDTO reason = ErrorStatus._BAD_REQUEST.getReasonHttpStatus();
+		ApiResponse<Map<String, String>> body = ApiResponse.onFailure(reason.getCode(), reason.getMessage(), errors);
+		return handleExceptionInternal(exception, body, headers, status, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleHandlerMethodValidationException(
+			HandlerMethodValidationException exception, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		Map<String, String> errors = new LinkedHashMap<>();
+		exception.getParameterValidationResults().forEach(result -> {
+			String field = result.getMethodParameter().getParameterName();
+			result.getResolvableErrors().forEach(error -> {
+				String message = error.getDefaultMessage() != null ? error.getDefaultMessage() : "유효하지 않은 값입니다.";
+				errors.merge(field, message, (existing, additional) -> existing + ", " + additional);
+			});
+		});
 		ErrorReasonDTO reason = ErrorStatus._BAD_REQUEST.getReasonHttpStatus();
 		ApiResponse<Map<String, String>> body = ApiResponse.onFailure(reason.getCode(), reason.getMessage(), errors);
 		return handleExceptionInternal(exception, body, headers, status, request);
