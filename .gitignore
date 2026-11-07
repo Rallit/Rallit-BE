@@ -41,3 +41,6 @@ out/
 
 ### Environment ###
 .env
+
+AGENTS.md
+CLAUDE.md
