@@ -9,9 +9,17 @@ public final class UserConstraintViolations {
   private UserConstraintViolations() {}
 
   public static boolean isNicknameConflict(Throwable failure) {
+    return matches(failure, NICKNAME_CONSTRAINT);
+  }
+
+  public static boolean isEmailConflict(Throwable failure) {
+    return matches(failure, "uk_users_email");
+  }
+
+  private static boolean matches(Throwable failure, String constraint) {
     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
       if (cause instanceof ConstraintViolationException violation
-          && NICKNAME_CONSTRAINT.equals(violation.getConstraintName())
+          && constraint.equals(violation.getConstraintName())
           && UNIQUE_VIOLATION.equals(violation.getSQLState())) return true;
     }
     return false;

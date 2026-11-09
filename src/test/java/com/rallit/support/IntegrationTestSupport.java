@@ -6,6 +6,11 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 public abstract class IntegrationTestSupport {
+  protected static com.rallit.domain.auth.model.SocialIdentity kakao(String subject) {
+    return new com.rallit.domain.auth.model.SocialIdentity(
+        com.rallit.domain.auth.model.OAuthProvider.KAKAO, subject, subject + "@example.test", true);
+  }
+
   static final PostgreSQLContainer PG =
       new PostgreSQLContainer(
           "postgres@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395");

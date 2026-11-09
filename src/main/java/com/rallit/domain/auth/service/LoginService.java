@@ -2,6 +2,7 @@ package com.rallit.domain.auth.service;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.model.SessionTokens;
+import com.rallit.domain.auth.model.SocialIdentity;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
@@ -17,13 +18,13 @@ public class LoginService {
   private final UserRepository users;
   private final TokenSessionService sessions;
 
-  public SessionTokens loginKakao(String kakaoId, LoginTarget target) {
+  public SessionTokens login(SocialIdentity identity, LoginTarget target) {
     User user =
         switch (target) {
-          case SERVICE -> registration.getOrCreateKakaoUser(kakaoId);
+          case SERVICE -> registration.getOrCreateUser(identity);
           case ADMIN ->
               users
-                  .findByProviderAndProviderUserId("KAKAO", kakaoId)
+                  .findByProviderAndProviderUserId(identity.provider().name(), identity.subject())
                   .orElseThrow(() -> new GeneralException(ErrorStatus._FORBIDDEN));
         };
     return sessions.login(user.getId(), target);

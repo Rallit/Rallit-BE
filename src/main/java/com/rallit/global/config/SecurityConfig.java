@@ -50,6 +50,7 @@ public class SecurityConfig {
                     ? "https://kapi.kakao.com/v2/user/me"
                     : p.kakaoUserInfoUri())
             .userNameAttributeName("id")
+            .scope("account_email")
             .clientName("Kakao");
     if (p.kakaoClientSecret() != null && !p.kakaoClientSecret().isBlank())
       builder

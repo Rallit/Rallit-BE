@@ -30,14 +30,14 @@ class AuthFlowIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
 
   long user() {
-    return users.getOrCreateKakaoUser(UUID.randomUUID().toString()).getId();
+    return users.getOrCreateUser(kakao(UUID.randomUUID().toString())).getId();
   }
 
   @Test
   void registrationIsStableAndCaseInsensitiveUnique() {
     String id = UUID.randomUUID().toString();
-    var a = users.getOrCreateKakaoUser(id);
-    var b = users.getOrCreateKakaoUser(id);
+    var a = users.getOrCreateUser(kakao(id));
+    var b = users.getOrCreateUser(kakao(id));
     assertThat(a.getId()).isEqualTo(b.getId());
     assertThat(a.getNickname()).isEqualTo(b.getNickname());
     assertThat(a.getNickname()).matches("[가-힣a-z0-9]{2,12}");

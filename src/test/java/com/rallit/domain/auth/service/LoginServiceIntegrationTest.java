@@ -24,8 +24,8 @@ class LoginServiceIntegrationTest extends IntegrationTestSupport {
   @Test
   void serviceLoginCreatesOneStableMemberAndIndependentSessions() {
     String kakaoId = UUID.randomUUID().toString();
-    var first = login.loginKakao(kakaoId, LoginTarget.SERVICE);
-    var second = login.loginKakao(kakaoId, LoginTarget.SERVICE);
+    var first = login.login(kakao(kakaoId), LoginTarget.SERVICE);
+    var second = login.login(kakao(kakaoId), LoginTarget.SERVICE);
     var user = users.findByProviderAndProviderUserId("KAKAO", kakaoId).orElseThrow();
     assertThat(user.isOnboardingCompleted()).isFalse();
     assertThat(jwt.verifyAccess(first.accessToken(), LoginTarget.SERVICE).userId())
@@ -38,12 +38,12 @@ class LoginServiceIntegrationTest extends IntegrationTestSupport {
   @Test
   void adminLoginCannotCreateAnAccountOrPromoteRegularMember() {
     String kakaoId = UUID.randomUUID().toString();
-    assertThatThrownBy(() -> login.loginKakao(kakaoId, LoginTarget.ADMIN))
+    assertThatThrownBy(() -> login.login(kakao(kakaoId), LoginTarget.ADMIN))
         .isInstanceOfSatisfying(
             GeneralException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorStatus._FORBIDDEN));
     assertThat(users.findByProviderAndProviderUserId("KAKAO", kakaoId)).isEmpty();
-    login.loginKakao(kakaoId, LoginTarget.SERVICE);
-    assertThatThrownBy(() -> login.loginKakao(kakaoId, LoginTarget.ADMIN))
+    login.login(kakao(kakaoId), LoginTarget.SERVICE);
+    assertThatThrownBy(() -> login.login(kakao(kakaoId), LoginTarget.ADMIN))
         .isInstanceOfSatisfying(
             GeneralException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorStatus._FORBIDDEN));
   }
@@ -51,10 +51,10 @@ class LoginServiceIntegrationTest extends IntegrationTestSupport {
   @Test
   void knownAdminCanLogInWithoutTennisProfile() {
     String kakaoId = UUID.randomUUID().toString();
-    login.loginKakao(kakaoId, LoginTarget.SERVICE);
+    login.login(kakao(kakaoId), LoginTarget.SERVICE);
     long id = users.findByProviderAndProviderUserId("KAKAO", kakaoId).orElseThrow().getId();
     jdbc.update("update users set role='ADMIN' where id=?", id);
-    var tokens = login.loginKakao(kakaoId, LoginTarget.ADMIN);
+    var tokens = login.login(kakao(kakaoId), LoginTarget.ADMIN);
     assertThat(jwt.verifyAccess(tokens.accessToken(), LoginTarget.ADMIN).userId()).isEqualTo(id);
   }
 }

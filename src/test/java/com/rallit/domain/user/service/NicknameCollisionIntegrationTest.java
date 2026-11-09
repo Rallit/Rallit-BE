@@ -27,7 +27,7 @@ class NicknameCollisionIntegrationTest extends IntegrationTestSupport {
         UUID.randomUUID().toString(),
         duplicate);
     when(generator.generate()).thenReturn(duplicate, unique);
-    assertThat(registration.getOrCreateKakaoUser(UUID.randomUUID().toString()).getNickname())
+    assertThat(registration.getOrCreateUser(kakao(UUID.randomUUID().toString())).getNickname())
         .isEqualTo(unique);
   }
 }

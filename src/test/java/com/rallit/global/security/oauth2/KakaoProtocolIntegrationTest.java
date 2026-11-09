@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
   static final HttpServer server;
+  static final Map<String, String> profiles = new java.util.concurrent.ConcurrentHashMap<>();
   static final AtomicInteger exchanges = new AtomicInteger();
 
   static {
@@ -40,8 +41,17 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
               e.close();
               return;
             }
+            String code =
+                Arrays.stream(form.split("&"))
+                    .filter(v -> v.startsWith("code="))
+                    .map(v -> URLDecoder.decode(v.substring(5), StandardCharsets.UTF_8))
+                    .findFirst()
+                    .orElseThrow();
+            String access = profiles.containsKey(code) ? code : "test-kakao-access";
             byte[] body =
-                "{\"access_token\":\"test-kakao-access\",\"token_type\":\"bearer\",\"expires_in\":3600}"
+                ("{\"access_token\":\""
+                        + access
+                        + "\",\"token_type\":\"bearer\",\"expires_in\":3600}")
                     .getBytes(StandardCharsets.UTF_8);
             e.getResponseHeaders().set("Content-Type", "application/json");
             e.sendResponseHeaders(200, body.length);
@@ -51,14 +61,18 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
       server.createContext(
           "/userinfo",
           e -> {
-            if (!"Bearer test-kakao-access"
-                .equals(e.getRequestHeaders().getFirst("Authorization"))) {
+            String auth = e.getRequestHeaders().getFirst("Authorization");
+            String profile =
+                auth != null && auth.startsWith("Bearer ") ? profiles.get(auth.substring(7)) : null;
+            if (profile == null && !"Bearer test-kakao-access".equals(auth)) {
               e.sendResponseHeaders(401, -1);
               e.close();
               return;
             }
             byte[] body =
-                "{\"id\":12345678,\"connected_at\":\"2026-01-01T00:00:00Z\"}"
+                (profile == null
+                        ? "{\"id\":12345678,\"kakao_account\":{\"email\":\"12345678@example.test\",\"is_email_valid\":true,\"is_email_verified\":true}}"
+                        : profile)
                     .getBytes(StandardCharsets.UTF_8);
             e.getResponseHeaders().set("Content-Type", "application/json");
             e.sendResponseHeaders(200, body.length);
@@ -211,12 +225,76 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
         .orElseThrow();
   }
 
+  @Test
+  void missingInvalidOrUnverifiedKakaoEmailCannotCreateMember() throws Exception {
+    for (String flags : List.of("", "\"is_email_valid\":true,", "\"is_email_verified\":true,")) {
+      String code = UUID.randomUUID().toString();
+      long subject = Math.abs(UUID.randomUUID().getMostSignificantBits());
+      profiles.put(
+          code,
+          "{\"id\":"
+              + subject
+              + ",\"kakao_account\":{"
+              + flags
+              + "\"email\":\""
+              + code
+              + "@example.test\"}}");
+      var attempt = start("service");
+      var response =
+          mvc.perform(
+                  get("/api/v1/auth/kakao/callback")
+                      .param("code", code)
+                      .param("state", attempt.state())
+                      .cookie(attempt.binding()))
+              .andExpect(redirectedUrl("https://rallit.co.kr/auth/callback?error=email_required"))
+              .andReturn()
+              .getResponse();
+      assertThat(users.findByProviderAndProviderUserId("KAKAO", Long.toString(subject))).isEmpty();
+      assertThat(response.getHeaders("Set-Cookie"))
+          .noneMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
+      profiles.remove(code);
+    }
+  }
+
+  @Test
+  void kakaoEmailCollisionShowsGoogleLoginMethod() throws Exception {
+    String code = UUID.randomUUID().toString();
+    String email = code + "@example.test";
+    long subject = Math.abs(UUID.randomUUID().getMostSignificantBits());
+    registration.getOrCreateUser(
+        new com.rallit.domain.auth.model.SocialIdentity(
+            com.rallit.domain.auth.model.OAuthProvider.GOOGLE, code, email, true));
+    profiles.put(
+        code,
+        "{\"id\":"
+            + subject
+            + ",\"kakao_account\":{\"is_email_valid\":true,\"is_email_verified\":true,\"email\":\""
+            + email
+            + "\"}}");
+    try {
+      var attempt = start("service");
+      mvc.perform(
+              get("/api/v1/auth/kakao/callback")
+                  .param("code", code)
+                  .param("state", attempt.state())
+                  .cookie(attempt.binding()))
+          .andExpect(
+              redirectedUrl(
+                  "https://rallit.co.kr/auth/callback?error=account_exists&existingProvider=google"));
+      assertThat(users.findByProviderAndProviderUserId("KAKAO", Long.toString(subject))).isEmpty();
+    } finally {
+      profiles.remove(code);
+    }
+  }
+
+  @Autowired com.rallit.domain.user.repository.UserRepository users;
+
   @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
   @Autowired com.rallit.domain.user.service.UserRegistrationService registration;
 
   @Test
   void adminLoginHasSeparateCookiesAndRequiresCurrentRole() throws Exception {
-    long id = registration.getOrCreateKakaoUser("12345678").getId();
+    long id = registration.getOrCreateUser(kakao("12345678")).getId();
     jdbc.update("update users set role='USER' where id=?", id);
     var denied = start("admin");
     var failure =

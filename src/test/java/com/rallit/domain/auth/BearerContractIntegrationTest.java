@@ -26,7 +26,7 @@ class BearerContractIntegrationTest extends IntegrationTestSupport {
 
   SessionTokens login() {
     return sessions.login(
-        users.getOrCreateKakaoUser(UUID.randomUUID().toString()).getId(), LoginTarget.SERVICE);
+        users.getOrCreateUser(kakao(UUID.randomUUID().toString())).getId(), LoginTarget.SERVICE);
   }
 
   @Test
@@ -140,7 +140,7 @@ class BearerContractIntegrationTest extends IntegrationTestSupport {
 
   @Test
   void encodedAdminPathUsesAdminSessionNotServiceCookie() throws Exception {
-    long id = users.getOrCreateKakaoUser(UUID.randomUUID().toString()).getId();
+    long id = users.getOrCreateUser(kakao(UUID.randomUUID().toString())).getId();
     jdbc.update("update users set role='ADMIN' where id=?", id);
     var admin = sessions.login(id, LoginTarget.ADMIN);
     var service = sessions.login(id, LoginTarget.SERVICE);
