@@ -3,7 +3,7 @@ package com.rallit.domain.user.controller;
 import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.service.UserService;
 import com.rallit.global.apiPayload.ApiResponse;
-import com.rallit.global.security.authentication.RallitPrincipal;
+import com.rallit.global.security.authentication.UserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,7 +17,7 @@ public class UserController {
 
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<UserResponse>> me(
-      @AuthenticationPrincipal RallitPrincipal principal) {
+      @AuthenticationPrincipal UserDetails principal) {
     return ResponseEntity.ok(ApiResponse.onSuccess(users.getMe(principal.userId())));
   }
 }

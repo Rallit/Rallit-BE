@@ -7,7 +7,7 @@ import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.service.UserService;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.security.authentication.AuthRequestMatchers;
-import com.rallit.global.security.authentication.RallitPrincipal;
+import com.rallit.global.security.authentication.UserDetails;
 import com.rallit.global.security.cookie.AuthCookieManager;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
@@ -40,8 +40,7 @@ public class AuthController {
   }
 
   @GetMapping("/api/v1/admin/me")
-  public ResponseEntity<ApiResponse<UserResponse>> adminMe(
-      @AuthenticationPrincipal RallitPrincipal p) {
+  public ResponseEntity<ApiResponse<UserResponse>> adminMe(@AuthenticationPrincipal UserDetails p) {
     return ResponseEntity.ok(ApiResponse.onSuccess(users.getMe(p.userId())));
   }
 

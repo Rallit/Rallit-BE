@@ -1,85 +1,77 @@
 package com.rallit.global.security.authentication;
 
 import com.rallit.domain.auth.model.LoginTarget;
-import com.rallit.domain.user.enums.UserRole;
-import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.jwt.JwtTokenService;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.util.List;
+import java.util.Collections;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class BearerAuthenticationFilter extends OncePerRequestFilter {
   private final LoginTarget target;
   private final JwtTokenService jwt;
-  private final UserRepository users;
+  private final UserDetailsService userDetailsService;
   private final SecurityErrorWriter errors;
 
   public BearerAuthenticationFilter(
-      LoginTarget t, JwtTokenService j, UserRepository u, SecurityErrorWriter e) {
-    target = t;
-    jwt = j;
-    users = u;
-    errors = e;
+      LoginTarget target,
+      JwtTokenService jwt,
+      UserDetailsService userDetailsService,
+      SecurityErrorWriter errors) {
+    this.target = target;
+    this.jwt = jwt;
+    this.userDetailsService = userDetailsService;
+    this.errors = errors;
   }
 
   @Override
-  protected boolean shouldNotFilter(HttpServletRequest r) {
-    return AuthRequestMatchers.isRecovery(r, target) || AuthRequestMatchers.isOAuth(r);
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    return AuthRequestMatchers.isRecovery(request, target) || AuthRequestMatchers.isOAuth(request);
   }
 
   private String accessToken(HttpServletRequest request) {
-    var headers = java.util.Collections.list(request.getHeaders("Authorization"));
+    var headers = Collections.list(request.getHeaders("Authorization"));
     if (headers.isEmpty()) return null;
-    if (headers.size() != 1)
-      throw new GeneralException(
-          com.rallit.global.apiPayload.code.status.ErrorStatus._UNAUTHORIZED);
+    if (headers.size() != 1) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
     String header = headers.getFirst();
     if (!header.regionMatches(true, 0, "Bearer ", 0, 7) || header.length() <= 7)
-      throw new GeneralException(
-          com.rallit.global.apiPayload.code.status.ErrorStatus._UNAUTHORIZED);
+      throw new GeneralException(ErrorStatus._UNAUTHORIZED);
     return header.substring(7);
   }
 
   @Override
-  protected void doFilterInternal(HttpServletRequest r, HttpServletResponse s, FilterChain chain)
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
     try {
-      String token = accessToken(r);
+      String token = accessToken(request);
       if (token != null) {
-        var v = jwt.verifyAccess(token, target);
-        var u =
-            users
-                .findById(v.userId())
-                .orElseThrow(
-                    () ->
-                        new GeneralException(
-                            com.rallit.global.apiPayload.code.status.ErrorStatus._UNAUTHORIZED));
-        if (target == LoginTarget.ADMIN && u.getRole() != UserRole.ADMIN) {
-          errors.write(s, 403);
+        var verified = jwt.verifyAccess(token, target);
+        var principal = userDetailsService.loadUserByUsername(verified.userId().toString());
+        if (target == LoginTarget.ADMIN
+            && !principal.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))) {
+          errors.write(response, 403);
           return;
         }
-        var principal =
-            new RallitPrincipal(u.getId(), target, u.getRole(), u.isOnboardingCompleted());
         var context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(
             UsernamePasswordAuthenticationToken.authenticated(
-                principal,
-                null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + u.getRole().name()))));
+                principal, null, principal.getAuthorities()));
         SecurityContextHolder.setContext(context);
       }
-    } catch (GeneralException e) {
+    } catch (GeneralException | UsernameNotFoundException rejected) {
       SecurityContextHolder.clearContext();
-      errors.write(s, 401);
+      errors.write(response, 401);
       return;
     }
-    s.setHeader("Cache-Control", "no-store");
-    chain.doFilter(r, s);
+    response.setHeader("Cache-Control", "no-store");
+    chain.doFilter(request, response);
   }
 }
