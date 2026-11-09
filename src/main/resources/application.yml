@@ -3,6 +3,8 @@ spring:
     name: RallitBackend
   config:
     import: optional:file:.env[.properties]
+  profiles:
+    default: local
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -10,4 +12,6 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+server:
+  forward-headers-strategy: native

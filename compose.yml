@@ -1,0 +1,55 @@
+name: rallit
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  app:
+    image: ${APP_IMAGE:?APP_IMAGE를 .env에 설정하세요}
+    restart: unless-stopped
+    # RDS 환경에서는 db 프로필이 꺼져 있으므로 의존성을 선택 사항으로 둔다.
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    environment:
+      TZ: Asia/Seoul
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?SPRING_PROFILES_ACTIVE를 .env에 설정하세요}
+      DB_URL: ${DB_URL:?DB_URL을 .env에 설정하세요}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME을 .env에 설정하세요}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 .env에 설정하세요}
+    mem_limit: ${APP_MEM_LIMIT:-700m}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    logging: *logging
+
+  db:
+    image: postgres:17-alpine
+    profiles:
+      - local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rallit}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME을 .env에 설정하세요}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 .env에 설정하세요}
+    mem_limit: ${DB_MEM_LIMIT:-256m}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+
+volumes:
+  postgres-data:
