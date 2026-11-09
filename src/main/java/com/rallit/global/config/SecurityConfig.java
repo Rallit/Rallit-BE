@@ -23,7 +23,7 @@ import org.springframework.security.web.context.NullSecurityContextRepository;
 import org.springframework.web.cors.*;
 
 @Configuration
-@EnableConfigurationProperties(AuthProperties.class)
+@EnableConfigurationProperties({AuthProperties.class, GoogleOAuthProperties.class})
 public class SecurityConfig {
   @Bean
   Clock clock() {
@@ -31,7 +31,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  ClientRegistrationRepository clientRegistrations(AuthProperties p) {
+  ClientRegistrationRepository clientRegistrations(AuthProperties p, GoogleOAuthProperties google) {
     var builder =
         ClientRegistration.withRegistrationId("kakao")
             .clientId(p.kakaoClientId())
@@ -57,7 +57,27 @@ public class SecurityConfig {
           .clientSecret(p.kakaoClientSecret())
           .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
     else builder.clientAuthenticationMethod(ClientAuthenticationMethod.NONE);
-    return new InMemoryClientRegistrationRepository(builder.build());
+    var registrations = new java.util.ArrayList<ClientRegistration>();
+    registrations.add(builder.build());
+    if (google.enabled()) registrations.add(googleRegistration(google));
+    return new InMemoryClientRegistrationRepository(registrations);
+  }
+
+  private ClientRegistration googleRegistration(GoogleOAuthProperties properties) {
+    var builder =
+        org.springframework.security.config.oauth2.client.CommonOAuth2Provider.GOOGLE
+            .getBuilder("google")
+            .clientId(properties.clientId())
+            .clientSecret(properties.clientSecret())
+            .redirectUri(properties.redirectUri())
+            .scope("openid", "email")
+            .issuerUri("https://accounts.google.com");
+    if (properties.authorizationUri() != null)
+      builder.authorizationUri(properties.authorizationUri());
+    if (properties.tokenUri() != null) builder.tokenUri(properties.tokenUri());
+    if (properties.jwkSetUri() != null) builder.jwkSetUri(properties.jwkSetUri());
+    if (properties.userInfoUri() != null) builder.userInfoUri(properties.userInfoUri());
+    return builder.build();
   }
 
   private void common(
@@ -146,7 +166,7 @@ public class SecurityConfig {
               jakarta.servlet.FilterChain chain)
               throws jakarta.servlet.ServletException, java.io.IOException {
             String t = r.getParameter("target");
-            if (com.rallit.global.security.web.AuthRequestMatchers.isKakaoLogin(r)
+            if (com.rallit.global.security.web.AuthRequestMatchers.isLogin(r)
                 && t != null
                 && !t.equals("service")
                 && !t.equals("admin")) {
@@ -165,7 +185,7 @@ public class SecurityConfig {
                         a.authorizationRequestResolver(
                                 new PurposeAuthorizationRequestResolver(clients))
                             .authorizationRequestRepository(requests))
-                .redirectionEndpoint(r -> r.baseUri("/api/v1/auth/kakao/callback"))
+                .redirectionEndpoint(r -> r.baseUri("/api/v1/auth/*/callback"))
                 .authorizedClientRepository(new NoStoreAuthorizedClientRepository())
                 .successHandler(handlers::success)
                 .failureHandler(handlers::authenticationFailure));
@@ -180,6 +200,8 @@ public class SecurityConfig {
                 a.requestMatchers(
                         "/api/v1/auth/kakao",
                         "/api/v1/auth/kakao/callback",
+                        "/api/v1/auth/google",
+                        "/api/v1/auth/google/callback",
                         "/api/v1/auth/refresh",
                         "/api/v1/auth/logout",
                         "/actuator/health",

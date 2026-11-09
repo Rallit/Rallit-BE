@@ -67,7 +67,7 @@ public class RedisAuthorizationRequestRepository
         response,
         name(auth.getState()),
         binding,
-        (properties.secure() ? "/" : "/api/v1/auth/kakao/callback"),
+        (properties.secure() ? "/" : java.net.URI.create(auth.getRedirectUri()).getPath()),
         300);
   }
 
@@ -91,6 +91,9 @@ public class RedisAuthorizationRequestRepository
     String raw = redis.opsForValue().get(key(state));
     if (raw == null) return null;
     Snapshot s = mapper.readValue(raw, Snapshot.class);
+    Object registration = s.attributes().get("registration_id");
+    if (!(registration instanceof String id)
+        || !com.rallit.global.security.web.AuthRequestMatchers.isCallback(request, id)) return null;
     if (!java.security.MessageDigest.isEqual(
         s.browserHash().getBytes(java.nio.charset.StandardCharsets.US_ASCII),
         TokenSessionService.hash(binding).getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
@@ -110,7 +113,7 @@ public class RedisAuthorizationRequestRepository
           response,
           name(state),
           "",
-          (properties.secure() ? "/" : "/api/v1/auth/kakao/callback"),
+          (properties.secure() ? "/" : java.net.URI.create(s.redirectUri()).getPath()),
           0);
     }
     return OAuth2AuthorizationRequest.authorizationCode()
