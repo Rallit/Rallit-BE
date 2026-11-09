@@ -2,7 +2,7 @@ package com.rallit.global.security.oauth2;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
-import com.rallit.global.security.cookie.AuthCookieManager;
+import com.rallit.global.security.web.AuthCookieManager;
 import jakarta.servlet.http.*;
 import java.time.Duration;
 import java.util.*;
@@ -22,7 +22,7 @@ public class RedisAuthorizationRequestRepository
   private final StringRedisTemplate redis;
   private final ObjectMapper mapper;
   private final AuthCookieManager cookies;
-  private final com.rallit.global.security.config.AuthProperties properties;
+  private final com.rallit.global.config.AuthProperties properties;
 
   private String name(String state) {
     return (properties.secure() ? "__Host-rallit_oauth_" : "rallit_oauth_")

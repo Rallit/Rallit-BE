@@ -3,7 +3,7 @@ package com.rallit.global.security;
 import static org.assertj.core.api.Assertions.*;
 
 import com.rallit.domain.auth.model.LoginTarget;
-import com.rallit.global.security.config.AuthProperties;
+import com.rallit.global.config.AuthProperties;
 import com.rallit.global.security.jwt.JwtTokenService;
 import java.time.*;
 import java.util.*;

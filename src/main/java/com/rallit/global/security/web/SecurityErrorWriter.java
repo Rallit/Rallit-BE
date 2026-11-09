@@ -1,4 +1,4 @@
-package com.rallit.global.security.handler;
+package com.rallit.global.security.web;
 
 import com.rallit.global.apiPayload.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;

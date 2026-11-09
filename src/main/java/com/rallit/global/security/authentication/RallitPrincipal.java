@@ -1,4 +1,4 @@
-package com.rallit.global.security.principal;
+package com.rallit.global.security.authentication;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.user.enums.UserRole;

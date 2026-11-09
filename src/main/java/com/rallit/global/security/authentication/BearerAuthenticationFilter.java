@@ -1,11 +1,11 @@
-package com.rallit.global.security.jwt;
+package com.rallit.global.security.authentication;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.user.enums.UserRole;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.exception.GeneralException;
-import com.rallit.global.security.handler.SecurityErrorWriter;
-import com.rallit.global.security.principal.RallitPrincipal;
+import com.rallit.global.security.jwt.JwtTokenService;
+import com.rallit.global.security.web.SecurityErrorWriter;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -31,8 +31,8 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest r) {
-    return com.rallit.global.security.route.AuthRequestMatchers.isRecovery(r, target)
-        || com.rallit.global.security.route.AuthRequestMatchers.isOAuth(r);
+    return com.rallit.global.security.web.AuthRequestMatchers.isRecovery(r, target)
+        || com.rallit.global.security.web.AuthRequestMatchers.isOAuth(r);
   }
 
   private String accessToken(HttpServletRequest request) {

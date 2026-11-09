@@ -6,8 +6,8 @@ import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.service.UserService;
 import com.rallit.global.apiPayload.ApiResponse;
-import com.rallit.global.security.cookie.AuthCookieManager;
-import com.rallit.global.security.principal.RallitPrincipal;
+import com.rallit.global.security.authentication.RallitPrincipal;
+import com.rallit.global.security.web.AuthCookieManager;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -45,7 +45,7 @@ public class AuthController {
   }
 
   private LoginTarget target(HttpServletRequest r) {
-    return com.rallit.global.security.route.AuthRequestMatchers.isAdmin(r)
+    return com.rallit.global.security.web.AuthRequestMatchers.isAdmin(r)
         ? LoginTarget.ADMIN
         : LoginTarget.SERVICE;
   }

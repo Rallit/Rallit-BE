@@ -1,9 +1,9 @@
-package com.rallit.global.security.cookie;
+package com.rallit.global.security.web;
 
 import static org.assertj.core.api.Assertions.*;
 
 import com.rallit.domain.auth.model.*;
-import com.rallit.global.security.config.AuthProperties;
+import com.rallit.global.config.AuthProperties;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

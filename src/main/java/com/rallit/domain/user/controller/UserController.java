@@ -3,7 +3,7 @@ package com.rallit.domain.user.controller;
 import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.service.UserService;
 import com.rallit.global.apiPayload.ApiResponse;
-import com.rallit.global.security.principal.RallitPrincipal;
+import com.rallit.global.security.authentication.RallitPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

@@ -1,4 +1,4 @@
-package com.rallit.global.security.route;
+package com.rallit.global.security.web;
 
 import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
 

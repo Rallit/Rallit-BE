@@ -1,9 +1,9 @@
-package com.rallit.global.security.cookie;
+package com.rallit.global.security.web;
 
 import com.rallit.domain.auth.model.*;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
-import com.rallit.global.security.config.AuthProperties;
+import com.rallit.global.config.AuthProperties;
 import jakarta.servlet.http.*;
 import java.time.*;
 import lombok.RequiredArgsConstructor;

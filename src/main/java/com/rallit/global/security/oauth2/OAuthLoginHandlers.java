@@ -1,13 +1,11 @@
 package com.rallit.global.security.oauth2;
 
 import com.rallit.domain.auth.model.*;
-import com.rallit.domain.auth.service.TokenSessionService;
-import com.rallit.domain.user.repository.UserRepository;
-import com.rallit.domain.user.service.UserRegistrationService;
+import com.rallit.domain.auth.service.LoginService;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
-import com.rallit.global.security.config.AuthProperties;
-import com.rallit.global.security.cookie.AuthCookieManager;
+import com.rallit.global.config.AuthProperties;
+import com.rallit.global.security.web.AuthCookieManager;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +21,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OAuthLoginHandlers {
   private final AuthProperties properties;
-  private final UserRegistrationService registration;
-  private final UserRepository users;
-  private final TokenSessionService sessions;
+  private final LoginService login;
   private final AuthCookieManager cookies;
 
   public void success(
@@ -42,15 +38,8 @@ public class OAuthLoginHandlers {
       Object raw = principal.getAttribute("id");
       if (raw == null) throw new IllegalArgumentException();
       String id = raw.toString();
-      stage = LoginStage.MEMBER;
-      var user =
-          target == LoginTarget.ADMIN
-              ? users
-                  .findByProviderAndProviderUserId("KAKAO", id)
-                  .orElseThrow(() -> new GeneralException(ErrorStatus._FORBIDDEN))
-              : registration.getOrCreateKakaoUser(id);
-      stage = LoginStage.SESSION;
-      var tokens = sessions.login(user.getId(), target);
+      stage = LoginStage.LOGIN;
+      var tokens = login.loginKakao(id, target);
       stage = LoginStage.RESPONSE;
       cookies.writeRefresh(response, tokens, target);
       response.setHeader("Cache-Control", "no-store");
@@ -116,8 +105,7 @@ public class OAuthLoginHandlers {
 
   private enum LoginStage {
     IDENTITY,
-    MEMBER,
-    SESSION,
+    LOGIN,
     RESPONSE
   }
 }

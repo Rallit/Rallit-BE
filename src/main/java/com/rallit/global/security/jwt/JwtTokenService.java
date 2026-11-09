@@ -4,7 +4,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.rallit.domain.auth.model.*;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
-import com.rallit.global.security.config.AuthProperties;
+import com.rallit.global.config.AuthProperties;
 import java.time.*;
 import java.util.*;
 import javax.crypto.spec.SecretKeySpec;

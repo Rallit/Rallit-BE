@@ -1,4 +1,4 @@
-package com.rallit.global.security.config;
+package com.rallit.global.config;
 
 import jakarta.validation.constraints.*;
 import java.util.*;

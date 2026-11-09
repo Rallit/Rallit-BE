@@ -17,7 +17,7 @@ public class PurposeAuthorizationRequestResolver implements OAuth2AuthorizationR
 
   @Override
   public OAuth2AuthorizationRequest resolve(HttpServletRequest r) {
-    return com.rallit.global.security.route.AuthRequestMatchers.isKakaoLogin(r)
+    return com.rallit.global.security.web.AuthRequestMatchers.isKakaoLogin(r)
         ? customize(delegate.resolve(r), r)
         : null;
   }
