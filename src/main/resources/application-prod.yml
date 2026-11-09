@@ -1,0 +1,7 @@
+rallit:
+  auth:
+    secure-cookies: true
+    service-origins:
+      - https://rallit.co.kr
+    admin-origins:
+      - https://admin.rallit.co.kr
