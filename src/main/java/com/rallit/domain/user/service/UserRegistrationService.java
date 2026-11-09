@@ -1,9 +1,9 @@
 package com.rallit.domain.user.service;
 
+import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.exception.SocialLoginRejectedException;
 import com.rallit.domain.auth.exception.SocialLoginRejectedException.Reason;
 import com.rallit.domain.auth.model.OAuthProvider;
-import com.rallit.domain.auth.model.SocialIdentity;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.repository.UserConstraintViolations;
 import com.rallit.domain.user.repository.UserRepository;

@@ -1,5 +1,6 @@
-package com.rallit.domain.auth.model;
+package com.rallit.domain.auth.dto.internal;
 
+import com.rallit.domain.auth.model.OAuthProvider;
 import java.util.Locale;
 import java.util.Objects;
 

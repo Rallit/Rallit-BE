@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.rallit.domain.auth.dto.internal.SessionTokens;
 import com.rallit.domain.auth.model.*;
 import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.service.UserRegistrationService;

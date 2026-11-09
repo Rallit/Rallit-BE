@@ -262,7 +262,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
     String email = code + "@example.test";
     long subject = Math.abs(UUID.randomUUID().getMostSignificantBits());
     registration.getOrCreateUser(
-        new com.rallit.domain.auth.model.SocialIdentity(
+        new com.rallit.domain.auth.dto.internal.SocialIdentity(
             com.rallit.domain.auth.model.OAuthProvider.GOOGLE, code, email, true));
     profiles.put(
         code,

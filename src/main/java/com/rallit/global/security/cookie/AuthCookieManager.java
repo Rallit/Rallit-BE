@@ -1,5 +1,6 @@
-package com.rallit.global.security.web;
+package com.rallit.global.security.cookie;
 
+import com.rallit.domain.auth.dto.internal.SessionTokens;
 import com.rallit.domain.auth.model.*;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;

@@ -1,22 +1,23 @@
 package com.rallit.global.security.oauth2;
 
+import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.exception.SocialLoginRejectedException;
 import com.rallit.domain.auth.model.*;
 import com.rallit.domain.auth.service.LoginService;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.config.AuthProperties;
-import com.rallit.global.security.web.AuthCookieManager;
+import com.rallit.global.security.cookie.AuthCookieManager;
+import com.rallit.global.security.oauth2.google.GoogleIdentityMapper;
+import com.rallit.global.security.oauth2.kakao.KakaoIdentityMapper;
 import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Component;
 
@@ -113,26 +114,10 @@ public class OAuthLoginHandlers {
     OAuthProvider provider =
         OAuthProvider.fromRegistrationId(authentication.getAuthorizedClientRegistrationId());
     OAuth2User principal = authentication.getPrincipal();
-    if (provider == OAuthProvider.GOOGLE) {
-      if (!(principal instanceof OidcUser oidc))
-        throw new IllegalArgumentException("Missing verified OIDC principal");
-      var token = oidc.getIdToken();
-      return new SocialIdentity(
-          provider,
-          token.getSubject(),
-          token.getEmail(),
-          Boolean.TRUE.equals(token.getEmailVerified()));
-    }
-    Object id = principal.getAttribute("id");
-    if (!(id instanceof Number) || ((Number) id).longValue() <= 0)
-      throw new IllegalArgumentException("Missing Kakao identity");
-    Map<?, ?> account =
-        principal.getAttribute("kakao_account") instanceof Map<?, ?> value ? value : Map.of();
-    String email = account.get("email") instanceof String value ? value : null;
-    boolean verified =
-        Boolean.TRUE.equals(account.get("is_email_valid"))
-            && Boolean.TRUE.equals(account.get("is_email_verified"));
-    return new SocialIdentity(provider, id.toString(), email, verified);
+    return switch (provider) {
+      case KAKAO -> KakaoIdentityMapper.map(principal);
+      case GOOGLE -> GoogleIdentityMapper.map(principal);
+    };
   }
 
   private String causeType(Throwable failure) {

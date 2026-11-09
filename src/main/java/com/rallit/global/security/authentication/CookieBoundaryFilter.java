@@ -1,8 +1,9 @@
-package com.rallit.global.security.web;
+package com.rallit.global.security.authentication;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.config.AuthProperties;
+import com.rallit.global.security.cookie.AuthCookieManager;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.IOException;
@@ -57,7 +58,7 @@ public class CookieBoundaryFilter extends OncePerRequestFilter {
   }
 
   private boolean isCookieOperation(HttpServletRequest request) {
-    return com.rallit.global.security.web.AuthRequestMatchers.isRecovery(request, target);
+    return AuthRequestMatchers.isRecovery(request, target);
   }
 
   private boolean hasAllowedOrigin(HttpServletRequest request) {

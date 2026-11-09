@@ -1,6 +1,7 @@
 package com.rallit.global.security.oauth2;
 
 import com.rallit.domain.auth.model.LoginTarget;
+import com.rallit.global.security.authentication.AuthRequestMatchers;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.*;
@@ -17,9 +18,7 @@ public class PurposeAuthorizationRequestResolver implements OAuth2AuthorizationR
 
   @Override
   public OAuth2AuthorizationRequest resolve(HttpServletRequest r) {
-    return com.rallit.global.security.web.AuthRequestMatchers.isLogin(r)
-        ? customize(delegate.resolve(r), r)
-        : null;
+    return AuthRequestMatchers.isLogin(r) ? customize(delegate.resolve(r), r) : null;
   }
 
   @Override

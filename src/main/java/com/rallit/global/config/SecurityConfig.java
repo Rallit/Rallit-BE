@@ -2,11 +2,13 @@ package com.rallit.global.config;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.global.security.authentication.AuthRequestMatchers;
 import com.rallit.global.security.authentication.BearerAuthenticationFilter;
+import com.rallit.global.security.authentication.CookieBoundaryFilter;
+import com.rallit.global.security.authentication.SecurityErrorWriter;
+import com.rallit.global.security.cookie.AuthCookieManager;
 import com.rallit.global.security.jwt.*;
 import com.rallit.global.security.oauth2.*;
-import com.rallit.global.security.web.AuthCookieManager;
-import com.rallit.global.security.web.SecurityErrorWriter;
 import java.time.Clock;
 import java.util.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -90,7 +92,7 @@ public class SecurityConfig {
       SecurityErrorWriter errors)
       throws Exception {
     http.addFilterAfter(
-        new com.rallit.global.security.web.CookieBoundaryFilter(target, p, cookies, errors),
+        new CookieBoundaryFilter(target, p, cookies, errors),
         org.springframework.web.filter.CorsFilter.class);
     http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .securityContext(s -> s.securityContextRepository(new NullSecurityContextRepository()))
@@ -166,7 +168,7 @@ public class SecurityConfig {
               jakarta.servlet.FilterChain chain)
               throws jakarta.servlet.ServletException, java.io.IOException {
             String t = r.getParameter("target");
-            if (com.rallit.global.security.web.AuthRequestMatchers.isLogin(r)
+            if (AuthRequestMatchers.isLogin(r)
                 && t != null
                 && !t.equals("service")
                 && !t.equals("admin")) {

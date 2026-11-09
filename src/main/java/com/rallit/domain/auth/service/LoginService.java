@@ -1,8 +1,8 @@
 package com.rallit.domain.auth.service;
 
+import com.rallit.domain.auth.dto.internal.SessionTokens;
+import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.LoginTarget;
-import com.rallit.domain.auth.model.SessionTokens;
-import com.rallit.domain.auth.model.SocialIdentity;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;

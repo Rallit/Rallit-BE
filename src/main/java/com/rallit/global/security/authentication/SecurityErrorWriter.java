@@ -1,4 +1,4 @@
-package com.rallit.global.security.web;
+package com.rallit.global.security.authentication;
 
 import com.rallit.global.apiPayload.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;

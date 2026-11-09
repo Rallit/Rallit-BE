@@ -9,6 +9,7 @@ import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.*;
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.*;
+import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.*;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;

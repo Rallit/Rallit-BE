@@ -1,4 +1,4 @@
-package com.rallit.domain.auth.model;
+package com.rallit.domain.auth.dto.internal;
 
 import java.time.Instant;
 

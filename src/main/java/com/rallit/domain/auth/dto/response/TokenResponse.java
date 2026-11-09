@@ -1,6 +1,6 @@
-package com.rallit.domain.auth.dto;
+package com.rallit.domain.auth.dto.response;
 
-import com.rallit.domain.auth.model.SessionTokens;
+import com.rallit.domain.auth.dto.internal.SessionTokens;
 import java.time.Instant;
 
 public record TokenResponse(String accessToken, Instant accessExpiresAt, Instant sessionExpiresAt) {

@@ -2,6 +2,7 @@ package com.rallit.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.exception.SocialLoginRejectedException;
 import com.rallit.domain.auth.model.*;
 import com.rallit.domain.user.repository.UserRepository;

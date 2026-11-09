@@ -1,5 +1,6 @@
 package com.rallit.domain.auth.service;
 
+import com.rallit.domain.auth.dto.internal.SessionTokens;
 import com.rallit.domain.auth.model.*;
 import com.rallit.domain.user.enums.UserRole;
 import com.rallit.domain.user.repository.UserRepository;

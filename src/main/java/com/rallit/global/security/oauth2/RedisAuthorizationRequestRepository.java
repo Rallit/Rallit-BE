@@ -2,7 +2,8 @@ package com.rallit.global.security.oauth2;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
-import com.rallit.global.security.web.AuthCookieManager;
+import com.rallit.global.security.authentication.AuthRequestMatchers;
+import com.rallit.global.security.cookie.AuthCookieManager;
 import jakarta.servlet.http.*;
 import java.time.Duration;
 import java.util.*;
@@ -92,8 +93,8 @@ public class RedisAuthorizationRequestRepository
     if (raw == null) return null;
     Snapshot s = mapper.readValue(raw, Snapshot.class);
     Object registration = s.attributes().get("registration_id");
-    if (!(registration instanceof String id)
-        || !com.rallit.global.security.web.AuthRequestMatchers.isCallback(request, id)) return null;
+    if (!(registration instanceof String id) || !AuthRequestMatchers.isCallback(request, id))
+      return null;
     if (!java.security.MessageDigest.isEqual(
         s.browserHash().getBytes(java.nio.charset.StandardCharsets.US_ASCII),
         TokenSessionService.hash(binding).getBytes(java.nio.charset.StandardCharsets.US_ASCII)))

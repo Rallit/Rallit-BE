@@ -6,8 +6,8 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 public abstract class IntegrationTestSupport {
-  protected static com.rallit.domain.auth.model.SocialIdentity kakao(String subject) {
-    return new com.rallit.domain.auth.model.SocialIdentity(
+  protected static com.rallit.domain.auth.dto.internal.SocialIdentity kakao(String subject) {
+    return new com.rallit.domain.auth.dto.internal.SocialIdentity(
         com.rallit.domain.auth.model.OAuthProvider.KAKAO, subject, subject + "@example.test", true);
   }
 

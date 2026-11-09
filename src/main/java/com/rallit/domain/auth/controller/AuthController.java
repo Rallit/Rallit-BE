@@ -1,13 +1,14 @@
 package com.rallit.domain.auth.controller;
 
-import com.rallit.domain.auth.dto.TokenResponse;
+import com.rallit.domain.auth.dto.response.TokenResponse;
 import com.rallit.domain.auth.model.*;
 import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.service.UserService;
 import com.rallit.global.apiPayload.ApiResponse;
+import com.rallit.global.security.authentication.AuthRequestMatchers;
 import com.rallit.global.security.authentication.RallitPrincipal;
-import com.rallit.global.security.web.AuthCookieManager;
+import com.rallit.global.security.cookie.AuthCookieManager;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -45,8 +46,6 @@ public class AuthController {
   }
 
   private LoginTarget target(HttpServletRequest r) {
-    return com.rallit.global.security.web.AuthRequestMatchers.isAdmin(r)
-        ? LoginTarget.ADMIN
-        : LoginTarget.SERVICE;
+    return AuthRequestMatchers.isAdmin(r) ? LoginTarget.ADMIN : LoginTarget.SERVICE;
   }
 }

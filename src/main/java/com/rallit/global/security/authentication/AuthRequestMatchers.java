@@ -1,4 +1,4 @@
-package com.rallit.global.security.web;
+package com.rallit.global.security.authentication;
 
 import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
 

@@ -1,7 +1,8 @@
-package com.rallit.global.security.web;
+package com.rallit.global.security.cookie;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.rallit.domain.auth.dto.internal.SessionTokens;
 import com.rallit.domain.auth.model.*;
 import com.rallit.global.config.AuthProperties;
 import java.time.*;
