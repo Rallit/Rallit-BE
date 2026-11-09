@@ -58,6 +58,7 @@ ssh-keyscan -t ed25519 <EC2_HOST> | ssh-keygen -lf -  # 로컬: 위 지문과 �
 uname -m                       # aarch64면 DOCKER_PLATFORM을 linux/arm64로 설정
 free -h                        # 2GB 미만이면 아래 스왑 설정
 docker compose version         # 2.20 이상 필요
+flock --version                # 동시 배포 잠금에 필요
 sudo ss -tlnp                  # 80, 443, 8080 사용 여부
 sudo nginx -T                  # 기존 Nginx 설정
 dig +short api.rallit.co.kr    # 탄력적 IP와 일치해야 함
@@ -121,22 +122,26 @@ scp -i <키 파일> compose.yml deploy/deploy.sh <사용자>@<EC2_HOST>:~/rallit
 ./gradlew test bootJar
 docker login
 docker buildx build --platform linux/amd64 -t <도커허브ID>/rallit-backend:temp-manual-1 --push .
-ssh -i <키 파일> <사용자>@<EC2_HOST> "bash ~/rallit/deploy.sh <도커허브ID>/rallit-backend:temp-manual-1"
+ssh -i <키 파일> <사용자>@<EC2_HOST> "cd ~/rallit && flock -w 600 .deploy.lock bash deploy.sh <도커허브ID>/rallit-backend:temp-manual-1"
 ```
 
-정식 배포와 임시 배포는 같은 EC2를 사용하므로 나중에 실행된 쪽이 남습니다. 배포는 `app`만 교체하며 `db` 컨테이너와 데이터는 유지합니다.
+정식 배포와 임시 배포는 같은 EC2를 사용하므로 서버의 `.deploy.lock`으로 순서대로 실행되고, 나중에 실행된 쪽이 남습니다. 배포는 `app`만 교체하며 `db` 컨테이너와 데이터는 유지합니다.
 
 > ⚠️ `docker compose down -v`, `docker volume rm`, `docker system prune --volumes`는 DB 데이터를 삭제합니다.
 
 ## 4. 실패와 롤백
 
-Actions의 실패한 Job 로그를 먼저 확인합니다. `deploy.sh`는 실패 시 앱 로그와 롤백 명령을 출력합니다. `.env`의 `APP_IMAGE`는 배포가 성공했을 때만 갱신됩니다.
+Actions의 실패한 Job 로그를 먼저 확인합니다. 헬스체크가 실패하면 `deploy.sh`가 앱 로그를 출력하고 `deploy-history.log`의 마지막 성공 이미지로 자동 복구합니다. 복구에 성공해도 Job은 실패로 표시됩니다. 첫 배포처럼 이력이 없으면 복구하지 않습니다. `.env`의 `APP_IMAGE`는 배포가 성공했을 때만 갱신됩니다.
+
+자동 복구가 실패했거나 다른 버전으로 되돌려야 하면 직접 실행합니다.
 
 ```bash
 cd ~/rallit
 docker compose logs --tail 200 app
 tail deploy-history.log               # 성공한 배포 이력
-bash deploy.sh <이미지>:<이전 태그>
+flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 ```
 
-이미 변경된 DB 스키마는 롤백되지 않습니다.
+복구는 이미지만 되돌리며 `compose.yml`과 `deploy.sh`는 새 버전을 유지합니다. 이미 변경된 DB 스키마도 롤백되지 않습니다. `temp` 프로필은 `ddl-auto: update`이므로 실패한 이미지가 스키마를 바꿨을 수 있습니다. 복구 후 헬스체크가 통과해도 쓰기 동작을 확인합니다.
+
+배포에 성공하면 최근 성공 이미지 3개만 남기고 같은 저장소의 나머지 태그를 삭제합니다. 정리에 실패하면 경고만 남기고, 볼륨은 건드리지 않습니다. 디스크가 이미 가득 차서 이미지 Pull이 실패하면 정리까지 진행되지 않으므로 직접 공간을 확보합니다.

@@ -68,22 +68,24 @@ jobs:
   deploy:
     needs: publish
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: ${{ inputs.environment }}
     concurrency:
-      group: ec2-deploy
+      group: ec2-deploy-${{ inputs.environment }}
       cancel-in-progress: false
     env:
       IMAGE: ${{ vars.DOCKER_IMAGE }}:${{ inputs.image-tag }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       SSH_TARGET: ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}
+      INCOMING_DIR: .incoming-${{ github.run_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: main 최신 커밋 여부 확인
         id: latest
         if: inputs.require-latest-main
+        shell: bash
         run: |
-          latest="$(git ls-remote origin refs/heads/main | cut -f1)"
+          latest="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
           if [ "$latest" != "$GITHUB_SHA" ]; then
             echo "::notice::$GITHUB_SHA 는 main 최신 커밋($latest)이 아니므로 배포를 건너뜁니다."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -101,11 +103,11 @@ jobs:
       - name: 배포 파일 전송
         if: steps.latest.outputs.skip != 'true'
         run: |
-          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$SSH_TARGET" "mkdir -p '$DEPLOY_PATH'"
-          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes compose.yml deploy/deploy.sh "$SSH_TARGET:$DEPLOY_PATH/"
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$SSH_TARGET" "mkdir -p '$DEPLOY_PATH/$INCOMING_DIR'"
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes compose.yml deploy/deploy.sh "$SSH_TARGET:$DEPLOY_PATH/$INCOMING_DIR/"
       - name: 원격 배포 및 헬스체크
         if: steps.latest.outputs.skip != 'true'
-        run: ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$SSH_TARGET" "bash '$DEPLOY_PATH/deploy.sh' '$IMAGE'"
+        run: ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$SSH_TARGET" "cd '$DEPLOY_PATH' && flock --verbose -w 600 .deploy.lock sh -c 'mv $INCOMING_DIR/compose.yml $INCOMING_DIR/deploy.sh . && rmdir $INCOMING_DIR && bash deploy.sh \"$IMAGE\"'"
       - name: 배포 결과 기록
         if: always() && steps.latest.outputs.skip != 'true'
         env:
