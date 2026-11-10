@@ -1,4 +1,6 @@
-package com.rallit;
+package com.rallit.global.config;
+
+import com.rallit.support.IntegrationTestSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,10 +15,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class RallitBackendApplicationTests {
+class RallitBackendApplicationTests extends IntegrationTestSupport {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
@@ -28,8 +30,8 @@ class RallitBackendApplicationTests {
 	void connectsToPostgresqlContainer() {
 		String version = jdbcTemplate.queryForObject("SELECT version()", String.class);
 		String database = jdbcTemplate.queryForObject("SELECT current_database()", String.class);
-		assertThat(version).startsWith("PostgreSQL 17");
-		assertThat(database).isEqualTo("rallit_test");
+		assertThat(version).startsWith("PostgreSQL 18");
+		assertThat(database).isEqualTo("test");
 	}
 
 	@Test
