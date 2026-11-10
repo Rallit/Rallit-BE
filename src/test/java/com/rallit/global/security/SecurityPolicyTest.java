@@ -15,7 +15,9 @@ class SecurityPolicyTest {
         Base64.getEncoder().encodeToString(new byte[32]),
         Base64.getEncoder().encodeToString("a-different-test-signing-key-32-bytes!!".getBytes()),
         callback,
-        secure ? "https://admin.rallit.co.kr/auth/callback" : "http://localhost:3001/auth/callback",
+        secure
+            ? "https://admin.rallit.co.kr/auth/callback"
+            : "http://admin.example.test/auth/callback",
         "client",
         null,
         "http://localhost:8080/api/v1/auth/kakao/callback",
@@ -45,7 +47,7 @@ class SecurityPolicyTest {
     assertThat(prod.cookieName(LoginTarget.ADMIN, "access"))
         .isEqualTo("__Host-rallit_admin_access");
     assertThat(prod.cookiePath(LoginTarget.ADMIN, true)).isEqualTo("/");
-    var local = properties("http://localhost:3000/auth/callback", false);
+    var local = properties("http://frontend.example.test/auth/callback", false);
     assertThat(local.cookieName(LoginTarget.SERVICE, "access")).isEqualTo("rallit_access");
     assertThat(local.secure()).isFalse();
   }
