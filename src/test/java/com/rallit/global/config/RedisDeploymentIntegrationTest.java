@@ -112,6 +112,10 @@ class RedisDeploymentIntegrationTest extends DeploymentTestSupport {
           .isEqualTo("OK");
       var config = run(Map.of(), "docker", "exec", container, "cat", "/tmp/rallit-redis.conf");
       assertThat(config.output()).doesNotContain(password);
+      assertThat(authenticated(container, "CONFIG", "GET", "appendonly"))
+          .isEqualTo("appendonly\nyes");
+      assertThat(authenticated(container, "CONFIG", "GET", "appendfsync"))
+          .isEqualTo("appendfsync\neverysec");
       assertThat(authenticated(container, "CONFIG", "GET", "maxmemory-policy"))
           .contains("noeviction");
       var recreated =

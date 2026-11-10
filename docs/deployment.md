@@ -100,6 +100,8 @@ chmod 600 .env
 | `FRONTEND_CALLBACK_URL`, `ADMIN_FRONTEND_CALLBACK_URL` | 배포된 일반·운영자 FE의 로그인 완료 주소 |
 | `SERVICE_ORIGINS`, `ADMIN_ORIGINS` | 배포된 FE의 정확한 Origin. 여러 개면 쉼표로 구분 |
 
+`SERVICE_ORIGINS`와 `ADMIN_ORIGINS`는 `temp`와 `prod` 모두에서 반영됩니다. 서비스·운영자 목적에 맞는 Origin만 각각 허용합니다. 로그인 완료 콜백은 별도 검증을 거치며, Secure 설정에서는 일반 FE는 `rallit.co.kr`, 운영자 FE는 `admin.rallit.co.kr`의 HTTPS(기본 포트 또는 443) 주소만 허용합니다. 다른 테스트 도메인을 콜백으로 넣으면 앱이 시작되지 않습니다.
+
 FE 관련 항목은 서버에서 사용하는 배포 설정입니다. 개인 테스트 프론트 파일과 주소는 공유 설정에 포함하지 않습니다. 인증 쿠키는 배포 Compose에서 Secure로 강제하므로 HTTPS와 등록한 OAuth 콜백이 준비돼 있어야 합니다.
 
 `temp`/`prod` 모두 Flyway와 `ddl-auto: validate`를 사용합니다. 엔티티 변경에는 새 마이그레이션이 필요하며 이미 적용한 SQL을 수정하지 않습니다.
