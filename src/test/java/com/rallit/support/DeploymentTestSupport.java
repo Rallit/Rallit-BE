@@ -1,0 +1,44 @@
+package com.rallit.support;
+
+import java.nio.file.*;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.io.TempDir;
+
+public abstract class DeploymentTestSupport {
+  protected static final String LINUX_IMAGE =
+      "postgres@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395";
+  protected final Path repository = Path.of("").toAbsolutePath();
+  @TempDir protected Path temporary;
+
+  protected record Result(int exitCode, String output) {}
+
+  protected Map<String, String> exampleEnvironment() throws Exception {
+    var values = new LinkedHashMap<String, String>();
+    for (String line : Files.readAllLines(repository.resolve(".env.deploy.example"))) {
+      if (!line.isBlank() && !line.startsWith("#")) {
+        var pair = line.split("=", 2);
+        values.put(pair[0], pair.length == 2 ? pair[1] : "");
+      }
+    }
+    return values;
+  }
+
+  protected Result run(Map<String, String> environment, String... command) throws Exception {
+    Path output = temporary.resolve("command-" + UUID.randomUUID() + ".log");
+    var builder =
+        new ProcessBuilder(command)
+            .directory(repository.toFile())
+            .redirectErrorStream(true)
+            .redirectOutput(output.toFile());
+    // Never allow a developer's exported deployment values to enter the test fixture.
+    for (String key : exampleEnvironment().keySet()) builder.environment().remove(key);
+    builder.environment().putAll(environment);
+    var process = builder.start();
+    if (!process.waitFor(100, TimeUnit.SECONDS)) {
+      process.destroyForcibly();
+      throw new AssertionError("Deployment test command timed out");
+    }
+    return new Result(process.exitValue(), Files.readString(output));
+  }
+}

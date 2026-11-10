@@ -55,6 +55,9 @@ if grep -qx db <<< "$services"; then
   docker compose up -d --wait db
 fi
 
+echo "redis 컨테이너가 정상 상태인지 확인합니다."
+docker compose up -d --wait --wait-timeout 180 redis
+
 echo "$image 이미지로 app을 교체합니다."
 if ! docker compose up -d --wait --wait-timeout 180 --no-deps app; then
   echo "배포 실패: app이 정상 상태가 되지 않았습니다. 최근 로그를 출력합니다." >&2
