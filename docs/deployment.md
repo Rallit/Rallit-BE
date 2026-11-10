@@ -104,7 +104,7 @@ chmod 600 .env
 
 FE 관련 항목은 서버에서 사용하는 배포 설정입니다. 개인 테스트 프론트 파일과 주소는 공유 설정에 포함하지 않습니다. 인증 쿠키는 배포 Compose에서 Secure로 강제하므로 HTTPS와 등록한 OAuth 콜백이 준비돼 있어야 합니다.
 
-`temp`/`prod` 모두 Flyway와 `ddl-auto: validate`를 사용합니다. 엔티티 변경에는 새 마이그레이션이 필요하며 이미 적용한 SQL을 수정하지 않습니다.
+`temp`는 `application-temp.yml`을 유지하고, `prod`는 공통 `application.yml`을 사용합니다. 두 환경 모두 Flyway와 `ddl-auto: validate`를 사용합니다. 엔티티 변경에는 새 마이그레이션이 필요하며 이미 적용한 SQL을 수정하지 않습니다.
 
 
 ### 첫 배포

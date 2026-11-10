@@ -1,5 +1,0 @@
-rallit:
-  auth:
-    secure-cookies: true
-    service-origins: ${SERVICE_ORIGINS:https://rallit.co.kr}
-    admin-origins: ${ADMIN_ORIGINS:https://admin.rallit.co.kr}
