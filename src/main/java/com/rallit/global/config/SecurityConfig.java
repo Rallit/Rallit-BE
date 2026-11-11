@@ -59,10 +59,7 @@ public class SecurityConfig {
           .clientSecret(p.kakaoClientSecret())
           .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
     else builder.clientAuthenticationMethod(ClientAuthenticationMethod.NONE);
-    var registrations = new java.util.ArrayList<ClientRegistration>();
-    registrations.add(builder.build());
-    if (google.enabled()) registrations.add(googleRegistration(google));
-    return new InMemoryClientRegistrationRepository(registrations);
+    return new InMemoryClientRegistrationRepository(builder.build(), googleRegistration(google));
   }
 
   private ClientRegistration googleRegistration(GoogleOAuthProperties properties) {

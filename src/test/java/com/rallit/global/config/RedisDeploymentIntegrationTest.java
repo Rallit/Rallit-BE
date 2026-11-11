@@ -33,6 +33,9 @@ class RedisDeploymentIntegrationTest extends DeploymentTestSupport {
     values.put("JWT_ADMIN_KEY", "test-admin-placeholder");
     values.put("KAKAO_REST_API_KEY", "test-kakao-client");
     values.put("KAKAO_REDIRECT_URI", "https://api.example.test/api/v1/auth/kakao/callback");
+    values.put("GOOGLE_CLIENT_ID", "test-google-client");
+    values.put("GOOGLE_CLIENT_SECRET", "test-google-secret");
+    values.put("GOOGLE_REDIRECT_URI", "https://api.example.test/api/v1/auth/google/callback");
 
     values.put("FRONTEND_CALLBACK_URL", "https://frontend.example.test/auth/callback");
     values.put("ADMIN_FRONTEND_CALLBACK_URL", "https://admin.example.test/auth/callback");
@@ -77,6 +80,10 @@ class RedisDeploymentIntegrationTest extends DeploymentTestSupport {
       assertThat(app.path("REDIS_PASSWORD").asText()).isEqualTo(password);
       assertThat(app.path("JWT_SERVICE_KEY").asText()).isEqualTo("test-service-placeholder");
       assertThat(app.path("KAKAO_REST_API_KEY").asText()).isEqualTo("test-kakao-client");
+      assertThat(app.path("GOOGLE_CLIENT_ID").asText()).isEqualTo("test-google-client");
+      assertThat(app.path("GOOGLE_CLIENT_SECRET").asText()).isEqualTo("test-google-secret");
+      assertThat(app.path("GOOGLE_REDIRECT_URI").asText())
+          .isEqualTo("https://api.example.test/api/v1/auth/google/callback");
       assertThat(app.path("FRONTEND_CALLBACK_URL").asText())
           .isEqualTo("https://frontend.example.test/auth/callback");
       assertThat(app.path("SERVICE_ORIGINS").asText()).isEqualTo("https://frontend.example.test");

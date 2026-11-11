@@ -4,7 +4,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("rallit.auth.google")
 public record GoogleOAuthProperties(
-    boolean enabled,
     String clientId,
     String clientSecret,
     String redirectUri,
@@ -13,14 +12,14 @@ public record GoogleOAuthProperties(
     String jwkSetUri,
     String userInfoUri) {
   public GoogleOAuthProperties {
-    if (enabled && (blank(clientId) || blank(clientSecret) || blank(redirectUri)))
+    if (blank(clientId) || blank(clientSecret) || blank(redirectUri))
       throw new IllegalArgumentException(
-          "Google OAuth credentials and redirect URI required when enabled");
+          "Google OAuth client ID, client secret and redirect URI are required");
   }
 
   @Override
   public String toString() {
-    return "GoogleOAuthProperties[enabled=" + enabled + "]";
+    return "GoogleOAuthProperties[redacted]";
   }
 
   private static boolean blank(String value) {

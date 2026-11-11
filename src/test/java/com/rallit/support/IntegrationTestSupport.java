@@ -51,5 +51,10 @@ public abstract class IntegrationTestSupport {
     r.add(
         "rallit.auth.kakao-redirect-uri",
         () -> "https://api.rallit.co.kr/api/v1/auth/kakao/callback");
+    r.add("rallit.auth.google.client-id", () -> "test-google-client");
+    r.add("rallit.auth.google.client-secret", () -> "test-google-secret");
+    r.add(
+        "rallit.auth.google.redirect-uri",
+        () -> "https://api.rallit.co.kr/api/v1/auth/google/callback");
   }
 }

@@ -137,12 +137,6 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
 
   @DynamicPropertySource
   static void google(DynamicPropertyRegistry r) {
-    r.add("rallit.auth.google.enabled", () -> true);
-    r.add("rallit.auth.google.client-id", () -> "test-google-client");
-    r.add("rallit.auth.google.client-secret", () -> "test-google-secret");
-    r.add(
-        "rallit.auth.google.redirect-uri",
-        () -> "https://api.rallit.co.kr/api/v1/auth/google/callback");
     r.add(
         "rallit.auth.google.token-uri",
         () -> "http://127.0.0.1:" + server.getAddress().getPort() + "/token");

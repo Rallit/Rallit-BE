@@ -9,24 +9,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
 class GoogleAuthorizationIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
-
-  @DynamicPropertySource
-  static void google(DynamicPropertyRegistry r) {
-    r.add("rallit.auth.google.enabled", () -> true);
-    r.add("rallit.auth.google.client-id", () -> "test-google-client");
-    r.add("rallit.auth.google.client-secret", () -> "test-google-secret");
-    r.add(
-        "rallit.auth.google.redirect-uri",
-        () -> "https://api.rallit.co.kr/api/v1/auth/google/callback");
-  }
 
   @Test
   void googleStartsBackendOidcFlowWithEmailAndNonce() throws Exception {

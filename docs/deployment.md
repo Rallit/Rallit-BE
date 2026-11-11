@@ -96,7 +96,7 @@ chmod 600 .env
 | `REDIS_MEM_LIMIT`, `REDIS_MAXMEMORY` | 컨테이너 한도와 Redis 데이터 상한 |
 | `JWT_SERVICE_KEY`, `JWT_ADMIN_KEY` | 일반·운영자 인증용 독립된 서명 키 |
 | `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI` | 카카오 앱의 키 및 BE 콜백. Client Secret 활성화 앱은 해당 값 필수 |
-| `GOOGLE_LOGIN_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google 로그인 사용 시 활성화하고 세 자격 항목 모두 입력 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth 클라이언트 ID, 비밀 키 및 BE 콜백 주소를 모두 입력 |
 | `FRONTEND_CALLBACK_URL`, `ADMIN_FRONTEND_CALLBACK_URL` | 배포된 일반·운영자 FE의 로그인 완료 주소 |
 | `SERVICE_ORIGINS`, `ADMIN_ORIGINS` | 배포된 FE의 정확한 Origin. 여러 개면 쉼표로 구분 |
 
