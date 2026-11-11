@@ -14,10 +14,12 @@ import java.util.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.*;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
@@ -175,8 +177,7 @@ public class SecurityConfig {
             chain.doFilter(r, response);
           }
         },
-        org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter
-            .class);
+        OAuth2AuthorizationRequestRedirectFilter.class);
     http.oauth2Login(
         o ->
             o.authorizationEndpoint(
@@ -187,7 +188,16 @@ public class SecurityConfig {
                 .redirectionEndpoint(r -> r.baseUri("/api/v1/auth/*/callback"))
                 .authorizedClientRepository(new NoStoreAuthorizedClientRepository())
                 .successHandler(handlers::success)
-                .failureHandler(handlers::authenticationFailure));
+                .failureHandler(handlers::authenticationFailure)
+                .withObjectPostProcessor(
+                    new ObjectPostProcessor<OAuth2AuthorizationRequestRedirectFilter>() {
+                      @Override
+                      public <T extends OAuth2AuthorizationRequestRedirectFilter> T postProcess(
+                          T filter) {
+                        filter.setAuthenticationFailureHandler(handlers::authorizationRequestFailure);
+                        return filter;
+                      }
+                    }));
     if (environment.acceptsProfiles(org.springframework.core.env.Profiles.of("local"))) {
       http.authorizeHttpRequests(
           a ->

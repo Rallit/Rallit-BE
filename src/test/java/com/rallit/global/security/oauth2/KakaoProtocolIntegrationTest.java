@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -128,6 +130,26 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
             .findFirst()
             .orElseThrow();
     return new Attempt(state, binding);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "service, https://rallit.co.kr/auth/callback",
+    "admin, https://admin.rallit.co.kr/auth/callback"
+  })
+  @SuppressWarnings("unchecked")
+  void stateSaveFailureRedirectsToLoginFailureWithoutWritingCookies(String target, String callback)
+      throws Exception {
+    ValueOperations<String, String> unavailable = mock(ValueOperations.class);
+    doThrow(redisUnavailable())
+        .when(unavailable)
+        .set(anyString(), anyString(), any(java.time.Duration.class));
+    doReturn(unavailable).when(stateRedis).opsForValue();
+
+    mvc.perform(get("/api/v1/auth/kakao").param("target", target))
+        .andExpect(redirectedUrl(callback + "?error=login_failed"))
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(header().doesNotExist("Set-Cookie"));
   }
 
   @Test

@@ -15,9 +15,11 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Component;
 
@@ -108,6 +110,21 @@ public class OAuthLoginHandlers {
       throws IOException {
     log.warn("OAuth exchange rejected: failureType={}", failure.getClass().getSimpleName());
     failure(request, response);
+  }
+
+  public void authorizationRequestFailure(
+      HttpServletRequest request, HttpServletResponse response, AuthenticationException failure)
+      throws IOException {
+    if (failure.getCause() instanceof OAuth2AuthenticationException oauthFailure
+        && RedisAuthorizationRequestRepository.STORE_UNAVAILABLE.equals(
+            oauthFailure.getError().getErrorCode())) {
+      log.error("OAuth state storage unavailable: causeType={}", causeType(oauthFailure));
+      failure(request, response);
+      return;
+    }
+    log.error("OAuth authorization request failed: causeType={}", causeType(failure));
+    response.sendError(
+        HttpStatus.INTERNAL_SERVER_ERROR.value(), HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase());
   }
 
   private SocialIdentity identity(OAuth2AuthenticationToken authentication) {

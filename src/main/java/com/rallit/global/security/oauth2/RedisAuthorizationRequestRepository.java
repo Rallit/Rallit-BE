@@ -23,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 public class RedisAuthorizationRequestRepository
     implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
   public static final String TARGET = "rallit.loginTarget";
+  static final String STORE_UNAVAILABLE = "authorization_request_store_unavailable";
   private final StringRedisTemplate redis;
   private final ObjectMapper mapper;
   private final AuthCookieManager cookies;
@@ -64,9 +65,17 @@ public class RedisAuthorizationRequestRepository
             auth.getAttributes(),
             auth.getAdditionalParameters(),
             auth.getAuthorizationRequestUri());
-    redis
-        .opsForValue()
-        .set(key(auth.getState()), mapper.writeValueAsString(snapshot), Duration.ofMinutes(5));
+    try {
+      redis
+          .opsForValue()
+          .set(key(auth.getState()), mapper.writeValueAsString(snapshot), Duration.ofMinutes(5));
+    } catch (DataAccessException failure) {
+      String target = auth.getAttribute(TARGET);
+      if (target != null) {
+        request.setAttribute(TARGET, LoginTarget.valueOf(target));
+      }
+      throw storeUnavailable(failure);
+    }
     cookies.add(
         response,
         name(auth.getState()),
@@ -86,9 +95,12 @@ public class RedisAuthorizationRequestRepository
     try {
       return load(request, response, true);
     } catch (DataAccessException failure) {
-      throw new OAuth2AuthenticationException(
-          new OAuth2Error("authorization_request_store_unavailable"), failure);
+      throw storeUnavailable(failure);
     }
+  }
+
+  private OAuth2AuthenticationException storeUnavailable(DataAccessException failure) {
+    return new OAuth2AuthenticationException(new OAuth2Error(STORE_UNAVAILABLE), failure);
   }
 
   private OAuth2AuthorizationRequest load(
