@@ -1,6 +1,8 @@
 package com.rallit.global.security.oauth2;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -15,8 +17,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
@@ -97,6 +104,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
 
   @Autowired MockMvc mvc;
   @Autowired tools.jackson.databind.ObjectMapper mapper;
+  @MockitoSpyBean StringRedisTemplate stateRedis;
 
   record Attempt(String state, Cookie binding) {}
 
@@ -120,6 +128,48 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
             .findFirst()
             .orElseThrow();
     return new Attempt(state, binding);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void stateReadFailureRedirectsToDefaultLoginFailureWithoutExchangingCode() throws Exception {
+    var attempt = start("admin");
+    ValueOperations<String, String> unavailable = mock(ValueOperations.class);
+    when(unavailable.get(anyString())).thenThrow(redisUnavailable());
+    doReturn(unavailable).when(stateRedis).opsForValue();
+
+    assertFailedCallback(attempt, "https://rallit.co.kr/auth/callback?error=login_failed");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void stateConsumptionFailureRedirectsToVerifiedAdminFailureWithoutExchangingCode()
+      throws Exception {
+    var attempt = start("admin");
+    doThrow(redisUnavailable())
+        .when(stateRedis)
+        .execute(any(RedisScript.class), anyList(), anyString());
+
+    assertFailedCallback(attempt, "https://admin.rallit.co.kr/auth/callback?error=login_failed");
+  }
+
+  private RedisConnectionFailureException redisUnavailable() {
+    return new RedisConnectionFailureException("Test Redis outage");
+  }
+
+  private void assertFailedCallback(Attempt attempt, String destination) throws Exception {
+    int before = exchanges.get();
+    var response =
+        mvc.perform(
+                get("/api/v1/auth/kakao/callback")
+                    .param("code", "test-code")
+                    .param("state", attempt.state())
+                    .cookie(attempt.binding()))
+            .andExpect(redirectedUrl(destination))
+            .andReturn()
+            .getResponse();
+    assertThat(exchanges.get()).isEqualTo(before);
+    assertThat(response.getHeaders("Set-Cookie")).noneMatch(cookie -> cookie.contains("_refresh="));
   }
 
   @Test

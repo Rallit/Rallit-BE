@@ -11,6 +11,7 @@ import com.rallit.global.security.jwt.JwtTokenService;
 import com.rallit.support.IntegrationTestSupport;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -154,6 +155,56 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
     assertThat(
             jdbc.queryForObject("select count(*) from users where email_key=?", Long.class, email))
         .isEqualTo(1L);
+  }
+
+  @Test
+  void simultaneousFirstLoginsWithSameIdentityReuseTheMember() throws Exception {
+    String subject = id(), email = id() + "@example.test";
+    var identity = identity(OAuthProvider.KAKAO, subject, email, true);
+    var firstLookup = new CountDownLatch(1);
+    var otherLoginCommitted = new CountDownLatch(1);
+    var first = new AtomicBoolean(true);
+    // Hold the first empty lookup until the other request has committed the same identity.
+    org.mockito.Mockito.doAnswer(
+            invocation -> {
+              var matchingUser =
+                  jdbc.query(
+                          "select id from users where provider='KAKAO' and provider_user_id=?",
+                          (row, index) -> row.getLong("id"),
+                          subject)
+                      .stream()
+                      .findFirst()
+                      .flatMap(users::findById);
+              if (first.getAndSet(false)) {
+                assertThat(matchingUser).isEmpty();
+                firstLookup.countDown();
+                assertThat(otherLoginCommitted.await(10, TimeUnit.SECONDS)).isTrue();
+              }
+              return matchingUser;
+            })
+        .when(users)
+        .findByProviderAndProviderUserId("KAKAO", subject);
+
+    try (var pool = Executors.newSingleThreadExecutor()) {
+      var waitingLogin = pool.submit(() -> login.login(identity, LoginTarget.SERVICE));
+      try {
+        assertThat(firstLookup.await(10, TimeUnit.SECONDS)).isTrue();
+        var committed = login.login(identity, LoginTarget.SERVICE);
+        otherLoginCommitted.countDown();
+        var resumed = waitingLogin.get(10, TimeUnit.SECONDS);
+
+        assertThat(jwt.verifyAccess(resumed.accessToken(), LoginTarget.SERVICE).userId())
+            .isEqualTo(jwt.verifyAccess(committed.accessToken(), LoginTarget.SERVICE).userId());
+        assertThat(
+                jdbc.queryForObject(
+                    "select count(*) from users where email_key=?", Long.class, email))
+            .isEqualTo(1L);
+      } finally {
+        otherLoginCommitted.countDown();
+      }
+    } finally {
+      org.mockito.Mockito.reset(users);
+    }
   }
 
   boolean attempt(SocialIdentity identity) {

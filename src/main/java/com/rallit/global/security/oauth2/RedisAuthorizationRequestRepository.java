@@ -8,9 +8,12 @@ import jakarta.servlet.http.*;
 import java.time.Duration;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -80,7 +83,12 @@ public class RedisAuthorizationRequestRepository
   @Override
   public OAuth2AuthorizationRequest removeAuthorizationRequest(
       HttpServletRequest request, HttpServletResponse response) {
-    return load(request, response, true);
+    try {
+      return load(request, response, true);
+    } catch (DataAccessException failure) {
+      throw new OAuth2AuthenticationException(
+          new OAuth2Error("authorization_request_store_unavailable"), failure);
+    }
   }
 
   private OAuth2AuthorizationRequest load(
@@ -100,6 +108,8 @@ public class RedisAuthorizationRequestRepository
         TokenSessionService.hash(binding).getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
       return null;
     if (consume) {
+      // The verified target is also needed for the failure redirect if Redis is unavailable.
+      request.setAttribute(TARGET, LoginTarget.valueOf((String) s.attributes().get(TARGET)));
       Long deleted =
           redis.execute(
               new DefaultRedisScript<>(
@@ -108,8 +118,10 @@ public class RedisAuthorizationRequestRepository
                   Long.class),
               List.of(key(state)),
               raw);
-      if (!Long.valueOf(1).equals(deleted)) return null;
-      request.setAttribute(TARGET, LoginTarget.valueOf((String) s.attributes().get(TARGET)));
+      if (!Long.valueOf(1).equals(deleted)) {
+        request.removeAttribute(TARGET);
+        return null;
+      }
       cookies.add(
           response,
           name(state),

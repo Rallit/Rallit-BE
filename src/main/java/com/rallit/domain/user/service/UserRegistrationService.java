@@ -8,6 +8,7 @@ import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.repository.UserConstraintViolations;
 import com.rallit.domain.user.repository.UserRepository;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -30,13 +31,16 @@ public class UserRegistrationService {
           && (email == null || Objects.equals(email, existing.get().getEmail())))
         return existing.get();
       if (email == null) throw new SocialLoginRejectedException(Reason.EMAIL_REQUIRED, null);
-      rejectEmailOwner(email, existing.map(User::getId).orElse(null));
+      var emailOwner = findMatchingEmailOwner(identity, email);
+      if (emailOwner.isPresent() && email.equals(emailOwner.get().getEmail()))
+        return emailOwner.get();
+      var registeredUser = emailOwner.or(() -> existing);
       try {
         return new TransactionTemplate(manager)
             .execute(
                 status -> {
                   User user =
-                      existing
+                      registeredUser
                           .map(found -> users.findByIdForUpdate(found.getId()).orElseThrow())
                           .orElseGet(
                               () ->
@@ -50,10 +54,10 @@ public class UserRegistrationService {
                 });
       } catch (DataIntegrityViolationException failure) {
         if (UserConstraintViolations.isEmailConflict(failure)) {
-          var concurrent =
-              users.findByProviderAndProviderUserId(identity.provider().name(), identity.subject());
-          rejectEmailOwner(email, concurrent.map(User::getId).orElse(null));
-          if (concurrent.isPresent()) continue;
+          if (findMatchingEmailOwner(identity, email).isPresent()
+              || users
+                  .findByProviderAndProviderUserId(identity.provider().name(), identity.subject())
+                  .isPresent()) continue;
           throw failure;
         }
         if (users
@@ -65,12 +69,13 @@ public class UserRegistrationService {
     throw new IllegalStateException("Unable to register member after concurrent conflicts");
   }
 
-  private void rejectEmailOwner(String email, Long currentUserId) {
-    users
+  private Optional<User> findMatchingEmailOwner(SocialIdentity identity, String email) {
+    return users
         .findByEmailIgnoreCase(email)
-        .filter(owner -> !owner.getId().equals(currentUserId))
-        .ifPresent(
+        .map(
             owner -> {
+              if (identity.provider().name().equals(owner.getProvider())
+                  && identity.subject().equals(owner.getProviderUserId())) return owner;
               throw new SocialLoginRejectedException(
                   Reason.ACCOUNT_EXISTS, OAuthProvider.valueOf(owner.getProvider()));
             });
