@@ -12,7 +12,7 @@ class SchemaIntegrationTest {
   void schemaRejectsDuplicateAccountsAndCaseInsensitiveNicknames() throws Exception {
     try (var pg =
         new PostgreSQLContainer(
-            "postgres@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395")) {
+            "postgres@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac")) {
       pg.start();
       Flyway.configure()
           .dataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword())

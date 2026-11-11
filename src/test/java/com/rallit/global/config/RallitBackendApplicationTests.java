@@ -30,7 +30,7 @@ class RallitBackendApplicationTests extends IntegrationTestSupport {
 	void connectsToPostgresqlContainer() {
 		String version = jdbcTemplate.queryForObject("SELECT version()", String.class);
 		String database = jdbcTemplate.queryForObject("SELECT current_database()", String.class);
-		assertThat(version).startsWith("PostgreSQL 18");
+		assertThat(version).startsWith("PostgreSQL 17");
 		assertThat(database).isEqualTo("test");
 	}
 

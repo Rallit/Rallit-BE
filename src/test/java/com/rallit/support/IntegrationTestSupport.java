@@ -13,7 +13,7 @@ public abstract class IntegrationTestSupport {
 
   static final PostgreSQLContainer PG =
       new PostgreSQLContainer(
-          "postgres@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395");
+          "postgres@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac");
   static final GenericContainer<?> REDIS =
       new GenericContainer<>(
               "redis@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80")
