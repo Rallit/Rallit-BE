@@ -36,22 +36,7 @@ public class UserRegistrationService {
         return emailOwner.get();
       var registeredUser = emailOwner.or(() -> existing);
       try {
-        return new TransactionTemplate(manager)
-            .execute(
-                status -> {
-                  User user =
-                      registeredUser
-                          .map(found -> users.findByIdForUpdate(found.getId()).orElseThrow())
-                          .orElseGet(
-                              () ->
-                                  User.register(
-                                      identity.provider().name(),
-                                      identity.subject(),
-                                      generator.generate(),
-                                      email));
-                  user.updateVerifiedEmail(email);
-                  return users.saveAndFlush(user);
-                });
+        return saveUserWithVerifiedEmail(identity, email, registeredUser);
       } catch (DataIntegrityViolationException failure) {
         if (UserConstraintViolations.isEmailConflict(failure)) {
           if (findMatchingEmailOwner(identity, email).isPresent()
@@ -69,9 +54,29 @@ public class UserRegistrationService {
     throw new IllegalStateException("Unable to register member after concurrent conflicts");
   }
 
+  private User saveUserWithVerifiedEmail(
+      SocialIdentity identity, String email, Optional<User> registeredUser) {
+    return new TransactionTemplate(manager)
+        .execute(
+            status -> {
+              User user =
+                  registeredUser
+                      .map(found -> users.findByIdForUpdate(found.getId()).orElseThrow())
+                      .orElseGet(
+                          () ->
+                              User.register(
+                                  identity.provider().name(),
+                                  identity.subject(),
+                                  generator.generate(),
+                                  email));
+              user.updateVerifiedEmail(email);
+              return users.saveAndFlush(user);
+            });
+  }
+
   private Optional<User> findMatchingEmailOwner(SocialIdentity identity, String email) {
     return users
-        .findByEmailIgnoreCase(email)
+        .findByEmailKey(email)
         .map(
             owner -> {
               if (identity.provider().name().equals(owner.getProvider())

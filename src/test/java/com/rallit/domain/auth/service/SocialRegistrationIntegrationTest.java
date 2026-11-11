@@ -39,6 +39,10 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
       String subject = id(), email = id() + "@example.test";
       var first = identity(firstProvider, subject, email, true);
       var tokens = login.login(first, LoginTarget.SERVICE);
+      jdbc.update(
+          "update users set email = upper(email) where provider = ? and provider_user_id = ?",
+          firstProvider.name(),
+          subject);
       var secondProvider =
           firstProvider == OAuthProvider.KAKAO ? OAuthProvider.GOOGLE : OAuthProvider.KAKAO;
       String other = id();
@@ -62,6 +66,19 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
                   .orElseThrow()
                   .getId());
     }
+  }
+
+  @Test
+  void addressesWithDifferentDatabaseEmailKeysCanRegisterSeparately() {
+    String prefix = id();
+    var first =
+        registration.getOrCreateUser(
+            identity(OAuthProvider.GOOGLE, id(), prefix + "ς@example.test", true));
+    var second =
+        registration.getOrCreateUser(
+            identity(OAuthProvider.KAKAO, id(), prefix + "σ@example.test", true));
+
+    assertThat(second.getId()).isNotEqualTo(first.getId());
   }
 
   @Test
