@@ -66,7 +66,7 @@ sudo nginx -T                  # 기존 Nginx 설정
 dig +short api.rallit.co.kr    # 탄력적 IP와 일치해야 함
 ```
 
-`.env.deploy.example`의 한도 예시는 app 700m + DB 256m + Redis 128m으로 합계 1084MiB이며 OS 메모리는 별도입니다. 실제 EC2 RAM을 확인하고 조정합니다. Redis 데이터 상한 `REDIS_MAXMEMORY`는 컨테이너 한도 `REDIS_MEM_LIMIT`보다 작게 둬 AOF·버퍼·프로세스 여유를 확보합니다. 아래 스왑은 필요한 경우에만 추가하며 RAM 예산을 대체하지 않습니다.
+Compose의 기본 메모리 한도는 app 700m + DB 256m + Redis 128m으로 합계 1084MiB이며 OS 메모리는 별도입니다. 실제 EC2 RAM을 확인하고 조정합니다. Redis 데이터 상한 `REDIS_MAXMEMORY`는 컨테이너 한도 `REDIS_MEM_LIMIT`보다 작게 둬 AOF·버퍼·프로세스 여유를 확보합니다. 아래 스왑은 필요한 경우에만 추가하며 RAM 예산을 대체하지 않습니다.
 
 ```bash
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
@@ -82,13 +82,13 @@ openssl rand -hex 32       # DB_PASSWORD용
 openssl rand -hex 32       # 별도의 REDIS_PASSWORD용
 openssl rand -base64 32    # JWT_SERVICE_KEY용
 openssl rand -base64 32    # 별도의 JWT_ADMIN_KEY용
-nano .env              # .env.deploy.example 내용을 붙여넣고 값 수정
+nano .env                 # .env.example 내용을 붙여넣고 EC2 환경에 맞게 값 설정
 chmod 600 .env
 ```
 
 `DB_URL`의 DB 이름은 `POSTGRES_DB`와 같아야 합니다. 볼륨이 이미 초기화된 뒤에는 `.env`를 바꿔도 DB 이름과 사용자, 비밀번호는 바뀌지 않습니다.
 
-예시 파일의 `replace-with-...`는 교체용 문구입니다. JWT 키는 각각 최소 32바이트의 독립된 Base64 키를 사용하며, 기존 배포 키와 Redis 비밀번호를 재배포마다 새로 생성하지 않습니다.
+`.env.example` 주석에 따라 배포 프로필과 주소를 설정하고 빈 비밀값을 채웁니다. JWT 키는 각각 최소 32바이트의 독립된 Base64 키를 사용하며, 기존 배포 키와 Redis 비밀번호를 재배포마다 새로 생성하지 않습니다.
 
 | 항목 | 서버 `.env`에 설정할 값 |
 | --- | --- |

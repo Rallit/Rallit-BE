@@ -18,18 +18,27 @@ class RedisDeploymentIntegrationTest extends DeploymentTestSupport {
 
   @BeforeEach
   void fixture() throws Exception {
-    var values = exampleEnvironment();
+    var values = new LinkedHashMap<String, String>();
+    values.put("APP_IMAGE", "example/rallit:test");
+    values.put("SPRING_PROFILES_ACTIVE", "temp");
+    values.put("DB_URL", "jdbc:postgresql://db:5432/rallit");
+    values.put("DB_USERNAME", "test");
+    values.put("DB_PASSWORD", "test-only-db-password");
+
     values.put("REDIS_PASSWORD", password);
     values.put("REDIS_MEM_LIMIT", "128m");
     values.put("REDIS_MAXMEMORY", "32mb");
+
     values.put("JWT_SERVICE_KEY", "test-service-placeholder");
     values.put("JWT_ADMIN_KEY", "test-admin-placeholder");
     values.put("KAKAO_REST_API_KEY", "test-kakao-client");
     values.put("KAKAO_REDIRECT_URI", "https://api.example.test/api/v1/auth/kakao/callback");
+
     values.put("FRONTEND_CALLBACK_URL", "https://frontend.example.test/auth/callback");
     values.put("ADMIN_FRONTEND_CALLBACK_URL", "https://admin.example.test/auth/callback");
     values.put("SERVICE_ORIGINS", "https://frontend.example.test");
     values.put("ADMIN_ORIGINS", "https://admin.example.test");
+
     environmentFile = temporary.resolve("compose.env");
     Files.write(
         environmentFile,

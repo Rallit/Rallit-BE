@@ -13,17 +13,6 @@ public abstract class DeploymentTestSupport {
 
   protected record Result(int exitCode, String output) {}
 
-  protected Map<String, String> exampleEnvironment() throws Exception {
-    var values = new LinkedHashMap<String, String>();
-    for (String line : Files.readAllLines(repository.resolve(".env.deploy.example"))) {
-      if (!line.isBlank() && !line.startsWith("#")) {
-        var pair = line.split("=", 2);
-        values.put(pair[0], pair.length == 2 ? pair[1] : "");
-      }
-    }
-    return values;
-  }
-
   protected Result run(Map<String, String> environment, String... command) throws Exception {
     Path output = temporary.resolve("command-" + UUID.randomUUID() + ".log");
     var builder =
@@ -32,7 +21,11 @@ public abstract class DeploymentTestSupport {
             .redirectErrorStream(true)
             .redirectOutput(output.toFile());
     // Never allow a developer's exported deployment values to enter the test fixture.
-    for (String key : exampleEnvironment().keySet()) builder.environment().remove(key);
+    for (String line : Files.readAllLines(repository.resolve(".env.example"))) {
+      if (!line.isBlank() && !line.startsWith("#")) {
+        builder.environment().remove(line.split("=", 2)[0]);
+      }
+    }
     builder.environment().putAll(environment);
     var process = builder.start();
     if (!process.waitFor(100, TimeUnit.SECONDS)) {
