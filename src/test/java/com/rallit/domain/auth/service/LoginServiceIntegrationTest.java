@@ -3,7 +3,8 @@ package com.rallit.domain.auth.service;
 import static org.assertj.core.api.Assertions.*;
 
 import com.rallit.domain.auth.model.LoginTarget;
-import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.domain.user.enums.SocialProvider;
+import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.jwt.JwtTokenService;
@@ -17,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 class LoginServiceIntegrationTest extends IntegrationTestSupport {
   @Autowired LoginService login;
-  @Autowired UserRepository users;
+  @Autowired SocialAccountRepository accounts;
   @Autowired JwtTokenService jwt;
   @Autowired JdbcTemplate jdbc;
 
@@ -26,7 +27,8 @@ class LoginServiceIntegrationTest extends IntegrationTestSupport {
     String kakaoId = UUID.randomUUID().toString();
     var first = login.login(kakao(kakaoId), LoginTarget.SERVICE);
     var second = login.login(kakao(kakaoId), LoginTarget.SERVICE);
-    var user = users.findByProviderAndProviderUserId("KAKAO", kakaoId).orElseThrow();
+    var user =
+        accounts.findUserByProviderAndProviderUserId(SocialProvider.KAKAO, kakaoId).orElseThrow();
     assertThat(user.isOnboardingCompleted()).isFalse();
     assertThat(jwt.verifyAccess(first.accessToken(), LoginTarget.SERVICE).userId())
         .isEqualTo(user.getId());
@@ -41,7 +43,7 @@ class LoginServiceIntegrationTest extends IntegrationTestSupport {
     assertThatThrownBy(() -> login.login(kakao(kakaoId), LoginTarget.ADMIN))
         .isInstanceOfSatisfying(
             GeneralException.class, e -> assertThat(e.getCode()).isEqualTo(ErrorStatus._FORBIDDEN));
-    assertThat(users.findByProviderAndProviderUserId("KAKAO", kakaoId)).isEmpty();
+    assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.KAKAO, kakaoId)).isEmpty();
     login.login(kakao(kakaoId), LoginTarget.SERVICE);
     assertThatThrownBy(() -> login.login(kakao(kakaoId), LoginTarget.ADMIN))
         .isInstanceOfSatisfying(
@@ -52,7 +54,11 @@ class LoginServiceIntegrationTest extends IntegrationTestSupport {
   void knownAdminCanLogInWithoutTennisProfile() {
     String kakaoId = UUID.randomUUID().toString();
     login.login(kakao(kakaoId), LoginTarget.SERVICE);
-    long id = users.findByProviderAndProviderUserId("KAKAO", kakaoId).orElseThrow().getId();
+    long id =
+        accounts
+            .findUserByProviderAndProviderUserId(SocialProvider.KAKAO, kakaoId)
+            .orElseThrow()
+            .getId();
     jdbc.update("update users set role='ADMIN' where id=?", id);
     var tokens = login.login(kakao(kakaoId), LoginTarget.ADMIN);
     assertThat(jwt.verifyAccess(tokens.accessToken(), LoginTarget.ADMIN).userId()).isEqualTo(id);

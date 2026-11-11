@@ -18,6 +18,7 @@ import com.rallit.domain.user.enums.UserRole;
 import com.rallit.domain.user.enums.UserStatus;
 import com.rallit.support.EntityFixtures;
 import jakarta.persistence.EntityManager;
+import com.rallit.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,10 +27,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @ActiveProfiles("test")
 @Transactional
-class UserRepositoryTest {
+class UserRepositoryTest extends IntegrationTestSupport {
 
 	@Autowired
 	private UserRepository userRepository;
@@ -135,7 +136,9 @@ class UserRepositoryTest {
 		socialAccountRepository.saveAndFlush(socialAccount(user, SocialProvider.KAKAO, "1234567890"));
 		socialAccountRepository.saveAndFlush(socialAccount(user, SocialProvider.GOOGLE, "1234567890"));
 
-		assertThat(socialAccountRepository.count()).isEqualTo(2);
+		assertThat(jdbcTemplate.queryForObject(
+				"select count(*) from social_account where user_id = ?", Long.class, user.getId()))
+				.isEqualTo(2L);
 	}
 
 	@Test

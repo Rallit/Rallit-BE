@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.*;
 import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.exception.SocialLoginRejectedException;
 import com.rallit.domain.auth.model.*;
+import com.rallit.domain.user.entity.SocialAccount;
+import com.rallit.domain.user.entity.User;
+import com.rallit.domain.user.enums.SocialProvider;
+import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.global.security.jwt.JwtTokenService;
@@ -13,6 +17,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,7 +27,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
   @Autowired LoginService login;
   @Autowired UserRegistrationService registration;
-  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean UserRepository users;
+  @Autowired UserRepository users;
+  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean SocialAccountRepository accounts;
   @Autowired JwtTokenService jwt;
   @Autowired JdbcTemplate jdbc;
 
@@ -40,9 +47,8 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
       var first = identity(firstProvider, subject, email, true);
       var tokens = login.login(first, LoginTarget.SERVICE);
       jdbc.update(
-          "update users set email = upper(email) where provider = ? and provider_user_id = ?",
-          firstProvider.name(),
-          subject);
+          "update users set email = upper(email) where id = ?",
+          jwt.verifyAccess(tokens.accessToken(), LoginTarget.SERVICE).userId());
       var secondProvider =
           firstProvider == OAuthProvider.KAKAO ? OAuthProvider.GOOGLE : OAuthProvider.KAKAO;
       String other = id();
@@ -58,11 +64,15 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
                     .isEqualTo(SocialLoginRejectedException.Reason.ACCOUNT_EXISTS);
                 assertThat(e.existingProvider()).isEqualTo(firstProvider);
               });
-      assertThat(users.findByProviderAndProviderUserId(secondProvider.name(), other)).isEmpty();
+      assertThat(
+              accounts.findUserByProviderAndProviderUserId(
+                  SocialProvider.valueOf(secondProvider.name()), other))
+          .isEmpty();
       assertThat(jwt.verifyAccess(tokens.accessToken(), LoginTarget.SERVICE).userId())
           .isEqualTo(
-              users
-                  .findByProviderAndProviderUserId(firstProvider.name(), subject)
+              accounts
+                  .findUserByProviderAndProviderUserId(
+                      SocialProvider.valueOf(firstProvider.name()), subject)
                   .orElseThrow()
                   .getId());
     }
@@ -94,7 +104,8 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
                   assertThat(e.reason())
                       .isEqualTo(SocialLoginRejectedException.Reason.EMAIL_REQUIRED));
       assertThat(
-              users.findByProviderAndProviderUserId(identity.provider().name(), identity.subject()))
+              accounts.findUserByProviderAndProviderUserId(
+                  SocialProvider.valueOf(identity.provider().name()), identity.subject()))
           .isEmpty();
     }
   }
@@ -102,12 +113,8 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
   @Test
   void sameIdentityRetainsItsMemberAndLegacyEmailIsBackfilled() {
     String subject = id();
-    jdbc.update(
-        "insert into users(provider,provider_user_id,nickname,role,status,created_at,updated_at)"
-            + " values('KAKAO',?,?,'USER','PENDING',now(),now())",
-        subject,
-        "L" + id().replace("-", "").substring(0, 8));
-    var existing = users.findByProviderAndProviderUserId("KAKAO", subject).orElseThrow();
+    var existing = users.saveAndFlush(User.signUp(null));
+    accounts.saveAndFlush(SocialAccount.of(existing, SocialProvider.KAKAO, subject));
     var old = identity(OAuthProvider.KAKAO, subject, null, false);
     assertThat(
             jwt.verifyAccess(
@@ -130,11 +137,11 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
     org.mockito.Mockito.doAnswer(
             invocation -> {
               jdbc.update(
-                  "update users set role='USER', status='ACTIVE' where id=?", member.getId());
+                  "update users set role='USER', status='ACTIVE', gender='FEMALE' where id=?", member.getId());
               return java.util.Optional.of(stale);
             })
-        .when(users)
-        .findByProviderAndProviderUserId("KAKAO", subject);
+        .when(accounts)
+        .findUserByProviderAndProviderUserId(SocialProvider.KAKAO, subject);
     try {
       registration.getOrCreateUser(
           identity(OAuthProvider.KAKAO, subject, subject + "@example.test", true));
@@ -143,7 +150,7 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
       assertThat(saved.getStatus()).isEqualTo(com.rallit.domain.user.enums.UserStatus.ACTIVE);
       assertThat(saved.getEmail()).isEqualTo(subject + "@example.test");
     } finally {
-      org.mockito.Mockito.reset(users);
+      org.mockito.Mockito.reset(accounts);
     }
   }
 
@@ -174,10 +181,13 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
         .isEqualTo(1L);
   }
 
-  @Test
-  void simultaneousFirstLoginsWithSameIdentityReuseTheMember() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void simultaneousFirstLoginsWithSameIdentityReuseTheMember(boolean sameEmail) throws Exception {
     String subject = id(), email = id() + "@example.test";
+    String otherEmail = sameEmail ? email : id() + "@example.test";
     var identity = identity(OAuthProvider.KAKAO, subject, email, true);
+    var otherIdentity = identity(OAuthProvider.KAKAO, subject, otherEmail, true);
     var firstLookup = new CountDownLatch(1);
     var otherLoginCommitted = new CountDownLatch(1);
     var first = new AtomicBoolean(true);
@@ -186,8 +196,8 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
             invocation -> {
               var matchingUser =
                   jdbc.query(
-                          "select id from users where provider='KAKAO' and provider_user_id=?",
-                          (row, index) -> row.getLong("id"),
+                          "select user_id from social_account where provider='KAKAO' and provider_user_id=?",
+                          (row, index) -> row.getLong("user_id"),
                           subject)
                       .stream()
                       .findFirst()
@@ -199,14 +209,14 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
               }
               return matchingUser;
             })
-        .when(users)
-        .findByProviderAndProviderUserId("KAKAO", subject);
+        .when(accounts)
+        .findUserByProviderAndProviderUserId(SocialProvider.KAKAO, subject);
 
     try (var pool = Executors.newSingleThreadExecutor()) {
       var waitingLogin = pool.submit(() -> login.login(identity, LoginTarget.SERVICE));
       try {
         assertThat(firstLookup.await(10, TimeUnit.SECONDS)).isTrue();
-        var committed = login.login(identity, LoginTarget.SERVICE);
+        var committed = login.login(otherIdentity, LoginTarget.SERVICE);
         otherLoginCommitted.countDown();
         var resumed = waitingLogin.get(10, TimeUnit.SECONDS);
 
@@ -214,13 +224,22 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
             .isEqualTo(jwt.verifyAccess(committed.accessToken(), LoginTarget.SERVICE).userId());
         assertThat(
                 jdbc.queryForObject(
-                    "select count(*) from users where email_key=?", Long.class, email))
+                    "select count(*) from users where email_key in (?, ?)",
+                    Long.class,
+                    email,
+                    otherEmail))
+            .isEqualTo(1L);
+        assertThat(
+                jdbc.queryForObject(
+                    "select count(*) from social_account where provider='KAKAO' and provider_user_id=?",
+                    Long.class,
+                    subject))
             .isEqualTo(1L);
       } finally {
         otherLoginCommitted.countDown();
       }
     } finally {
-      org.mockito.Mockito.reset(users);
+      org.mockito.Mockito.reset(accounts);
     }
   }
 

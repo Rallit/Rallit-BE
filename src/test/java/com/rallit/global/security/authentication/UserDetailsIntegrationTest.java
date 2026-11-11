@@ -43,7 +43,7 @@ class UserDetailsIntegrationTest extends IntegrationTestSupport {
         .extracting(GrantedAuthority::getAuthority)
         .containsExactly("ROLE_USER");
     assertThat(((UserDetails) pending).onboardingCompleted()).isFalse();
-    jdbc.update("update users set role='ADMIN',status='ACTIVE' where id=?", id);
+    jdbc.update("update users set role='ADMIN',status='ACTIVE',gender='FEMALE' where id=?", id);
     var current = details.loadUserByUsername(Long.toString(id));
     assertThat(current.getAuthorities())
         .extracting(GrantedAuthority::getAuthority)
@@ -59,6 +59,7 @@ class UserDetailsIntegrationTest extends IntegrationTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.id").value(id))
         .andExpect(jsonPath("$.result.onboardingCompleted").value(false));
+    jdbc.update("delete from social_account where user_id=?", id);
     jdbc.update("delete from users where id=?", id);
     assertThatThrownBy(() -> details.loadUserByUsername(Long.toString(id)))
         .isInstanceOf(UsernameNotFoundException.class);

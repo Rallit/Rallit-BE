@@ -4,7 +4,6 @@ import com.rallit.domain.auth.dto.internal.SessionTokens;
 import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.user.entity.User;
-import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class LoginService {
   private final UserRegistrationService registration;
-  private final UserRepository users;
   private final TokenSessionService sessions;
 
   public SessionTokens login(SocialIdentity identity, LoginTarget target) {
@@ -23,8 +21,8 @@ public class LoginService {
         switch (target) {
           case SERVICE -> registration.getOrCreateUser(identity);
           case ADMIN ->
-              users
-                  .findByProviderAndProviderUserId(identity.provider().name(), identity.subject())
+              registration
+                  .findUserBySocialIdentity(identity)
                   .orElseThrow(() -> new GeneralException(ErrorStatus._FORBIDDEN));
         };
     return sessions.login(user.getId(), target);

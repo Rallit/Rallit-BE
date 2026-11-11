@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.rallit.domain.user.enums.SocialProvider;
+import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.support.IntegrationTestSupport;
 import com.sun.net.httpserver.HttpServer;
 import jakarta.servlet.http.Cookie;
@@ -321,7 +323,10 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
               .andExpect(redirectedUrl("https://rallit.co.kr/auth/callback?error=email_required"))
               .andReturn()
               .getResponse();
-      assertThat(users.findByProviderAndProviderUserId("KAKAO", Long.toString(subject))).isEmpty();
+      assertThat(
+              accounts.findUserByProviderAndProviderUserId(
+                  SocialProvider.KAKAO, Long.toString(subject)))
+          .isEmpty();
       assertThat(response.getHeaders("Set-Cookie"))
           .noneMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
       profiles.remove(code);
@@ -353,13 +358,16 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
           .andExpect(
               redirectedUrl(
                   "https://rallit.co.kr/auth/callback?error=account_exists&existingProvider=google"));
-      assertThat(users.findByProviderAndProviderUserId("KAKAO", Long.toString(subject))).isEmpty();
+      assertThat(
+              accounts.findUserByProviderAndProviderUserId(
+                  SocialProvider.KAKAO, Long.toString(subject)))
+          .isEmpty();
     } finally {
       profiles.remove(code);
     }
   }
 
-  @Autowired com.rallit.domain.user.repository.UserRepository users;
+  @Autowired SocialAccountRepository accounts;
 
   @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
   @Autowired com.rallit.domain.user.service.UserRegistrationService registration;

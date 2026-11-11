@@ -15,6 +15,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   @Query(value = "select u.* from users u where u.email_key = lower(:email)", nativeQuery = true)
   Optional<User> findByEmailKey(@Param("email") String email);
-
-  Optional<User> findByProviderAndProviderUserId(String provider, String providerUserId);
 }

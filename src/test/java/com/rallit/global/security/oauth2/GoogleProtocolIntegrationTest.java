@@ -11,7 +11,8 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.*;
 import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.*;
-import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.domain.user.enums.SocialProvider;
+import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.support.IntegrationTestSupport;
 import com.sun.net.httpserver.*;
@@ -149,7 +150,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   }
 
   @Autowired MockMvc mvc;
-  @Autowired UserRepository users;
+  @Autowired SocialAccountRepository accounts;
   @Autowired UserRegistrationService registration;
 
   Attempt start(String target) throws Exception {
@@ -194,11 +195,16 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
     assertThat(first.getHeader("Location")).isEqualTo(CALLBACK);
     assertThat(first.getHeaders("Set-Cookie"))
         .anyMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
-    var member = users.findByProviderAndProviderUserId("GOOGLE", subject).orElseThrow();
+    var member =
+        accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject).orElseThrow();
     assertThat(member.getEmail()).isEqualTo(email);
     assertThat(callback(start("service"), subject, email, true, "").getHeader("Location"))
         .isEqualTo(CALLBACK);
-    assertThat(users.findByProviderAndProviderUserId("GOOGLE", subject).orElseThrow().getId())
+    assertThat(
+            accounts
+                .findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)
+                .orElseThrow()
+                .getId())
         .isEqualTo(member.getId());
   }
 
@@ -212,7 +218,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
           .isEqualTo(CALLBACK + "?error=login_failed");
       assertThat(result.getHeaders("Set-Cookie"))
           .noneMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
-      assertThat(users.findByProviderAndProviderUserId("GOOGLE", subject)).isEmpty();
+      assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
     }
   }
 
@@ -223,7 +229,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
     var response = callback(start("service"), subject, email, true, "");
     assertThat(response.getHeader("Location"))
         .isEqualTo(CALLBACK + "?error=account_exists&existingProvider=kakao");
-    assertThat(users.findByProviderAndProviderUserId("GOOGLE", subject)).isEmpty();
+    assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
     assertThat(response.getHeaders("Set-Cookie"))
         .noneMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
   }
@@ -236,7 +242,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
           callback(
               start("service"), subject, missing ? null : subject + "@example.test", false, "");
       assertThat(result.getHeader("Location")).isEqualTo(CALLBACK + "?error=email_required");
-      assertThat(users.findByProviderAndProviderUserId("GOOGLE", subject)).isEmpty();
+      assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
     }
   }
 
@@ -249,7 +255,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
     var result = callback(start("admin"), subject, email, true, "");
     assertThat(result.getHeader("Location"))
         .isEqualTo("https://admin.rallit.co.kr/auth/callback?error=login_failed");
-    assertThat(users.findByProviderAndProviderUserId("GOOGLE", subject)).isEmpty();
+    assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
   }
 
   @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;

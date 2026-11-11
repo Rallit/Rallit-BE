@@ -11,6 +11,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.support.EntityFixtures;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
+import com.rallit.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,10 +19,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @ActiveProfiles("test")
 @Transactional
-class NotificationRepositoryTest {
+class NotificationRepositoryTest extends IntegrationTestSupport {
 
 	@Autowired
 	private UserRepository userRepository;

@@ -22,9 +22,8 @@ class NicknameCollisionIntegrationTest extends IntegrationTestSupport {
     String duplicate = "N" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     String unique = "U" + duplicate;
     jdbc.update(
-        "insert into users(provider,provider_user_id,nickname,role,status,created_at,updated_at)"
-            + " values('KAKAO',?,?,'USER','PENDING',now(),now())",
-        UUID.randomUUID().toString(),
+        "insert into users(nickname,role,status,same_gender_only,created_at,updated_at)"
+            + " values(?,'USER','ONBOARDING',false,now(),now())",
         duplicate);
     when(generator.generate()).thenReturn(duplicate, unique);
     assertThat(registration.getOrCreateUser(kakao(UUID.randomUUID().toString())).getNickname())
