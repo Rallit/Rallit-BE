@@ -67,6 +67,23 @@ class AuthFlowIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
+  void adminSessionExpiresAfterEightHoursEvenWhenRefreshed() {
+    long id = user();
+    jdbc.update("update users set role='ADMIN' where id=?", id);
+    Instant before = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+    var admin = sessions.login(id, LoginTarget.ADMIN);
+    var service = sessions.login(id, LoginTarget.SERVICE);
+    Instant after = Instant.now();
+
+    assertThat(admin.sessionExpiresAt())
+        .isBetween(before.plus(Duration.ofHours(8)), after.plus(Duration.ofHours(8)));
+    assertThat(service.sessionExpiresAt())
+        .isBetween(before.plus(Duration.ofDays(14)), after.plus(Duration.ofDays(14)));
+    assertThat(sessions.refresh(admin.refreshToken(), LoginTarget.ADMIN).sessionExpiresAt())
+        .isEqualTo(admin.sessionExpiresAt());
+  }
+
+  @Test
   void rotationPreservesDeadlineAndOldTokenCannotRevokeNewSession() {
     var original = sessions.login(user(), LoginTarget.SERVICE);
     var rotated = sessions.refresh(original.refreshToken(), LoginTarget.SERVICE);

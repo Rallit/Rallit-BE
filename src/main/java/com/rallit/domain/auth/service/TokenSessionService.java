@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class TokenSessionService {
+  private static final Duration SERVICE_SESSION_LIFETIME = Duration.ofDays(14);
+  private static final Duration ADMIN_SESSION_LIFETIME = Duration.ofHours(8);
   private static final Duration REFRESH_REUSE_GRACE = Duration.ofSeconds(5);
 
   private final JwtTokenService jwt;
@@ -43,7 +45,8 @@ public class TokenSessionService {
   public SessionTokens login(Long id, LoginTarget target) {
     allowed(id, target);
     UUID sid = UUID.randomUUID();
-    var pair = jwt.issue(id, sid, target, clock.instant().plusSeconds(14 * 86400L));
+    Duration lifetime = target == LoginTarget.ADMIN ? ADMIN_SESSION_LIFETIME : SERVICE_SESSION_LIFETIME;
+    var pair = jwt.issue(id, sid, target, clock.instant().plus(lifetime));
     String value = id + ":" + hash(pair.refreshToken());
     try {
       redis
