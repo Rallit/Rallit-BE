@@ -13,6 +13,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.Locale;
 import java.util.UUID;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -113,19 +114,7 @@ public class ProfileImageService {
       try {
         reader.setInput(image, true, true);
         String extension = validatedExtension(reader.getFormatName(), filename);
-        reader.addIIOReadWarningListener((source, warning) -> {
-          throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
-        });
-        int width = reader.getWidth(0);
-        int height = reader.getHeight(0);
-        if (width <= 0 || height <= 0 || width > MAX_DIMENSION || height > MAX_DIMENSION
-            || (long) width * height > MAX_PIXELS) {
-          throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
-        }
-        var parameters = reader.getDefaultReadParam();
-        int step = Math.ceilDiv(Math.max(width, height), VALIDATION_SAMPLE_SIZE);
-        parameters.setSourceSubsampling(step, step, 0, 0);
-        reader.read(0, parameters);
+        validateDecodableImage(reader);
         return extension;
       } finally {
         reader.dispose();
@@ -133,6 +122,22 @@ public class ProfileImageService {
     } catch (IOException | IllegalArgumentException failure) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
     }
+  }
+
+  private void validateDecodableImage(ImageReader reader) throws IOException {
+    reader.addIIOReadWarningListener((source, warning) -> {
+      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+    });
+    int width = reader.getWidth(0);
+    int height = reader.getHeight(0);
+    if (width <= 0 || height <= 0 || width > MAX_DIMENSION || height > MAX_DIMENSION
+        || (long) width * height > MAX_PIXELS) {
+      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+    }
+    var parameters = reader.getDefaultReadParam();
+    int step = Math.ceilDiv(Math.max(width, height), VALIDATION_SAMPLE_SIZE);
+    parameters.setSourceSubsampling(step, step, 0, 0);
+    reader.read(0, parameters);
   }
 
   private String validatedExtension(String format, String filename) {
