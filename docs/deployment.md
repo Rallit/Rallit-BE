@@ -135,7 +135,7 @@ sudo certbot --nginx -d api.rallit.co.kr --redirect
 sudo certbot renew --dry-run
 ```
 
-외부 헬스체크는 `200`이어야 합니다. Swagger는 `local` 프로필에서만 허용하므로 배포된 `temp`/`prod`의 문서 경로는 공개하지 않습니다. 프론트엔드에는 별도로 관리하는 API 명세를 공유합니다.
+외부 헬스체크는 `200`이어야 합니다. `local`과 `temp`에서는 로그인 없이 `/swagger-ui/index.html`과 `/v3/api-docs`에 접근할 수 있습니다. `prod`가 활성화된 환경에서는 Swagger 접근을 차단합니다.
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" https://api.rallit.co.kr/actuator/health
