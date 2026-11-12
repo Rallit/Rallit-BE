@@ -7,6 +7,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.jwt.JwtTokenService;
+import com.rallit.global.security.jwt.JwtTokenService.VerifiedRefresh;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.time.*;
@@ -57,36 +58,51 @@ public class TokenSessionService {
     String script =
         "if redis.call('get',KEYS[1])==ARGV[1] then redis.call('set',KEYS[1],ARGV[2],'KEEPTTL');"
             + " return 1 else return 0 end";
-    compare(
-        script,
-        verified.sid(),
-        target,
-        verified.userId() + ":" + hash(token),
-        verified.userId() + ":" + hash(pair.refreshToken()));
+    long rotated =
+        execute(
+            script,
+            verified.sid(),
+            target,
+            verified.userId() + ":" + hash(token),
+            verified.userId() + ":" + hash(pair.refreshToken()));
+    if (rotated != 1) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
     return pair;
   }
 
   public void logout(String token, LoginTarget target) {
-    var v = jwt.verifyRefresh(token, target);
-    compare(
-        "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0"
-            + " end",
-        v.sid(),
-        target,
-        v.userId() + ":" + hash(token),
-        "");
+    if (token == null) return;
+
+    VerifiedRefresh verified;
+    try {
+      verified = jwt.verifyRefresh(token, target);
+    } catch (GeneralException invalidToken) {
+      if (invalidToken.getCode() != ErrorStatus._UNAUTHORIZED) throw invalidToken;
+      return;
+    }
+
+    long result =
+        execute(
+            """
+            local current = redis.call('get', KEYS[1])
+            if not current then return 0 end
+            if current ~= ARGV[1] then return -1 end
+            return redis.call('del', KEYS[1])
+            """,
+            verified.sid(),
+            target,
+            verified.userId() + ":" + hash(token));
+    if (result == -1) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
   }
 
-  private void compare(
-      String script, UUID sid, LoginTarget target, String old, String replacement) {
+  private long execute(String script, UUID sid, LoginTarget target, Object... arguments) {
     try {
       Long result =
           redis.execute(
               new DefaultRedisScript<>(script, Long.class),
               List.of(key(sid, target)),
-              old,
-              replacement);
-      if (!Long.valueOf(1).equals(result)) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
+              arguments);
+      if (result == null) throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
+      return result;
     } catch (DataAccessException e) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, e);
     }

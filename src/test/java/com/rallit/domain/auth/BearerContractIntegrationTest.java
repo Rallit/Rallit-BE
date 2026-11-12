@@ -12,10 +12,13 @@ import com.rallit.support.IntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
@@ -117,6 +120,56 @@ class BearerContractIntegrationTest extends IntegrationTestSupport {
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType("application/json"))
         .andExpect(status().isNoContent());
+  }
+
+  @ParameterizedTest
+  @EnumSource(LoginTarget.class)
+  void logoutClearsCookieAndIsIdempotent(LoginTarget target) throws Exception {
+    long id = users.getOrCreateUser(kakao(UUID.randomUUID().toString())).getId();
+    if (target == LoginTarget.ADMIN) {
+      jdbc.update("update users set role='ADMIN' where id=?", id);
+    }
+    var session = sessions.login(id, target);
+    String cookieName = "__Host-" + target.prefix() + "_refresh";
+    var cookie = new Cookie(cookieName, session.refreshToken());
+
+    for (var request :
+        List.of(logoutRequest(target).cookie(cookie), logoutRequest(target).cookie(cookie),
+            logoutRequest(target))) {
+      var response =
+          mvc.perform(request)
+              .andExpect(status().isNoContent())
+              .andReturn()
+              .getResponse();
+      assertThat(response.getHeaders("Set-Cookie"))
+          .anySatisfy(value -> assertThat(value).startsWith(cookieName + "=").contains("Max-Age=0"));
+    }
+  }
+
+  @Test
+  void logoutWithRotatedRefreshTokenClearsTheCookieAndReportsFailure() throws Exception {
+    var session = login();
+    var rotated = sessions.refresh(session.refreshToken(), LoginTarget.SERVICE);
+    var response =
+        mvc.perform(
+                logoutRequest(LoginTarget.SERVICE)
+                    .cookie(new Cookie("__Host-rallit_refresh", session.refreshToken())))
+            .andExpect(status().isUnauthorized())
+            .andReturn()
+            .getResponse();
+    assertThat(response.getHeaders("Set-Cookie"))
+        .anySatisfy(
+            value -> assertThat(value).startsWith("__Host-rallit_refresh=").contains("Max-Age=0"));
+    assertThat(sessions.refresh(rotated.refreshToken(), LoginTarget.SERVICE)).isNotNull();
+  }
+
+  private MockHttpServletRequestBuilder logoutRequest(LoginTarget target) {
+    String origin =
+        target == LoginTarget.ADMIN ? "https://admin.rallit.co.kr" : "https://rallit.co.kr";
+    return post(target.apiPath() + "/auth/logout")
+        .header("Origin", origin)
+        .header("X-Requested-With", "XMLHttpRequest")
+        .contentType("application/json");
   }
 
   @Test

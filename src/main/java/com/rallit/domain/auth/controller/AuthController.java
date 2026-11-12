@@ -48,8 +48,11 @@ public class AuthController {
   @PostMapping({"/api/v1/auth/logout", "/api/v1/admin/auth/logout"})
   public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
     var t = target(request);
-    sessions.logout(cookies.read(request, cookies.name(t, "refresh")), t);
-    cookies.clear(response, t);
+    try {
+      sessions.logout(cookies.read(request, cookies.name(t, "refresh")), t);
+    } finally {
+      cookies.clear(response, t);
+    }
     return ResponseEntity.noContent().build();
   }
 
