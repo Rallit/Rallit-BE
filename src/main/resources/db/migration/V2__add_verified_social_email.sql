@@ -1,0 +1,3 @@
+ALTER TABLE users ADD COLUMN email VARCHAR(320);
+ALTER TABLE users ADD COLUMN email_key VARCHAR(320) GENERATED ALWAYS AS (lower(email)) STORED;
+ALTER TABLE users ADD CONSTRAINT uk_users_email UNIQUE (email_key);

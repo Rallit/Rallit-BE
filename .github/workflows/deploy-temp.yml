@@ -1,0 +1,36 @@
+name: Deploy Temp
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: 임시 배포 허용 여부 확인
+        env:
+          ENABLED: ${{ vars.TEMP_DEPLOY_ENABLED }}
+        run: |
+          if [ "$ENABLED" != "true" ]; then
+            echo "::error::TEMP_DEPLOY_ENABLED가 true가 아니어서 임시 배포를 실행할 수 없습니다."
+            exit 1
+          fi
+          case "$GITHUB_REF" in
+            refs/heads/develop|refs/heads/release/*|refs/heads/feat/*|refs/heads/fix/*|refs/heads/chore/*) ;;
+            *)
+              echo "::error::$GITHUB_REF 는 임시 배포 대상이 아닙니다. main은 cd.yml로만 배포합니다."
+              exit 1
+              ;;
+          esac
+
+  deploy:
+    needs: guard
+    uses: ./.github/workflows/_deploy.yml
+    with:
+      image-tag: temp-${{ github.sha }}
+      environment: temp
+    secrets: inherit

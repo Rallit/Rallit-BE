@@ -1,0 +1,26 @@
+language: "ko-KR"
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "develop"
+  path_instructions:
+    - path: "src/main/java/**/*.java"
+      instructions: |
+        Follow these project conventions:
+        - Use lowercase package names, UpperCamelCase type names, lowerCamelCase members, and UPPER_SNAKE_CASE constants.
+        - Use singular names for single values and plural names only for collections or plural concepts. Avoid ad hoc abbreviations; keep standard acronyms such as ID, API, and URL in their conventional form.
+        - Use lowercase snake_case for database identifiers, singular table names, and `id` for a single-column primary key.
+        - Use kebab-case for HTTP paths and non-Java resource filenames. Java source filenames must match their public type names.
+        - Use Request/Response names for new API DTOs without a trailing Dto suffix. Do not suggest renaming existing shared types.
+        - Do not use Lombok @Data. Use @Builder by default for DTO and entity construction; exclude generated IDs and audit fields from entity builders.
+        - Use ApiResponse for API responses. Represent business logic errors with GeneralException and BaseErrorCode/ErrorStatus, handled by GlobalExceptionHandler.
+        - JPA entities that need createdAt and updatedAt auditing should extend BaseEntity instead of redeclaring those fields.
+        - Controllers must not return JPA entities directly as HTTP JSON. Services may use entities internally and may accept request DTOs or individual values; do not flag that choice by itself.
+        - Use the existing domain-based package structure.
+        Report concrete correctness, security, data-integrity, or API-compatibility issues. Avoid subjective style-only comments.

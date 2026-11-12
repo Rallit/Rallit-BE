@@ -1,0 +1,105 @@
+name: rallit
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  app:
+    image: ${APP_IMAGE:?APP_IMAGE를 .env에 설정하세요}
+    restart: unless-stopped
+    # RDS 환경에서는 db 프로필이 꺼져 있으므로 의존성을 선택 사항으로 둔다.
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+        required: false
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    environment:
+      TZ: Asia/Seoul
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?SPRING_PROFILES_ACTIVE를 .env에 설정하세요}
+      DB_URL: ${DB_URL:?DB_URL을 .env에 설정하세요}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME을 .env에 설정하세요}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 .env에 설정하세요}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DATABASE: ${REDIS_DATABASE:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD를 .env에 설정하세요}
+      JWT_SERVICE_KEY: ${JWT_SERVICE_KEY:?JWT_SERVICE_KEY를 .env에 설정하세요}
+      JWT_ADMIN_KEY: ${JWT_ADMIN_KEY:?JWT_ADMIN_KEY를 .env에 설정하세요}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:?KAKAO_REST_API_KEY를 .env에 설정하세요}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:?KAKAO_REDIRECT_URI를 .env에 설정하세요}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID를 .env에 설정하세요}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET를 .env에 설정하세요}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?GOOGLE_REDIRECT_URI를 .env에 설정하세요}
+      FRONTEND_CALLBACK_URL: ${FRONTEND_CALLBACK_URL:?FRONTEND_CALLBACK_URL을 .env에 설정하세요}
+      ADMIN_FRONTEND_CALLBACK_URL: ${ADMIN_FRONTEND_CALLBACK_URL:?ADMIN_FRONTEND_CALLBACK_URL을 .env에 설정하세요}
+      SERVICE_ORIGINS: ${SERVICE_ORIGINS:?SERVICE_ORIGINS를 .env에 설정하세요}
+      ADMIN_ORIGINS: ${ADMIN_ORIGINS:?ADMIN_ORIGINS를 .env에 설정하세요}
+      AUTH_SECURE_COOKIES: "true"
+    mem_limit: ${APP_MEM_LIMIT:-700m}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    logging: *logging
+
+  db:
+    image: postgres:17-alpine
+    profiles:
+      - local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rallit}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME을 .env에 설정하세요}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD를 .env에 설정하세요}
+    mem_limit: ${DB_MEM_LIMIT:-256m}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+
+  redis:
+    image: redis@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80
+    user: redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD를 .env에 설정하세요}
+      REDIS_MAXMEMORY: ${REDIS_MAXMEMORY:-32mb}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        password_hash=$$(printf '%s' "$$REDIS_PASSWORD" | sha256sum | cut -d ' ' -f 1)
+        {
+          printf '%s\n' 'dir /data' 'appendonly yes' 'appendfsync everysec' 'maxmemory-policy noeviction'
+          printf 'maxmemory %s\n' "$$REDIS_MAXMEMORY"
+          printf 'user default reset on #%s ~* &* +@all\n' "$$password_hash"
+        } > /tmp/rallit-redis.conf
+        exec redis-server /tmp/rallit-redis.conf
+    mem_limit: ${REDIS_MEM_LIMIT:-128m}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli --no-auth-warning ping | grep -qx PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    logging: *logging
+
+volumes:
+  postgres-data:
+  redis-data:
