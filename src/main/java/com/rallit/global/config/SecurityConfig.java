@@ -40,7 +40,7 @@ public class SecurityConfig {
   @Bean
   ClientRegistrationRepository clientRegistrations(
       AuthProperties p, GoogleOAuthProperties google, Environment environment) {
-    google.validateTokenUri(environment);
+    google.validateTokenAndUserInfoUris(environment);
     var builder =
         ClientRegistration.withRegistrationId("kakao")
             .clientId(p.kakaoClientId())

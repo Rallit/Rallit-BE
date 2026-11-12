@@ -22,10 +22,15 @@ public record GoogleOAuthProperties(
           "Google OAuth client ID, client secret and redirect URI are required");
   }
 
-  void validateTokenUri(Environment environment) {
-    if (tokenUri == null) return;
+  void validateTokenAndUserInfoUris(Environment environment) {
+    validateHttpsUri("token", tokenUri, environment);
+    validateHttpsUri("UserInfo", userInfoUri, environment);
+  }
 
-    var uri = URI.create(tokenUri);
+  private static void validateHttpsUri(String endpoint, String value, Environment environment) {
+    if (value == null) return;
+
+    var uri = URI.create(value);
     String host = uri.getHost();
     if (host != null && uri.getUserInfo() == null) {
       if ("https".equalsIgnoreCase(uri.getScheme())) return;
@@ -33,7 +38,8 @@ public record GoogleOAuthProperties(
           && Set.of("localhost", "127.0.0.1", "[::1]").contains(host.toLowerCase(Locale.ROOT))
           && environment.acceptsProfiles(Profiles.of("test & !prod & !temp"))) return;
     }
-    throw new IllegalArgumentException("Google token URI must use HTTPS outside loopback tests");
+    throw new IllegalArgumentException(
+        "Google " + endpoint + " URI must use HTTPS outside loopback tests");
   }
 
   @Override
