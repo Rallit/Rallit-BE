@@ -29,7 +29,7 @@ public final class EntityFixtures {
 	public static User user(EntityManager entityManager, String nickname, Gender gender) {
 		Area area = entityManager.createQuery("select a from Area a where a.code = '11440'", Area.class)
 				.getSingleResult();
-		User user = User.signUp(null);
+		User user = User.signUp();
 		user.completeOnboarding(new OnboardingProfile(nickname, gender, AgeGroup.TWENTIES,
 				ExperiencePeriod.ONE_TO_THREE_YEARS, new BigDecimal("3.0"), false,
 				Set.of(PreferredMatchType.SINGLES), Set.of(area), Set.of(PreferredTimeSlot.WEEKEND_MORNING)));

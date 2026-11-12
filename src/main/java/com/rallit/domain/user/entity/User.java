@@ -57,8 +57,8 @@ public class User extends BaseEntity {
 	@Column(length = 320)
 	private String email;
 
-	@Column(length = 500)
-	private String profileImageUrl;
+	@Column(length = 80)
+	private String profileImageKey;
 
 	@Enumerated(EnumType.STRING)
 	@Column(length = 30)
@@ -98,21 +98,24 @@ public class User extends BaseEntity {
 	@Column(name = "time_slot", nullable = false, length = 30)
 	private Set<PreferredTimeSlot> preferredTimeSlots = new HashSet<>();
 
-	private User(String profileImageUrl) {
-		this.role = UserRole.USER;
-		this.status = UserStatus.ONBOARDING;
-		this.profileImageUrl = profileImageUrl;
+	public static User signUp() {
+		User user = new User();
+		user.role = UserRole.USER;
+		user.status = UserStatus.ONBOARDING;
+		return user;
 	}
 
-	public static User signUp(String profileImageUrl) {
-		return new User(profileImageUrl);
-	}
-
-	public static User signUp(String profileImageUrl, String nickname, String verifiedEmail) {
-		User user = signUp(profileImageUrl);
+	public static User signUp(String nickname, String verifiedEmail) {
+		User user = signUp();
 		user.nickname = nickname;
 		user.updateVerifiedEmail(verifiedEmail);
 		return user;
+	}
+
+	public String replaceProfileImage(String key) {
+		String previous = profileImageKey;
+		profileImageKey = key;
+		return previous;
 	}
 
 	public void updateVerifiedEmail(String email) {

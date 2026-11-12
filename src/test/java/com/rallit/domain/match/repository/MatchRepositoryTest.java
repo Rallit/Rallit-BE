@@ -169,7 +169,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	@Test
 	void rejectsApplicationFromOnboardingApplicant() {
 		Match match = savedMatch();
-		User applicant = userRepository.save(User.signUp(null));
+		User applicant = userRepository.save(User.signUp());
 
 		assertThatThrownBy(() -> matchApplicationRepository.saveAndFlush(
 				EntityFixtures.matchApplication(match, applicant)))

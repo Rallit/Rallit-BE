@@ -48,22 +48,20 @@ class UserRepositoryTest extends IntegrationTestSupport {
 
 	@Test
 	void savesOnboardingUserRightAfterSocialLogin() {
-		User first = userRepository.saveAndFlush(User.signUp("https://k.kakaocdn.net/profile.png"));
-		User second = userRepository.saveAndFlush(User.signUp(null));
+		User first = userRepository.saveAndFlush(User.signUp());
 		entityManager.clear();
 
 		User found = userRepository.findById(first.getId()).orElseThrow();
 
 		assertThat(found.getRole()).isEqualTo(UserRole.USER);
 		assertThat(found.getStatus()).isEqualTo(UserStatus.ONBOARDING);
-		assertThat(found.getProfileImageUrl()).isEqualTo("https://k.kakaocdn.net/profile.png");
+		assertThat(found.getProfileImageKey()).isNull();
 		assertThat(found.getNickname()).isNull();
-		assertThat(userRepository.findById(second.getId()).orElseThrow().getNickname()).isNull();
 	}
 
 	@Test
 	void completesOnboardingWithTennisProfileAndPreferences() {
-		User user = User.signUp(null);
+		User user = User.signUp();
 		Area area = entityManager.createQuery("select a from Area a where a.code = '11440'", Area.class)
 				.getSingleResult();
 		user.completeOnboarding(new OnboardingProfile("테니스곰123", Gender.FEMALE, AgeGroup.TWENTIES,
@@ -100,7 +98,7 @@ class UserRepositoryTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsActiveUserWithoutGender() {
-		User user = userRepository.saveAndFlush(User.signUp(null));
+		User user = userRepository.saveAndFlush(User.signUp());
 		assertThatThrownBy(() -> jdbcTemplate.update(
 				"UPDATE users SET status = 'ACTIVE', nickname = '성별누락' WHERE id = ?", user.getId()))
 				.isInstanceOf(DataIntegrityViolationException.class)

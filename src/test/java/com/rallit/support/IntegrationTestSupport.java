@@ -11,7 +11,7 @@ public abstract class IntegrationTestSupport {
         com.rallit.domain.auth.model.OAuthProvider.KAKAO, subject, subject + "@example.test", true);
   }
 
-  static final PostgreSQLContainer PG =
+  protected static final PostgreSQLContainer PG =
       new PostgreSQLContainer(
           "postgres@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac");
   static final GenericContainer<?> REDIS =

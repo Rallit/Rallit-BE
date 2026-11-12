@@ -10,7 +10,9 @@ public enum UserErrorStatus implements BaseErrorCode {
   INVALID_ACTIVITY_AREA(HttpStatus.BAD_REQUEST, "활동 지역을 확인해 주세요."),
   INVALID_MATCH_PREFERENCES(HttpStatus.BAD_REQUEST, "동성만 매칭과 혼합복식은 함께 선택할 수 없습니다."),
   NICKNAME_CONFLICT(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
-  ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 온보딩을 완료했습니다.");
+  ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 온보딩을 완료했습니다."),
+  INVALID_PROFILE_IMAGE(HttpStatus.BAD_REQUEST, "JPG, JPEG 또는 PNG 사진을 선택해 주세요."),
+  PROFILE_IMAGE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "프로필 사진은 최대 5MB까지 올릴 수 있습니다.");
 
   private final HttpStatus status;
   private final String message;

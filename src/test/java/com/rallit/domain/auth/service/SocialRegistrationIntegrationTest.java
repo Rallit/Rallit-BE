@@ -133,7 +133,7 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
   @Test
   void sameIdentityRetainsItsMemberAndLegacyEmailIsBackfilled() {
     String subject = id();
-    var existing = users.saveAndFlush(User.signUp(null));
+    var existing = users.saveAndFlush(User.signUp());
     accounts.saveAndFlush(SocialAccount.of(existing, SocialProvider.KAKAO, subject));
     var old = identity(OAuthProvider.KAKAO, subject, null, false);
     assertThat(

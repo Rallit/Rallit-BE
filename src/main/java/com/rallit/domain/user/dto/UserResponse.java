@@ -5,10 +5,12 @@ import com.rallit.domain.user.enums.UserRole;
 
 public record UserResponse(
     Long id, String nickname, UserRole role, boolean onboardingCompleted,
-    String socialDisplayName, UserProfileResponse profile) {
+    String profileImageUrl, String socialDisplayName, UserProfileResponse profile) {
   public static UserResponse from(User user, String socialDisplayName) {
     return new UserResponse(
-        user.getId(), user.getNickname(), user.getRole(), user.isOnboardingCompleted(), socialDisplayName,
+        user.getId(), user.getNickname(), user.getRole(), user.isOnboardingCompleted(),
+        user.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(user.getId()),
+        socialDisplayName,
         user.isOnboardingCompleted() ? UserProfileResponse.from(user) : null);
   }
 }

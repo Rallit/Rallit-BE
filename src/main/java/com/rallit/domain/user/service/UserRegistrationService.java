@@ -92,7 +92,7 @@ public class UserRegistrationService {
     return new TransactionTemplate(manager)
         .execute(
             status -> {
-              User user = users.save(User.signUp(null, generator.generate(), email));
+              User user = users.save(User.signUp(generator.generate(), email));
               SocialProvider provider = SocialProvider.valueOf(identity.provider().name());
               accounts.saveAndFlush(SocialAccount.of(user, provider, identity.subject(), identity.displayName()));
               return user;
