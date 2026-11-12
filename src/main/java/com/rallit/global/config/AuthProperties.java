@@ -56,6 +56,11 @@ public record AuthProperties(
     return secure() ? "/" : t.apiPath() + (refresh ? "/auth" : "");
   }
 
+  @Override
+  public String toString() {
+    return "AuthProperties[redacted]";
+  }
+
   public boolean secure() {
     return !Boolean.FALSE.equals(secureCookies);
   }
