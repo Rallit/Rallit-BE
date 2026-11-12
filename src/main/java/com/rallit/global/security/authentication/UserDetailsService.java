@@ -25,6 +25,7 @@ public class UserDetailsService
     if (userId <= 0) throw new UsernameNotFoundException("Invalid member identifier");
     var user =
         users.findById(userId).orElseThrow(() -> new UsernameNotFoundException("Member not found"));
+    if (user.isWithdrawn()) throw new UsernameNotFoundException("Member withdrawn");
     return new UserDetails(user.getId(), user.getRole(), user.isOnboardingCompleted());
   }
 }

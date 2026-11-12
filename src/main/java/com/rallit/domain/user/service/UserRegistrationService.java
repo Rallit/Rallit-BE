@@ -58,7 +58,8 @@ public class UserRegistrationService {
   }
 
   private User syncVerifiedEmail(User existing, String email) {
-    if (email == null || Objects.equals(email, existing.getEmail())) return existing;
+    if (existing.isWithdrawn() || email == null || Objects.equals(email, existing.getEmail()))
+      return existing;
     if (users.findByEmailKey(email).filter(owner -> !owner.getId().equals(existing.getId())).isPresent())
       return existing;
 
@@ -67,6 +68,7 @@ public class UserRegistrationService {
           .execute(
               status -> {
                 User user = users.findByIdForUpdate(existing.getId()).orElseThrow();
+                if (user.isWithdrawn()) return user;
                 user.updateVerifiedEmail(email);
                 return users.saveAndFlush(user);
               });

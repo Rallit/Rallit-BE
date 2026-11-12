@@ -121,6 +121,10 @@ public class User extends BaseEntity {
 		this.email = Objects.requireNonNull(email);
 	}
 
+	public boolean isWithdrawn() {
+		return status == UserStatus.WITHDRAWN;
+	}
+
 	public boolean isOnboardingCompleted() {
 		return status == UserStatus.ACTIVE;
 	}

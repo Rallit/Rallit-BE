@@ -33,6 +33,7 @@ public class TokenSessionService {
 
   private void allowed(Long id, LoginTarget target) {
     var u = users.findById(id).orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
+    if (u.isWithdrawn()) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
     if (target == LoginTarget.ADMIN && u.getRole() != UserRole.ADMIN)
       throw new GeneralException(ErrorStatus._FORBIDDEN);
   }

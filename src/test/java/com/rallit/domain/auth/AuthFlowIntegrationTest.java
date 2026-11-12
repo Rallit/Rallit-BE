@@ -134,6 +134,24 @@ class AuthFlowIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
+  void withdrawnMemberCannotLogInRefreshOrUseAccessToken() throws Exception {
+    long id = user();
+    var session = sessions.login(id, LoginTarget.SERVICE);
+    jdbc.update("update users set status='WITHDRAWN' where id=?", id);
+
+    assertThatThrownBy(() -> sessions.login(id, LoginTarget.SERVICE))
+        .isInstanceOfSatisfying(
+            com.rallit.global.apiPayload.exception.GeneralException.class,
+            failure -> assertThat(failure.getErrorReasonHttpStatus().getHttpStatus().value()).isEqualTo(401));
+    assertThatThrownBy(() -> sessions.refresh(session.refreshToken(), LoginTarget.SERVICE))
+        .isInstanceOfSatisfying(
+            com.rallit.global.apiPayload.exception.GeneralException.class,
+            failure -> assertThat(failure.getErrorReasonHttpStatus().getHttpStatus().value()).isEqualTo(401));
+    mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + session.accessToken()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
   void unauthenticatedAndWrongPurposeFail() throws Exception {
     mvc.perform(get("/api/v1/users/me"))
         .andExpect(status().isUnauthorized())
