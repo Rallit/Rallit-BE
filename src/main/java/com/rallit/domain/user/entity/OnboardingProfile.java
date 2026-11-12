@@ -31,8 +31,7 @@ public record OnboardingProfile(
     activityAreas = Set.copyOf(activityAreas);
     preferredTimeSlots = Set.copyOf(preferredTimeSlots);
     if (!nickname.matches(NICKNAME_PATTERN)
-        || ntrp.compareTo(BigDecimal.ONE) < 0 || ntrp.compareTo(BigDecimal.valueOf(4)) > 0
-        || ntrp.remainder(new BigDecimal("0.5")).signum() != 0
+        || isInvalidNtrp(ntrp)
         || preferredMatchTypes.isEmpty() || preferredTimeSlots.isEmpty()) {
       throw new IllegalArgumentException("Invalid required onboarding profile values");
     }
@@ -42,5 +41,11 @@ public record OnboardingProfile(
     if (sameGenderOnly && preferredMatchTypes.contains(PreferredMatchType.MIXED_DOUBLES)) {
       throw new GeneralException(UserErrorStatus.INVALID_MATCH_PREFERENCES);
     }
+  }
+
+  private static boolean isInvalidNtrp(BigDecimal ntrp) {
+    return ntrp.compareTo(BigDecimal.ONE) < 0
+        || ntrp.compareTo(BigDecimal.valueOf(4)) > 0
+        || ntrp.remainder(new BigDecimal("0.5")).signum() != 0;
   }
 }
