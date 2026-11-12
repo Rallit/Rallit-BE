@@ -2,10 +2,21 @@ package com.rallit.domain.user.dto;
 
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.UserRole;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record UserResponse(
-    Long id, String nickname, UserRole role, boolean onboardingCompleted,
-    String profileImageUrl, String socialDisplayName, UserProfileResponse profile) {
+    Long id,
+    @Schema(description = "온보딩 입력칸에 채울 기본 닉네임 또는 가입 완료 후 저장된 닉네임")
+    String nickname,
+    UserRole role,
+    boolean onboardingCompleted,
+    @Schema(description = "백엔드 기준 상대 경로. 조회에 Bearer 토큰이 필요하며, 올린 사진이 없으면 null",
+        example = "/api/v1/users/1/profile-image", types = {"string", "null"})
+    String profileImageUrl,
+    @Schema(description = "온보딩 환영 인사용 소셜 이름. 값이 없으면 null", types = {"string", "null"})
+    String socialDisplayName,
+    @Schema(description = "저장된 온보딩 프로필. 가입 완료 전에는 null")
+    UserProfileResponse profile) {
   public static UserResponse from(User user, String socialDisplayName) {
     return new UserResponse(
         user.getId(), user.getNickname(), user.getRole(), user.isOnboardingCompleted(),

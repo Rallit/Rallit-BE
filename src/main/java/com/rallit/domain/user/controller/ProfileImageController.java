@@ -5,6 +5,7 @@ import com.rallit.domain.user.service.ProfileImageService;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,11 @@ public class ProfileImageController {
     return ResponseEntity.ok().contentType(image.mediaType()).body(image.contents());
   }
 
-  @Operation(summary = "내 프로필 사진 삭제", description = "직접 올린 사진을 제거하고 기본 이미지로 되돌립니다.")
+  @Operation(
+      summary = "내 프로필 사진 삭제",
+      description = "삭제 후 내 정보의 `profileImageUrl`이 `null`이면 랠릿 기본 이미지를 표시합니다.",
+      responses = @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "204", description = "사진 삭제 완료 또는 삭제할 사진 없음", content = @Content))
   @DeleteMapping("/me/profile-image")
   public ResponseEntity<Void> delete(@AuthenticationPrincipal UserDetails principal) {
     images.delete(principal.userId());
