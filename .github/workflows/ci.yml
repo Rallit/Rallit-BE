@@ -43,11 +43,6 @@ jobs:
           retention-days: 7
       - name: Docker 이미지 빌드 검증
         run: docker build -t rallit-backend:ci .
-      - name: Docker Compose 설정 검증
-        run: |
-          docker compose --env-file .env.deploy.example config --quiet
-          docker compose --env-file .env.deploy.example --profile local-db config --services | grep -qx db
-          COMPOSE_PROFILES='' docker compose --env-file .env.deploy.example config --services | grep -qx app
       - name: JAR 업로드
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

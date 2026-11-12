@@ -3,6 +3,7 @@ package com.rallit.domain.user.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 import com.rallit.domain.match.enums.MatchType;
@@ -49,6 +50,9 @@ public class User extends BaseEntity {
 
 	@Column(unique = true, length = 20)
 	private String nickname;
+
+	@Column(length = 320)
+	private String email;
 
 	@Column(length = 500)
 	private String profileImageUrl;
@@ -104,6 +108,25 @@ public class User extends BaseEntity {
 
 	public static User signUp(String profileImageUrl) {
 		return new User(profileImageUrl);
+	}
+
+	public static User signUp(String profileImageUrl, String nickname, String verifiedEmail) {
+		User user = signUp(profileImageUrl);
+		user.nickname = nickname;
+		user.updateVerifiedEmail(verifiedEmail);
+		return user;
+	}
+
+	public void updateVerifiedEmail(String email) {
+		this.email = Objects.requireNonNull(email);
+	}
+
+	public boolean isWithdrawn() {
+		return status == UserStatus.WITHDRAWN;
+	}
+
+	public boolean isOnboardingCompleted() {
+		return status == UserStatus.ACTIVE;
 	}
 
 	@Builder(builderMethodName = "onboarding", buildMethodName = "complete", builderClassName = "OnboardingBuilder")
