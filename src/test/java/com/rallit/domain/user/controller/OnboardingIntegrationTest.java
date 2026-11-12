@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -177,7 +177,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
   }
 
   private ResultActions submit(Member member, String body) throws Exception {
-    return mvc.perform(put(PATH).header("Authorization", member.bearer())
+    return mvc.perform(post(PATH).header("Authorization", member.bearer())
         .contentType("application/json").content(body));
   }
 

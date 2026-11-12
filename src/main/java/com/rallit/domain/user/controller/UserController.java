@@ -36,7 +36,7 @@ public class UserController {
   }
 
   @Operation(summary = "온보딩 완료", description = "세 단계의 입력을 저장하고 가입을 완료합니다.")
-  @PutMapping("/me/onboarding")
+  @PostMapping("/me/onboarding")
   public ResponseEntity<ApiResponse<UserResponse>> completeOnboarding(
       @AuthenticationPrincipal UserDetails principal, @Valid @RequestBody OnboardingRequest request) {
     return ResponseEntity.ok(ApiResponse.onSuccess(users.completeOnboarding(principal.userId(), request)));

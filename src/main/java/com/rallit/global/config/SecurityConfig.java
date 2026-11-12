@@ -230,7 +230,7 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers("/api/v1/users/me")
                 .authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/v1/users/me/onboarding")
+                .requestMatchers(HttpMethod.POST, "/api/v1/users/me/onboarding")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/nickname-availability")
                 .authenticated()
