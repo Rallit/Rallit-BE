@@ -7,7 +7,10 @@ import java.nio.file.*;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
+@DisabledOnOs(OS.WINDOWS)
 class DeploymentScriptTest extends DeploymentTestSupport {
   private static final String OLD = "example/rallit:old";
   private static final String NEW = "example/rallit:new";
