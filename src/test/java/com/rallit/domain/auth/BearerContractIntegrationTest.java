@@ -1,6 +1,9 @@
 package com.rallit.domain.auth;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -17,6 +20,9 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -24,6 +30,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc
 class BearerContractIntegrationTest extends IntegrationTestSupport {
   @Autowired TokenSessionService sessions;
+  @MockitoSpyBean StringRedisTemplate redis;
   @Autowired UserRegistrationService users;
   @Autowired MockMvc mvc;
   @Autowired tools.jackson.databind.ObjectMapper json;
@@ -169,6 +176,31 @@ class BearerContractIntegrationTest extends IntegrationTestSupport {
         .anySatisfy(
             value -> assertThat(value).startsWith("__Host-rallit_refresh=").contains("Max-Age=0"));
     assertThat(sessions.refresh(rotated.refreshToken(), LoginTarget.SERVICE)).isNotNull();
+  }
+
+  @Test
+  void logoutCanBeRetriedWithTheSameCookieAfterRedisRecovers() throws Exception {
+    var session = login();
+    var cookie = new Cookie("__Host-rallit_refresh", session.refreshToken());
+    doThrow(new RedisConnectionFailureException("Simulated Redis outage"))
+        .doCallRealMethod()
+        .when(redis)
+        .execute(any(), anyList(), any(Object[].class));
+
+    mvc.perform(logoutRequest(LoginTarget.SERVICE).cookie(cookie))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("COMMON503"))
+        .andExpect(header().doesNotExist("Set-Cookie"));
+
+    var response =
+        mvc.perform(logoutRequest(LoginTarget.SERVICE).cookie(cookie))
+            .andExpect(status().isNoContent())
+            .andReturn()
+            .getResponse();
+    assertThat(response.getHeaders("Set-Cookie"))
+        .anySatisfy(value -> assertThat(value).startsWith(cookie.getName() + "=").contains("Max-Age=0"));
+    mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + session.accessToken()))
+        .andExpect(status().isUnauthorized());
   }
 
   private MockHttpServletRequestBuilder logoutRequest(LoginTarget target) {

@@ -6,6 +6,8 @@ import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.service.UserService;
 import com.rallit.global.apiPayload.ApiResponse;
+import com.rallit.global.apiPayload.code.status.ErrorStatus;
+import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.AuthRequestMatchers;
 import com.rallit.global.security.authentication.UserDetails;
 import com.rallit.global.security.cookie.AuthCookieManager;
@@ -41,17 +43,25 @@ public class AuthController {
   @Operation(
       summary = "로그아웃",
       description = "현재 세션을 종료하고 Refresh 쿠키를 삭제합니다.",
-      responses =
+      responses = {
           @io.swagger.v3.oas.annotations.responses.ApiResponse(
               responseCode = "204",
-              description = "로그아웃 완료"))
+              description = "로그아웃 완료"),
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "503",
+              description = "세션 종료를 확인하지 못했습니다. Refresh 쿠키를 유지해 다시 시도할 수 있습니다.")
+      })
   @PostMapping({"/api/v1/auth/logout", "/api/v1/admin/auth/logout"})
   public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
     var t = target(request);
+    boolean clearCookies = true;
     try {
       sessions.logout(cookies.read(request, cookies.name(t, "refresh")), t);
+    } catch (GeneralException failure) {
+      clearCookies = failure.getCode() != ErrorStatus._SERVICE_UNAVAILABLE;
+      throw failure;
     } finally {
-      cookies.clear(response, t);
+      if (clearCookies) cookies.clear(response, t);
     }
     return ResponseEntity.noContent().build();
   }
