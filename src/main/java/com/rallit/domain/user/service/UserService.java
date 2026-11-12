@@ -50,12 +50,7 @@ public class UserService {
       throw new GeneralException(UserErrorStatus.NICKNAME_CONFLICT);
     }
     user.completeOnboarding(profile);
-    try {
-      users.flush();
-    } catch (DataIntegrityViolationException failure) {
-      if (!UserConstraintViolations.isNicknameConflict(failure)) throw failure;
-      throw new GeneralException(UserErrorStatus.NICKNAME_CONFLICT);
-    }
+    flushOnboarding();
     return response(user);
   }
 
@@ -65,6 +60,15 @@ public class UserService {
       throw new GeneralException(UserErrorStatus.INVALID_ACTIVITY_AREA);
     }
     return request.toProfile(Set.copyOf(selectedAreas));
+  }
+
+  private void flushOnboarding() {
+    try {
+      users.flush();
+    } catch (DataIntegrityViolationException failure) {
+      if (!UserConstraintViolations.isNicknameConflict(failure)) throw failure;
+      throw new GeneralException(UserErrorStatus.NICKNAME_CONFLICT);
+    }
   }
 
   private UserResponse response(User user) {
