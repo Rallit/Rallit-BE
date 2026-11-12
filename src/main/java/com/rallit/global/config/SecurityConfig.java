@@ -203,7 +203,7 @@ public class SecurityConfig {
                         return filter;
                       }
                     }));
-    if (environment.acceptsProfiles(Profiles.of("local"))) {
+    if (environment.acceptsProfiles(Profiles.of("(local | temp) & !prod"))) {
       http.authorizeHttpRequests(
           a ->
               a.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")

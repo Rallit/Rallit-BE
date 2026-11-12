@@ -20,7 +20,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
 
   @Test
-  void localSwaggerDocumentsSocialLoginAndSeparatesAdminOperations() throws Exception {
+  void swaggerDocumentsSocialLoginAndSeparatesAdminOperations() throws Exception {
+    mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.tags[*].name", containsInAnyOrder("인증", "회원", "운영자")))
