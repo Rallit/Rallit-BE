@@ -100,7 +100,10 @@ public class ProfileImageService {
     if (file.isEmpty() || filename == null) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
     }
-    String lower = filename.toLowerCase(Locale.ROOT);
+    return validateImageContents(file, filename.toLowerCase(Locale.ROOT));
+  }
+
+  private String validateImageContents(MultipartFile file, String filename) {
     try (var contents = file.getInputStream(); var image = new MemoryCacheImageInputStream(contents)) {
       var readers = ImageIO.getImageReaders(image);
       if (!readers.hasNext()) {
@@ -109,7 +112,7 @@ public class ProfileImageService {
       var reader = readers.next();
       try {
         reader.setInput(image, true, true);
-        String extension = validatedExtension(reader.getFormatName(), lower);
+        String extension = validatedExtension(reader.getFormatName(), filename);
         reader.addIIOReadWarningListener((source, warning) -> {
           throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
         });
