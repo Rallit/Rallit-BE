@@ -7,10 +7,12 @@ import com.rallit.domain.user.dto.UserResponse;
 import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.SocialAccount;
 import com.rallit.domain.user.entity.User;
+import com.rallit.domain.user.exception.OnboardingProfileValidationException;
 import com.rallit.domain.user.exception.UserErrorStatus;
 import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.domain.user.repository.UserConstraintViolations;
 import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.global.apiPayload.code.BaseErrorCode;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.util.Set;
@@ -59,7 +61,16 @@ public class UserService {
     if (selectedAreas.size() != request.activityAreaCodes().size()) {
       throw new GeneralException(UserErrorStatus.INVALID_ACTIVITY_AREA);
     }
-    return request.toProfile(Set.copyOf(selectedAreas));
+    try {
+      return request.toProfile(Set.copyOf(selectedAreas));
+    } catch (OnboardingProfileValidationException failure) {
+      BaseErrorCode error = switch (failure.reason()) {
+        case INVALID_REQUIRED_VALUES -> ErrorStatus._BAD_REQUEST;
+        case INVALID_ACTIVITY_AREA -> UserErrorStatus.INVALID_ACTIVITY_AREA;
+        case INVALID_MATCH_PREFERENCES -> UserErrorStatus.INVALID_MATCH_PREFERENCES;
+      };
+      throw new GeneralException(error, failure);
+    }
   }
 
   private void flushOnboarding() {

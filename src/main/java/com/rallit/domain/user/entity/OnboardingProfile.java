@@ -2,8 +2,8 @@ package com.rallit.domain.user.entity;
 
 import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.enums.*;
-import com.rallit.domain.user.exception.UserErrorStatus;
-import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.domain.user.exception.OnboardingProfileValidationException;
+import com.rallit.domain.user.exception.OnboardingProfileValidationException.Reason;
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Set;
@@ -22,25 +22,25 @@ public record OnboardingProfile(
   public static final String NICKNAME_PATTERN = "[가-힣a-zA-Z0-9]{2,12}";
 
   public OnboardingProfile {
-    Objects.requireNonNull(nickname);
-    Objects.requireNonNull(gender);
-    Objects.requireNonNull(ageGroup);
-    Objects.requireNonNull(experiencePeriod);
-    Objects.requireNonNull(ntrp);
+    if (nickname == null || !nickname.matches(NICKNAME_PATTERN)
+        || gender == null || ageGroup == null || experiencePeriod == null
+        || ntrp == null || isInvalidNtrp(ntrp)
+        || invalidSelection(preferredMatchTypes) || invalidSelection(preferredTimeSlots)) {
+      throw new OnboardingProfileValidationException(Reason.INVALID_REQUIRED_VALUES);
+    }
+    if (invalidSelection(activityAreas) || activityAreas.size() > 3) {
+      throw new OnboardingProfileValidationException(Reason.INVALID_ACTIVITY_AREA);
+    }
+    if (sameGenderOnly && preferredMatchTypes.contains(PreferredMatchType.MIXED_DOUBLES)) {
+      throw new OnboardingProfileValidationException(Reason.INVALID_MATCH_PREFERENCES);
+    }
     preferredMatchTypes = Set.copyOf(preferredMatchTypes);
     activityAreas = Set.copyOf(activityAreas);
     preferredTimeSlots = Set.copyOf(preferredTimeSlots);
-    if (!nickname.matches(NICKNAME_PATTERN)
-        || isInvalidNtrp(ntrp)
-        || preferredMatchTypes.isEmpty() || preferredTimeSlots.isEmpty()) {
-      throw new IllegalArgumentException("Invalid required onboarding profile values");
-    }
-    if (activityAreas.isEmpty() || activityAreas.size() > 3) {
-      throw new GeneralException(UserErrorStatus.INVALID_ACTIVITY_AREA);
-    }
-    if (sameGenderOnly && preferredMatchTypes.contains(PreferredMatchType.MIXED_DOUBLES)) {
-      throw new GeneralException(UserErrorStatus.INVALID_MATCH_PREFERENCES);
-    }
+  }
+
+  private static boolean invalidSelection(Set<?> values) {
+    return values == null || values.isEmpty() || values.stream().anyMatch(Objects::isNull);
   }
 
   private static boolean isInvalidNtrp(BigDecimal ntrp) {

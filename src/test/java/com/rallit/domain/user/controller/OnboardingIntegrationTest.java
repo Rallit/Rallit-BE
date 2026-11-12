@@ -95,7 +95,9 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("\"11440\", \"11410\"", "\"11440\", \"11410\", \"11680\", \"11110\""))
         .andExpect(status().isBadRequest());
     submit(member, body.replace("false", "true").replace("DOUBLES", "MIXED_DOUBLES"))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON400"))
+        .andExpect(jsonPath("$.message").value("동성만 매칭과 혼합복식은 함께 선택할 수 없습니다."));
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(jsonPath("$.result.onboardingCompleted").value(false));
   }
