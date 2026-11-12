@@ -79,6 +79,26 @@ class SocialRegistrationIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
+  void existingSocialIdentityCanLogInWhenItsNewEmailIsAlreadyRegistered() {
+    String subject = id();
+    String originalEmail = id() + "@example.test";
+    String registeredEmail = id() + "@example.test";
+    var existing = registration.getOrCreateUser(
+        identity(OAuthProvider.KAKAO, subject, originalEmail, true));
+    var owner = registration.getOrCreateUser(
+        identity(OAuthProvider.GOOGLE, id(), registeredEmail, true));
+
+    var tokens = login.login(
+        identity(OAuthProvider.KAKAO, subject, registeredEmail.toUpperCase(Locale.ROOT), true),
+        LoginTarget.SERVICE);
+
+    assertThat(jwt.verifyAccess(tokens.accessToken(), LoginTarget.SERVICE).userId())
+        .isEqualTo(existing.getId());
+    assertThat(users.findById(existing.getId()).orElseThrow().getEmail()).isEqualTo(originalEmail);
+    assertThat(users.findByEmailKey(registeredEmail).orElseThrow().getId()).isEqualTo(owner.getId());
+  }
+
+  @Test
   void addressesWithDifferentDatabaseEmailKeysCanRegisterSeparately() {
     String prefix = id();
     var first =

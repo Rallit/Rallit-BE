@@ -35,39 +35,52 @@ public class UserRegistrationService {
     String email = identity.verifiedEmail();
     for (int attempt = 0; attempt < 5; attempt++) {
       var existing = findUserBySocialIdentity(identity);
-      if (existing.isPresent()
-          && (email == null || Objects.equals(email, existing.get().getEmail())))
-        return existing.get();
+      if (existing.isPresent()) return syncVerifiedEmail(existing.get(), email);
       if (email == null) throw new SocialLoginRejectedException(Reason.EMAIL_REQUIRED, null);
-      var emailOwner = findMatchingEmailOwner(identity, email);
-      if (emailOwner.isPresent() && email.equals(emailOwner.get().getEmail()))
-        return emailOwner.get();
-      var registeredUser = emailOwner.or(() -> existing);
+
+      var emailOwner = users.findByEmailKey(email);
+      if (emailOwner.isPresent()) {
+        // The same identity may have registered after the initial lookup.
+        existing = findUserBySocialIdentity(identity);
+        if (existing.isPresent()) return syncVerifiedEmail(existing.get(), email);
+        throw accountExists(emailOwner.get());
+      }
+
       try {
-        return saveUserWithVerifiedEmail(identity, email, registeredUser);
+        return createUser(identity, email);
       } catch (DataIntegrityViolationException failure) {
-        if (UserConstraintViolations.isEmailConflict(failure)) {
-          if (findMatchingEmailOwner(identity, email).isPresent()
-              || findUserBySocialIdentity(identity).isPresent()) continue;
-          throw failure;
-        }
-        if (findUserBySocialIdentity(identity).isPresent()) continue;
-        if (!UserConstraintViolations.isNicknameConflict(failure)) throw failure;
+        if (!UserConstraintViolations.isEmailConflict(failure)
+            && !UserConstraintViolations.isNicknameConflict(failure)
+            && findUserBySocialIdentity(identity).isEmpty()) throw failure;
       }
     }
     throw new IllegalStateException("Unable to register member after concurrent conflicts");
   }
 
-  private User saveUserWithVerifiedEmail(
-      SocialIdentity identity, String email, Optional<User> registeredUser) {
+  private User syncVerifiedEmail(User existing, String email) {
+    if (email == null || Objects.equals(email, existing.getEmail())) return existing;
+    if (users.findByEmailKey(email).filter(owner -> !owner.getId().equals(existing.getId())).isPresent())
+      return existing;
+
+    try {
+      return new TransactionTemplate(manager)
+          .execute(
+              status -> {
+                User user = users.findByIdForUpdate(existing.getId()).orElseThrow();
+                user.updateVerifiedEmail(email);
+                return users.saveAndFlush(user);
+              });
+    } catch (DataIntegrityViolationException failure) {
+      if (!UserConstraintViolations.isEmailConflict(failure)) throw failure;
+      // Another member claimed the address after the lookup.
+      return users.findById(existing.getId()).orElseThrow();
+    }
+  }
+
+  private User createUser(SocialIdentity identity, String email) {
     return new TransactionTemplate(manager)
         .execute(
             status -> {
-              if (registeredUser.isPresent()) {
-                User user = users.findByIdForUpdate(registeredUser.get().getId()).orElseThrow();
-                user.updateVerifiedEmail(email);
-                return users.saveAndFlush(user);
-              }
               User user = users.save(User.signUp(null, generator.generate(), email));
               SocialProvider provider = SocialProvider.valueOf(identity.provider().name());
               accounts.saveAndFlush(SocialAccount.of(user, provider, identity.subject()));
@@ -75,20 +88,9 @@ public class UserRegistrationService {
             });
   }
 
-  private Optional<User> findMatchingEmailOwner(SocialIdentity identity, String email) {
-    return users
-        .findByEmailKey(email)
-        .map(
-            owner -> {
-              if (findUserBySocialIdentity(identity)
-                  .map(User::getId)
-                  .filter(owner.getId()::equals)
-                  .isPresent()) return owner;
-
-              var account =
-                  accounts.findFirstByUserIdOrderByIdAsc(owner.getId()).orElseThrow();
-              throw new SocialLoginRejectedException(
-                  Reason.ACCOUNT_EXISTS, OAuthProvider.valueOf(account.getProvider().name()));
-            });
+  private SocialLoginRejectedException accountExists(User owner) {
+    var account = accounts.findFirstByUserIdOrderByIdAsc(owner.getId()).orElseThrow();
+    return new SocialLoginRejectedException(
+        Reason.ACCOUNT_EXISTS, OAuthProvider.valueOf(account.getProvider().name()));
   }
 }
