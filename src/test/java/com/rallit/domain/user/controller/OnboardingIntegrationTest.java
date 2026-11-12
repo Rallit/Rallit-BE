@@ -1,6 +1,12 @@
 package com.rallit.domain.user.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,13 +16,21 @@ import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.model.OAuthProvider;
 import com.rallit.domain.auth.service.TokenSessionService;
+import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.support.IntegrationTestSupport;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -41,6 +55,8 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
   @Autowired UserRegistrationService users;
   @Autowired TokenSessionService sessions;
+  @Autowired JdbcTemplate jdbc;
+  @MockitoSpyBean UserRepository userRepository;
 
   @Test
   void completesOnboardingAndHandlesRepeatedSubmissions() throws Exception {
@@ -112,6 +128,52 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.result.onboardingCompleted").value(false));
   }
 
+  @Test
+  void rollsBackLosingOnboardingWhenBothRequestsPassNicknameCheck() throws Exception {
+    var first = login();
+    var second = login();
+    var firstBefore = storedProfile(first);
+    var secondBefore = storedProfile(second);
+    String nickname = "race" + UUID.randomUUID().toString().substring(0, 8);
+    String body = PAYLOAD.formatted(nickname);
+    var afterNicknameLookup = new CyclicBarrier(2);
+    doAnswer(invocation -> {
+      Long userId = invocation.getArgument(1);
+      boolean taken = Boolean.TRUE.equals(jdbc.queryForObject("""
+          SELECT EXISTS (SELECT 1 FROM users WHERE lower(nickname) = lower(?) AND id <> ?)
+          """, Boolean.class, nickname, userId));
+      assertThat(taken).isFalse();
+      afterNicknameLookup.await(10, TimeUnit.SECONDS);
+      return taken;
+    }).when(userRepository).isNicknameTakenByAnotherUser(eq(nickname), anyLong());
+
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var firstRequest = executor.submit(() -> submit(first, body).andReturn().getResponse());
+      var secondRequest = executor.submit(() -> submit(second, body).andReturn().getResponse());
+      int firstStatus = firstRequest.get(20, TimeUnit.SECONDS).getStatus();
+      int secondStatus = secondRequest.get(20, TimeUnit.SECONDS).getStatus();
+      assertThat(List.of(firstStatus, secondStatus)).containsExactlyInAnyOrder(200, 409);
+      verify(userRepository, times(2)).isNicknameTakenByAnotherUser(eq(nickname), anyLong());
+
+      var winner = firstStatus == 200 ? first : second;
+      var loser = firstStatus == 409 ? first : second;
+      assertThat(storedProfile(winner)).containsEntry("status", "ACTIVE").containsEntry("nickname", nickname);
+      assertThat(storedProfile(loser)).isEqualTo(firstStatus == 409 ? firstBefore : secondBefore);
+      assertThat(jdbc.queryForObject("""
+          SELECT (SELECT count(*) FROM user_activity_areas WHERE user_id = ?)
+               + (SELECT count(*) FROM user_preferred_match_type WHERE user_id = ?)
+               + (SELECT count(*) FROM user_preferred_time_slot WHERE user_id = ?)
+          """, Long.class, loser.id(), loser.id(), loser.id())).isZero();
+    }
+  }
+
+  private Map<String, Object> storedProfile(Member member) {
+    return jdbc.queryForMap("""
+        SELECT status, nickname, gender, age_group, experience_period, ntrp, same_gender_only
+        FROM users WHERE id = ?
+        """, member.id());
+  }
+
   private ResultActions submit(Member member, String body) throws Exception {
     return mvc.perform(put(PATH).header("Authorization", member.bearer())
         .contentType("application/json").content(body));
@@ -125,9 +187,9 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     String subject = UUID.randomUUID().toString();
     var user = users.getOrCreateUser(
         new SocialIdentity(OAuthProvider.KAKAO, subject, subject + "@example.test", true, displayName));
-    return new Member(user.getNickname(),
+    return new Member(user.getId(), user.getNickname(),
         "Bearer " + sessions.login(user.getId(), LoginTarget.SERVICE).accessToken());
   }
 
-  private record Member(String nickname, String bearer) {}
+  private record Member(long id, String nickname, String bearer) {}
 }
