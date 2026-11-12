@@ -37,7 +37,7 @@ class NotificationRepositoryTest extends IntegrationTestSupport {
 
 	@BeforeEach
 	void setUp() {
-		recipient = userRepository.save(EntityFixtures.user("알림수신자", Gender.FEMALE));
+		recipient = userRepository.save(EntityFixtures.user(entityManager, "알림수신자", Gender.FEMALE));
 	}
 
 	@Test

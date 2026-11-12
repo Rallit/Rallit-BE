@@ -9,9 +9,15 @@ import com.rallit.domain.court.entity.CourtSlot;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.region.entity.Area;
+import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
+import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
+import com.rallit.domain.user.enums.PreferredMatchType;
+import com.rallit.domain.user.enums.PreferredTimeSlot;
+import jakarta.persistence.EntityManager;
 
 public final class EntityFixtures {
 
@@ -20,12 +26,13 @@ public final class EntityFixtures {
 	private EntityFixtures() {
 	}
 
-	public static User user(String nickname, Gender gender) {
+	public static User user(EntityManager entityManager, String nickname, Gender gender) {
+		Area area = entityManager.createQuery("select a from Area a where a.code = '11440'", Area.class)
+				.getSingleResult();
 		User user = User.signUp(null);
-		user.onboarding()
-				.nickname(nickname)
-				.gender(gender)
-				.complete();
+		user.completeOnboarding(new OnboardingProfile(nickname, gender, AgeGroup.TWENTIES,
+				ExperiencePeriod.ONE_TO_THREE_YEARS, new BigDecimal("3.0"), false,
+				Set.of(PreferredMatchType.SINGLES), Set.of(area), Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		return user;
 	}
 

@@ -1,0 +1,23 @@
+UPDATE users
+SET experience_period = CASE experience_period
+    WHEN 'BEGINNER' THEN 'UNDER_SIX_MONTHS'
+    WHEN 'ONE_YEAR' THEN 'ONE_TO_THREE_YEARS'
+    WHEN 'TWO_YEARS' THEN 'ONE_TO_THREE_YEARS'
+    WHEN 'THREE_YEARS' THEN 'THREE_YEARS_OR_MORE'
+    WHEN 'FOUR_YEARS' THEN 'THREE_YEARS_OR_MORE'
+    WHEN 'FIVE_YEARS' THEN 'THREE_YEARS_OR_MORE'
+    WHEN 'SIX_YEARS_OR_MORE' THEN 'THREE_YEARS_OR_MORE'
+    ELSE experience_period
+END
+WHERE experience_period IN (
+    'BEGINNER', 'ONE_YEAR', 'TWO_YEARS', 'THREE_YEARS', 'FOUR_YEARS', 'FIVE_YEARS', 'SIX_YEARS_OR_MORE'
+);
+
+INSERT INTO user_preferred_match_type (user_id, match_type)
+SELECT DISTINCT user_id, 'DOUBLES'
+FROM user_preferred_match_type
+WHERE match_type IN ('WOMENS_DOUBLES', 'MENS_DOUBLES')
+ON CONFLICT (user_id, match_type) DO NOTHING;
+
+DELETE FROM user_preferred_match_type
+WHERE match_type IN ('WOMENS_DOUBLES', 'MENS_DOUBLES');

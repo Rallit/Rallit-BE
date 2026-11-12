@@ -15,4 +15,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   @Query(value = "select u.* from users u where u.email_key = lower(:email)", nativeQuery = true)
   Optional<User> findByEmailKey(@Param("email") String email);
+
+  @Query(value = """
+      select exists (select 1 from users where lower(nickname) = lower(:nickname) and id <> :userId)
+      """, nativeQuery = true)
+  boolean isNicknameTakenByAnotherUser(@Param("nickname") String nickname, @Param("userId") Long userId);
 }
