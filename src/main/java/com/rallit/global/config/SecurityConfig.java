@@ -174,11 +174,8 @@ public class SecurityConfig {
               jakarta.servlet.http.HttpServletResponse response,
               jakarta.servlet.FilterChain chain)
               throws jakarta.servlet.ServletException, java.io.IOException {
-            String t = r.getParameter("target");
             if (AuthRequestMatchers.isLogin(r)
-                && t != null
-                && !t.equals("service")
-                && !t.equals("admin")) {
+                && LoginTarget.fromParameter(r.getParameter("target")).isEmpty()) {
               errors.write(response, 400);
               return;
             }

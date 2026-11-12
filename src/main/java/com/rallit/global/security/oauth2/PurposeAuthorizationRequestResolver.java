@@ -28,12 +28,9 @@ public class PurposeAuthorizationRequestResolver implements OAuth2AuthorizationR
 
   private OAuth2AuthorizationRequest customize(OAuth2AuthorizationRequest a, HttpServletRequest r) {
     if (a == null) return null;
-    String raw = r.getParameter("target");
     LoginTarget target =
-        raw == null || raw.equals("service")
-            ? LoginTarget.SERVICE
-            : raw.equals("admin") ? LoginTarget.ADMIN : null;
-    if (target == null) throw new OAuth2AuthorizationException(new OAuth2Error("invalid_request"));
+        LoginTarget.fromParameter(r.getParameter("target"))
+            .orElseThrow(() -> new OAuth2AuthorizationException(new OAuth2Error("invalid_request")));
     return OAuth2AuthorizationRequest.from(a)
         .attributes(v -> v.put(RedisAuthorizationRequestRepository.TARGET, target.name()))
         .build();
