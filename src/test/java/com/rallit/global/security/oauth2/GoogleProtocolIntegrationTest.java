@@ -30,6 +30,7 @@ import org.springframework.test.context.*;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   static final RSAKey key;

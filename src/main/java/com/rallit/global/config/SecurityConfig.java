@@ -15,6 +15,8 @@ import java.util.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -36,7 +38,9 @@ public class SecurityConfig {
   }
 
   @Bean
-  ClientRegistrationRepository clientRegistrations(AuthProperties p, GoogleOAuthProperties google) {
+  ClientRegistrationRepository clientRegistrations(
+      AuthProperties p, GoogleOAuthProperties google, Environment environment) {
+    google.validateTokenUri(environment);
     var builder =
         ClientRegistration.withRegistrationId("kakao")
             .clientId(p.kakaoClientId())
@@ -159,7 +163,7 @@ public class SecurityConfig {
       ClientRegistrationRepository clients,
       RedisAuthorizationRequestRepository requests,
       OAuthLoginHandlers handlers,
-      org.springframework.core.env.Environment environment)
+      Environment environment)
       throws Exception {
     common(http, LoginTarget.SERVICE, p, jwt, sessions, userDetailsService, cookies, errors);
     http.addFilterBefore(
@@ -202,7 +206,7 @@ public class SecurityConfig {
                         return filter;
                       }
                     }));
-    if (environment.acceptsProfiles(org.springframework.core.env.Profiles.of("local"))) {
+    if (environment.acceptsProfiles(Profiles.of("local"))) {
       http.authorizeHttpRequests(
           a ->
               a.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
