@@ -13,7 +13,7 @@ public record UserResponse(
     @Schema(description = "백엔드 기준 상대 경로. 조회에 Bearer 토큰이 필요하며, 올린 사진이 없으면 null",
         example = "/api/v1/users/1/profile-image", types = {"string", "null"})
     String profileImageUrl,
-    @Schema(description = "온보딩 환영 인사용 소셜 이름. 값이 없으면 null", types = {"string", "null"})
+    @Schema(description = "카카오·구글 소셜 로그인에서 받은 표시 이름", types = {"string", "null"})
     String socialDisplayName,
     @Schema(description = "저장된 온보딩 프로필. 가입 완료 전에는 null")
     UserProfileResponse profile) {
