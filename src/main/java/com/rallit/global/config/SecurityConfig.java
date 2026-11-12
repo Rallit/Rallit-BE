@@ -17,6 +17,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -222,6 +223,8 @@ public class SecurityConfig {
                         "/actuator/health/**")
                     .permitAll()
                     .requestMatchers("/api/v1/users/me")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
                     .authenticated()
                     .anyRequest()
                     .denyAll())
