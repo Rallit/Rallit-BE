@@ -62,19 +62,23 @@ public class ProfileImageService {
   @Transactional(readOnly = true)
   public Image get(Long userId) {
     try {
-      String key = getKey(userId);
-      try {
-        return readImage(key);
-      } catch (NoSuchFileException missing) {
-        // A concurrent replacement may have deleted the old file after we read its key.
-        String latestKey = getKey(userId);
-        if (latestKey.equals(key)) throw missing;
-        return readImage(latestKey);
-      }
+      return readImageWithReplacementRetry(userId);
     } catch (NoSuchFileException missing) {
       throw new GeneralException(ErrorStatus._NOT_FOUND);
     } catch (IOException failure) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
+    }
+  }
+
+  private Image readImageWithReplacementRetry(Long userId) throws IOException {
+    String key = getKey(userId);
+    try {
+      return readImage(key);
+    } catch (NoSuchFileException missing) {
+      // A concurrent replacement may have deleted the old file after we read its key.
+      String latestKey = getKey(userId);
+      if (latestKey.equals(key)) throw missing;
+      return readImage(latestKey);
     }
   }
 
