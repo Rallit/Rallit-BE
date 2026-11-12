@@ -85,6 +85,16 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
+  void rejectsCoercedJsonScalars() throws Exception {
+    var member = login();
+    var body = PAYLOAD.formatted(member.nickname());
+    submit(member, body.replace("\"FEMALE\"", "1")).andExpect(status().isBadRequest());
+    submit(member, body.replace("false", "0")).andExpect(status().isBadRequest());
+    submit(member, body.replace("\"11440\"", "11440")).andExpect(status().isBadRequest());
+    submit(member, body.replace("\"4.0+\"", "3.0")).andExpect(status().isBadRequest());
+  }
+
+  @Test
   void nicknameAvailabilityAndFinalSubmissionRespectTheSameUniquenessRule() throws Exception {
     var member = login();
     var other = login();
