@@ -139,13 +139,7 @@ public class User extends BaseEntity {
 		ageGroup = profile.ageGroup();
 		experiencePeriod = profile.experiencePeriod();
 		ntrp = profile.ntrp();
-		sameGenderOnly = profile.sameGenderOnly();
-		preferredMatchTypes.clear();
-		preferredMatchTypes.addAll(profile.preferredMatchTypes());
-		activityAreas.clear();
-		activityAreas.addAll(profile.activityAreas());
-		preferredTimeSlots.clear();
-		preferredTimeSlots.addAll(profile.preferredTimeSlots());
+		applyMatchPreferences(profile);
 		status = UserStatus.ACTIVE;
 	}
 
@@ -159,6 +153,16 @@ public class User extends BaseEntity {
 				&& preferredMatchTypes.equals(profile.preferredMatchTypes())
 				&& areaCodes(activityAreas).equals(areaCodes(profile.activityAreas()))
 				&& preferredTimeSlots.equals(profile.preferredTimeSlots());
+	}
+
+	private void applyMatchPreferences(OnboardingProfile profile) {
+		sameGenderOnly = profile.sameGenderOnly();
+		preferredMatchTypes.clear();
+		preferredMatchTypes.addAll(profile.preferredMatchTypes());
+		activityAreas.clear();
+		activityAreas.addAll(profile.activityAreas());
+		preferredTimeSlots.clear();
+		preferredTimeSlots.addAll(profile.preferredTimeSlots());
 	}
 
 	private Set<String> areaCodes(Set<Area> areas) {
