@@ -33,6 +33,7 @@ public abstract class IntegrationTestSupport {
     r.add("spring.datasource.hikari.minimum-idle", () -> 0);
     r.add("spring.data.redis.host", REDIS::getHost);
     r.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+    r.add("spring.data.redis.password", () -> "");
     r.add(
         "rallit.auth.service-key",
         () ->
