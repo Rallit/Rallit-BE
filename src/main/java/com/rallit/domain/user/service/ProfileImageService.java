@@ -3,18 +3,14 @@ package com.rallit.domain.user.service;
 import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.UserStatus;
-import com.rallit.domain.user.exception.UserErrorStatus;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.storage.ProfileImageStorage;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
-import java.util.Locale;
 import java.util.UUID;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.MemoryCacheImageInputStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -29,21 +25,17 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 @Slf4j
 public class ProfileImageService {
-  private static final long MAX_BYTES = 5L * 1024 * 1024;
-  private static final int MAX_DIMENSION = 16_384;
-  private static final long MAX_PIXELS = 64_000_000L;
-  private static final int VALIDATION_SAMPLE_SIZE = 256;
-
   private final UserRepository users;
   private final ProfileImageStorage storage;
+  private final ProfileImageNormalizer normalizer;
 
   @Transactional
   public ProfileImageResponse upload(Long userId, MultipartFile file) {
-    String extension = validate(file);
+    var image = normalizer.normalize(file);
     User user = lockUser(userId);
-    String key = UUID.randomUUID() + extension;
-    try (var contents = file.getInputStream()) {
-      storage.write(key, contents);
+    String key = UUID.randomUUID() + image.extension();
+    try {
+      storage.write(key, new ByteArrayInputStream(image.contents()));
     } catch (IOException failure) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
     }
@@ -95,61 +87,6 @@ public class ProfileImageService {
   private User lockUser(Long userId) {
     return users.findByIdForUpdate(userId).filter(user -> !user.isWithdrawn())
         .orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
-  }
-
-  private String validate(MultipartFile file) {
-    if (file.getSize() > MAX_BYTES) {
-      throw new GeneralException(UserErrorStatus.PROFILE_IMAGE_TOO_LARGE);
-    }
-    String filename = file.getOriginalFilename();
-    if (file.isEmpty() || filename == null) {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
-    }
-    return validateImageContents(file, filename.toLowerCase(Locale.ROOT));
-  }
-
-  private String validateImageContents(MultipartFile file, String filename) {
-    try (var contents = file.getInputStream(); var image = new MemoryCacheImageInputStream(contents)) {
-      var readers = ImageIO.getImageReaders(image);
-      if (!readers.hasNext()) {
-        throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
-      }
-      var reader = readers.next();
-      try {
-        reader.setInput(image, true, true);
-        String extension = validatedExtension(reader.getFormatName(), filename);
-        validateDecodableImage(reader);
-        return extension;
-      } finally {
-        reader.dispose();
-      }
-    } catch (IOException | IllegalArgumentException failure) {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
-    }
-  }
-
-  private void validateDecodableImage(ImageReader reader) throws IOException {
-    reader.addIIOReadWarningListener((source, warning) -> {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
-    });
-    int width = reader.getWidth(0);
-    int height = reader.getHeight(0);
-    if (width <= 0 || height <= 0 || width > MAX_DIMENSION || height > MAX_DIMENSION
-        || (long) width * height > MAX_PIXELS) {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
-    }
-    var parameters = reader.getDefaultReadParam();
-    int step = Math.ceilDiv(Math.max(width, height), VALIDATION_SAMPLE_SIZE);
-    parameters.setSourceSubsampling(step, step, 0, 0);
-    reader.read(0, parameters);
-  }
-
-  private String validatedExtension(String format, String filename) {
-    if ("png".equalsIgnoreCase(format) && filename.endsWith(".png")) return ".png";
-    if ("jpeg".equalsIgnoreCase(format) && (filename.endsWith(".jpeg") || filename.endsWith(".jpg"))) {
-      return ".jpg";
-    }
-    throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
   }
 
   private void cleanUpAfterTransaction(String previous, String uploaded) {
