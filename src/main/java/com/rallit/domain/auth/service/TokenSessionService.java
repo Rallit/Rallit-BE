@@ -7,6 +7,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.jwt.JwtTokenService;
+import com.rallit.global.security.jwt.JwtTokenService.VerifiedAccess;
 import com.rallit.global.security.jwt.JwtTokenService.VerifiedRefresh;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -67,6 +68,15 @@ public class TokenSessionService {
             verified.userId() + ":" + hash(pair.refreshToken()));
     if (rotated != 1) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
     return pair;
+  }
+
+  public void requireActiveSession(VerifiedAccess access, LoginTarget target) {
+    try {
+      if (!Boolean.TRUE.equals(redis.hasKey(key(access.sid(), target))))
+        throw new GeneralException(ErrorStatus._UNAUTHORIZED);
+    } catch (DataAccessException e) {
+      throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, e);
+    }
   }
 
   public void logout(String token, LoginTarget target) {

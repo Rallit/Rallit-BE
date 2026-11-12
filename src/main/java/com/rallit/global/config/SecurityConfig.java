@@ -1,6 +1,7 @@
 package com.rallit.global.config;
 
 import com.rallit.domain.auth.model.LoginTarget;
+import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.global.security.authentication.AuthRequestMatchers;
 import com.rallit.global.security.authentication.BearerAuthenticationFilter;
 import com.rallit.global.security.authentication.CookieBoundaryFilter;
@@ -86,6 +87,7 @@ public class SecurityConfig {
       LoginTarget target,
       AuthProperties p,
       JwtTokenService jwt,
+      TokenSessionService sessions,
       UserDetailsService userDetailsService,
       AuthCookieManager cookies,
       SecurityErrorWriter errors)
@@ -116,7 +118,7 @@ public class SecurityConfig {
                 s.authenticationEntryPoint((r, response, e) -> errors.write(response, 401))
                     .accessDeniedHandler(errors::denied))
         .addFilterBefore(
-            new BearerAuthenticationFilter(target, jwt, userDetailsService, errors),
+            new BearerAuthenticationFilter(target, jwt, sessions, userDetailsService, errors),
             AnonymousAuthenticationFilter.class);
   }
 
@@ -126,11 +128,12 @@ public class SecurityConfig {
       HttpSecurity http,
       AuthProperties p,
       JwtTokenService jwt,
+      TokenSessionService sessions,
       UserDetailsService userDetailsService,
       AuthCookieManager cookies,
       SecurityErrorWriter errors)
       throws Exception {
-    common(http, LoginTarget.ADMIN, p, jwt, userDetailsService, cookies, errors);
+    common(http, LoginTarget.ADMIN, p, jwt, sessions, userDetailsService, cookies, errors);
     return http.securityMatcher("/api/v1/admin/**")
         .authorizeHttpRequests(
             a ->
@@ -149,6 +152,7 @@ public class SecurityConfig {
       HttpSecurity http,
       AuthProperties p,
       JwtTokenService jwt,
+      TokenSessionService sessions,
       UserDetailsService userDetailsService,
       AuthCookieManager cookies,
       SecurityErrorWriter errors,
@@ -157,7 +161,7 @@ public class SecurityConfig {
       OAuthLoginHandlers handlers,
       org.springframework.core.env.Environment environment)
       throws Exception {
-    common(http, LoginTarget.SERVICE, p, jwt, userDetailsService, cookies, errors);
+    common(http, LoginTarget.SERVICE, p, jwt, sessions, userDetailsService, cookies, errors);
     http.addFilterBefore(
         new org.springframework.web.filter.OncePerRequestFilter() {
           @Override

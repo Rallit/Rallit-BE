@@ -124,15 +124,19 @@ class BearerContractIntegrationTest extends IntegrationTestSupport {
 
   @ParameterizedTest
   @EnumSource(LoginTarget.class)
-  void logoutClearsCookieAndIsIdempotent(LoginTarget target) throws Exception {
+  void logoutClearsCookieAndRevokesOnlyTheCurrentSession(LoginTarget target) throws Exception {
     long id = users.getOrCreateUser(kakao(UUID.randomUUID().toString())).getId();
     if (target == LoginTarget.ADMIN) {
       jdbc.update("update users set role='ADMIN' where id=?", id);
     }
     var session = sessions.login(id, target);
+    var otherSession = sessions.login(id, target);
+    String mePath = target == LoginTarget.ADMIN ? "/api/v1/admin/me" : "/api/v1/users/me";
     String cookieName = "__Host-" + target.prefix() + "_refresh";
     var cookie = new Cookie(cookieName, session.refreshToken());
 
+    mvc.perform(get(mePath).header("Authorization", "Bearer " + session.accessToken()))
+        .andExpect(status().isOk());
     for (var request :
         List.of(logoutRequest(target).cookie(cookie), logoutRequest(target).cookie(cookie),
             logoutRequest(target))) {
@@ -144,6 +148,10 @@ class BearerContractIntegrationTest extends IntegrationTestSupport {
       assertThat(response.getHeaders("Set-Cookie"))
           .anySatisfy(value -> assertThat(value).startsWith(cookieName + "=").contains("Max-Age=0"));
     }
+    mvc.perform(get(mePath).header("Authorization", "Bearer " + session.accessToken()))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get(mePath).header("Authorization", "Bearer " + otherSession.accessToken()))
+        .andExpect(status().isOk());
   }
 
   @Test

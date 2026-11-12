@@ -1,6 +1,7 @@
 package com.rallit.global.security.authentication;
 
 import com.rallit.domain.auth.model.LoginTarget;
+import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.jwt.JwtTokenService;
@@ -17,16 +18,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class BearerAuthenticationFilter extends OncePerRequestFilter {
   private final LoginTarget target;
   private final JwtTokenService jwt;
+  private final TokenSessionService sessions;
   private final UserDetailsService userDetailsService;
   private final SecurityErrorWriter errors;
 
   public BearerAuthenticationFilter(
       LoginTarget target,
       JwtTokenService jwt,
+      TokenSessionService sessions,
       UserDetailsService userDetailsService,
       SecurityErrorWriter errors) {
     this.target = target;
     this.jwt = jwt;
+    this.sessions = sessions;
     this.userDetailsService = userDetailsService;
     this.errors = errors;
   }
@@ -54,6 +58,7 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
       String token = accessToken(request);
       if (token != null) {
         var verified = jwt.verifyAccess(token, target);
+        sessions.requireActiveSession(verified, target);
         var principal = userDetailsService.loadUserByUsername(verified.userId().toString());
         if (target == LoginTarget.ADMIN
             && !principal.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_ADMIN"))) {
@@ -68,7 +73,12 @@ public class BearerAuthenticationFilter extends OncePerRequestFilter {
       }
     } catch (GeneralException | UsernameNotFoundException rejected) {
       SecurityContextHolder.clearContext();
-      errors.write(response, 401);
+      if (rejected instanceof GeneralException failure
+          && failure.getCode() == ErrorStatus._SERVICE_UNAVAILABLE) {
+        errors.write(response, ErrorStatus._SERVICE_UNAVAILABLE);
+      } else {
+        errors.write(response, 401);
+      }
       return;
     }
     response.setHeader("Cache-Control", "no-store");
