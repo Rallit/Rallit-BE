@@ -4,6 +4,7 @@ import com.rallit.domain.region.repository.AreaRepository;
 import com.rallit.domain.user.dto.NicknameAvailabilityResponse;
 import com.rallit.domain.user.dto.OnboardingRequest;
 import com.rallit.domain.user.dto.UserResponse;
+import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.SocialAccount;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.exception.UserErrorStatus;
@@ -40,11 +41,7 @@ public class UserService {
   public UserResponse completeOnboarding(Long userId, OnboardingRequest request) {
     User user = users.findByIdForUpdate(userId).filter(current -> !current.isWithdrawn())
         .orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
-    var selectedAreas = areas.findAllByCodeIn(request.activityAreaCodes());
-    if (selectedAreas.size() != request.activityAreaCodes().size()) {
-      throw new GeneralException(UserErrorStatus.INVALID_ACTIVITY_AREA);
-    }
-    var profile = request.toProfile(Set.copyOf(selectedAreas));
+    OnboardingProfile profile = resolveOnboardingProfile(request);
     if (user.isOnboardingCompleted()) {
       if (user.hasOnboardingProfile(profile)) return response(user);
       throw new GeneralException(UserErrorStatus.ONBOARDING_ALREADY_COMPLETED);
@@ -60,6 +57,14 @@ public class UserService {
       throw new GeneralException(UserErrorStatus.NICKNAME_CONFLICT);
     }
     return response(user);
+  }
+
+  private OnboardingProfile resolveOnboardingProfile(OnboardingRequest request) {
+    var selectedAreas = areas.findAllByCodeIn(request.activityAreaCodes());
+    if (selectedAreas.size() != request.activityAreaCodes().size()) {
+      throw new GeneralException(UserErrorStatus.INVALID_ACTIVITY_AREA);
+    }
+    return request.toProfile(Set.copyOf(selectedAreas));
   }
 
   private UserResponse response(User user) {
