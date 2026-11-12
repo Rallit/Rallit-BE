@@ -28,14 +28,19 @@ public class UserController {
 
   @Operation(
       summary = "내 회원 정보 조회",
-      description = "로그인한 회원의 기본 정보와 완료된 온보딩 프로필을 조회합니다.")
+      description = "`result.onboardingCompleted`가 `false`이면 온보딩 화면으로 이동합니다.")
   @GetMapping("/me")
   public ResponseEntity<ApiResponse<UserResponse>> me(
       @AuthenticationPrincipal UserDetails principal) {
     return ResponseEntity.ok(ApiResponse.onSuccess(users.getMe(principal.userId())));
   }
 
-  @Operation(summary = "온보딩 완료", description = "세 단계의 입력을 저장하고 가입을 완료합니다.")
+  @Operation(
+      summary = "온보딩 완료",
+      description = """
+          - 내 기본 닉네임은 사용할 수 있습니다. 영문 대소문자를 무시하고 비교하며, 다른 회원과 중복되면 `409`를 반환합니다.
+          - 완료 후 같은 내용으로 다시 제출하면 `200`, 입력값을 바꿔 제출하면 `409`를 반환합니다.
+          """)
   @PostMapping("/me/onboarding")
   public ResponseEntity<ApiResponse<UserResponse>> completeOnboarding(
       @AuthenticationPrincipal UserDetails principal, @Valid @RequestBody OnboardingRequest request) {
