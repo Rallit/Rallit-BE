@@ -11,6 +11,7 @@ import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
 import com.nimbusds.jwt.*;
 import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.*;
+import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.enums.SocialProvider;
 import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
@@ -94,6 +95,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
                           "nonce".equals(exchange.invalid()) ? "wrong-nonce" : exchange.nonce())
                       .claim("email_verified", exchange.verified());
               if (exchange.email() != null) claims.claim("email", exchange.email());
+              if (exchange.subject().startsWith("profile-")) claims.claim("name", "Google Name");
               var jwt =
                   new SignedJWT(
                       new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key").build(),
@@ -153,6 +155,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
   @Autowired SocialAccountRepository accounts;
   @Autowired UserRegistrationService registration;
+  @Autowired TokenSessionService sessions;
 
   Attempt start(String target) throws Exception {
     var response =
@@ -191,7 +194,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
 
   @Test
   void signedOidcTokenCreatesMemberAndKeepsSameMemberOnRelogin() throws Exception {
-    String subject = UUID.randomUUID().toString(), email = subject + "@example.test";
+    String subject = "profile-" + UUID.randomUUID(), email = subject + "@example.test";
     var first = callback(start("service"), subject, email, true, "");
     assertThat(first.getHeader("Location")).isEqualTo(CALLBACK);
     assertThat(first.getHeaders("Set-Cookie"))
@@ -199,6 +202,10 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
     var member =
         accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject).orElseThrow();
     assertThat(member.getEmail()).isEqualTo(email);
+    String token = sessions.login(member.getId(), LoginTarget.SERVICE).accessToken();
+    mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.socialDisplayName").value("Google Name"));
     assertThat(callback(start("service"), subject, email, true, "").getHeader("Location"))
         .isEqualTo(CALLBACK);
     assertThat(

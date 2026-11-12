@@ -21,7 +21,7 @@ class FlywayMigrationTest extends IntegrationTestSupport {
 	@Test
 	void appliesMvpAndAuthenticationMigrations() {
 		MigrationInfo current = flyway.info().current();
-		assertThat(current.getVersion().getVersion()).isEqualTo("7");
+		assertThat(current.getVersion().getVersion()).isEqualTo("8");
 		assertThat(current.getState()).isEqualTo(MigrationState.SUCCESS);
 		assertThat(flyway.info().pending()).isEmpty();
 	}

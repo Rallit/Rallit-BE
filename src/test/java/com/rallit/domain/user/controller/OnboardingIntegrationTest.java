@@ -6,7 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.rallit.domain.auth.dto.internal.SocialIdentity;
 import com.rallit.domain.auth.model.LoginTarget;
+import com.rallit.domain.auth.model.OAuthProvider;
 import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.support.IntegrationTestSupport;
@@ -42,7 +44,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
 
   @Test
   void completesOnboardingAndHandlesRepeatedSubmissions() throws Exception {
-    var member = login();
+    var member = login("환영 인사 이름");
     var body = PAYLOAD.formatted(member.nickname());
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(jsonPath("$.result.profile").value(nullValue()));
@@ -51,6 +53,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code").value("COMMON200"))
         .andExpect(jsonPath("$.result.onboardingCompleted").value(true))
+        .andExpect(jsonPath("$.result.socialDisplayName").value("환영 인사 이름"))
         .andExpect(jsonPath("$.result.profile.ntrp").value("4.0+"))
         .andExpect(jsonPath("$.result.profile.sameGenderOnly").value(false))
         .andExpect(jsonPath("$.result.profile.activityAreaCodes[0]").value("11410"));
@@ -61,6 +64,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
 
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.socialDisplayName").value("환영 인사 이름"))
         .andExpect(jsonPath("$.result.profile.ntrp").value("4.0+"));
   }
 
@@ -104,7 +108,13 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
   }
 
   private Member login() {
-    var user = users.getOrCreateUser(kakao(UUID.randomUUID().toString()));
+    return login(null);
+  }
+
+  private Member login(String displayName) {
+    String subject = UUID.randomUUID().toString();
+    var user = users.getOrCreateUser(
+        new SocialIdentity(OAuthProvider.KAKAO, subject, subject + "@example.test", true, displayName));
     return new Member(user.getNickname(),
         "Bearer " + sessions.login(user.getId(), LoginTarget.SERVICE).accessToken());
   }

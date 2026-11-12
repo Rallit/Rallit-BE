@@ -60,7 +60,7 @@ public class SecurityConfig {
                     ? "https://kapi.kakao.com/v2/user/me"
                     : p.kakaoUserInfoUri())
             .userNameAttributeName("id")
-            .scope("account_email")
+            .scope("account_email", "profile_nickname")
             .clientName("Kakao");
     if (p.kakaoClientSecret() != null && !p.kakaoClientSecret().isBlank())
       builder
@@ -77,7 +77,7 @@ public class SecurityConfig {
             .clientId(properties.clientId())
             .clientSecret(properties.clientSecret())
             .redirectUri(properties.redirectUri())
-            .scope("openid", "email")
+            .scope("openid", "email", "profile")
             .issuerUri("https://accounts.google.com");
     if (properties.authorizationUri() != null)
       builder.authorizationUri(properties.authorizationUri());

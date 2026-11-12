@@ -35,14 +35,14 @@ public class UserRegistrationService {
     String email = identity.verifiedEmail();
     for (int attempt = 0; attempt < 5; attempt++) {
       var existing = findUserBySocialIdentity(identity);
-      if (existing.isPresent()) return syncVerifiedEmail(existing.get(), email);
+      if (existing.isPresent()) return syncExistingUser(existing.get(), identity);
       if (email == null) throw new SocialLoginRejectedException(Reason.EMAIL_REQUIRED, null);
 
       var emailOwner = users.findByEmailKey(email);
       if (emailOwner.isPresent()) {
         // The same identity may have registered after the initial lookup.
         existing = findUserBySocialIdentity(identity);
-        if (existing.isPresent()) return syncVerifiedEmail(existing.get(), email);
+        if (existing.isPresent()) return syncExistingUser(existing.get(), identity);
         throw accountExists(emailOwner.get());
       }
 
@@ -79,13 +79,22 @@ public class UserRegistrationService {
     }
   }
 
+  private User syncExistingUser(User existing, SocialIdentity identity) {
+    User user = syncVerifiedEmail(existing, identity.verifiedEmail());
+    if (!user.isWithdrawn() && identity.displayName() != null) {
+      accounts.updateDisplayName(
+          SocialProvider.valueOf(identity.provider().name()), identity.subject(), identity.displayName());
+    }
+    return user;
+  }
+
   private User createUser(SocialIdentity identity, String email) {
     return new TransactionTemplate(manager)
         .execute(
             status -> {
               User user = users.save(User.signUp(null, generator.generate(), email));
               SocialProvider provider = SocialProvider.valueOf(identity.provider().name());
-              accounts.saveAndFlush(SocialAccount.of(user, provider, identity.subject()));
+              accounts.saveAndFlush(SocialAccount.of(user, provider, identity.subject(), identity.displayName()));
               return user;
             });
   }

@@ -42,13 +42,21 @@ public class SocialAccount extends BaseEntity {
 	@Column(nullable = false)
 	private String providerUserId;
 
-	private SocialAccount(User user, SocialProvider provider, String providerUserId) {
+	@Column(length = 255)
+	private String displayName;
+
+	private SocialAccount(User user, SocialProvider provider, String providerUserId, String displayName) {
 		this.user = user;
 		this.provider = provider;
 		this.providerUserId = providerUserId;
+		this.displayName = displayName;
 	}
 
 	public static SocialAccount of(User user, SocialProvider provider, String providerUserId) {
-		return new SocialAccount(user, provider, providerUserId);
+		return of(user, provider, providerUserId, null);
+	}
+
+	public static SocialAccount of(User user, SocialProvider provider, String providerUserId, String displayName) {
+		return new SocialAccount(user, provider, providerUserId, displayName);
 	}
 }
