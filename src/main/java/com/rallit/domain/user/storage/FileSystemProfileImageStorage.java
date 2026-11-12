@@ -3,8 +3,10 @@ package com.rallit.domain.user.storage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -40,8 +42,12 @@ public class FileSystemProfileImageStorage implements ProfileImageStorage {
   }
 
   @Override
-  public Resource read(String key) throws IOException {
-    return new InputStreamResource(Files.newInputStream(pathFor(key)));
+  public Optional<Resource> read(String key) throws IOException {
+    try {
+      return Optional.of(new InputStreamResource(Files.newInputStream(pathFor(key))));
+    } catch (NoSuchFileException missing) {
+      return Optional.empty();
+    }
   }
 
   @Override

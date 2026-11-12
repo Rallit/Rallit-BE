@@ -2,6 +2,12 @@ package com.rallit.domain.user.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -13,7 +19,9 @@ import com.drew.imaging.ImageMetadataReader;
 import com.drew.metadata.exif.GpsDirectory;
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
+import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
+import com.rallit.domain.user.storage.FileSystemProfileImageStorage;
 import com.rallit.support.IntegrationTestSupport;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
@@ -24,7 +32,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -35,8 +45,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @SpringBootTest(properties = {
     "RALLIT_ENV_FILE=.env.test-disabled",
@@ -49,6 +61,8 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
   @Autowired UserRegistrationService users;
   @Autowired TokenSessionService sessions;
+  @MockitoSpyBean UserRepository userRepository;
+  @MockitoSpyBean FileSystemProfileImageStorage storage;
 
   @Test
   void uploadsServesAndDeletesAnImageDuringOnboarding() throws Exception {
@@ -68,6 +82,11 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
     var served = view(viewer, url, "image/png");
     assertThat(ImageIO.read(new ByteArrayInputStream(served)).getRGB(0, 0))
         .isEqualTo(ImageIO.read(new ByteArrayInputStream(bytes)).getRGB(0, 0));
+
+    String previous = userRepository.findById(owner.id()).orElseThrow().getProfileImageKey();
+    upload(owner, "replacement.jpeg", "image/jpeg", image("jpeg")).andExpect(status().isOk());
+    assertThat(storage.read(previous)).isEmpty();
+    view(viewer, url, "image/jpeg");
 
     mvc.perform(delete(PATH).header("Authorization", owner.bearer()))
         .andExpect(status().isNoContent());
@@ -136,6 +155,44 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
     assertThat(view(owner, url, "image/jpeg")).isEqualTo(stored);
     mvc.perform(delete(PATH).header("Authorization", owner.bearer()))
         .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void writesBeforeTransactionAndCleansUpReplacementOnRollback() throws Exception {
+    var owner = login();
+    var url = "/api/v1/users/" + owner.id() + "/profile-image";
+    byte[] original = image("png");
+    upload(owner, "avatar.png", "image/png", original).andExpect(status().isOk());
+    byte[] stored = view(owner, url, "image/png");
+
+    var replacementKey = new AtomicReference<String>();
+    doAnswer(invocation -> {
+      assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+      replacementKey.set(invocation.getArgument(0));
+      return invocation.callRealMethod();
+    }).when(storage).write(anyString(), any());
+    doReturn(Optional.empty()).when(userRepository).findByIdForUpdate(owner.id());
+
+    upload(owner, "replacement.jpeg", "image/jpeg", image("jpeg")).andExpect(status().isUnauthorized());
+
+    assertThat(replacementKey.get()).isNotNull();
+    verify(storage).delete(replacementKey.get());
+    assertThat(storage.read(replacementKey.get())).isEmpty();
+    assertThat(view(owner, url, "image/png")).isEqualTo(stored);
+  }
+
+  @Test
+  void distinguishesMissingFileFromStorageFailure() throws Exception {
+    var owner = login();
+    var url = "/api/v1/users/" + owner.id() + "/profile-image";
+    upload(owner, "avatar.png", "image/png", image("png")).andExpect(status().isOk());
+    var key = userRepository.findById(owner.id()).orElseThrow().getProfileImageKey();
+    storage.delete(key);
+    assertThat(storage.read(key)).isEmpty();
+    mvc.perform(get(url).header("Authorization", owner.bearer())).andExpect(status().isNotFound());
+
+    doThrow(new IOException("test storage outage")).when(storage).read(key);
+    mvc.perform(get(url).header("Authorization", owner.bearer())).andExpect(status().isServiceUnavailable());
   }
 
   private byte[] view(Member viewer, String url, String type) throws Exception {
