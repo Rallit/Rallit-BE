@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class TokenSessionService {
+  private static final Duration REFRESH_REUSE_GRACE = Duration.ofSeconds(5);
+
   private final JwtTokenService jwt;
   private final StringRedisTemplate redis;
   private final UserRepository users;
@@ -57,16 +59,26 @@ public class TokenSessionService {
     var verified = jwt.verifyRefresh(token, target);
     allowed(verified.userId(), target);
     var pair = jwt.issue(verified.userId(), verified.sid(), target, verified.expiresAt());
-    String script =
-        "if redis.call('get',KEYS[1])==ARGV[1] then redis.call('set',KEYS[1],ARGV[2],'KEEPTTL');"
-            + " return 1 else return 0 end";
     long rotated =
         execute(
-            script,
+            """
+            local current = redis.call('get', KEYS[1])
+            if not current then return 0 end
+            if current == ARGV[1] then
+              redis.call('set', KEYS[2], ARGV[1], 'PX', ARGV[3])
+              redis.call('set', KEYS[1], ARGV[2], 'KEEPTTL')
+              return 1
+            end
+            if redis.call('get', KEYS[2]) ~= ARGV[1] then
+              redis.call('del', KEYS[1], KEYS[2])
+            end
+            return 0
+            """,
             verified.sid(),
             target,
             verified.userId() + ":" + hash(token),
-            verified.userId() + ":" + hash(pair.refreshToken()));
+            verified.userId() + ":" + hash(pair.refreshToken()),
+            String.valueOf(REFRESH_REUSE_GRACE.toMillis()));
     if (rotated != 1) throw new GeneralException(ErrorStatus._UNAUTHORIZED);
     return pair;
   }
@@ -97,7 +109,7 @@ public class TokenSessionService {
             local current = redis.call('get', KEYS[1])
             if not current then return 0 end
             if current ~= ARGV[1] then return -1 end
-            return redis.call('del', KEYS[1])
+            return redis.call('del', KEYS[1], KEYS[2])
             """,
             verified.sid(),
             target,
@@ -106,11 +118,12 @@ public class TokenSessionService {
   }
 
   private long execute(String script, UUID sid, LoginTarget target, Object... arguments) {
+    String sessionKey = key(sid, target);
     try {
       Long result =
           redis.execute(
               new DefaultRedisScript<>(script, Long.class),
-              List.of(key(sid, target)),
+              List.of(sessionKey, sessionKey + ":refresh-grace"),
               arguments);
       if (result == null) throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
       return result;

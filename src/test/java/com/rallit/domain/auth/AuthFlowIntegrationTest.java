@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,6 +28,7 @@ class AuthFlowIntegrationTest extends IntegrationTestSupport {
   @Autowired TokenSessionService sessions;
   @Autowired JwtTokenService jwt;
   @Autowired JdbcTemplate jdbc;
+  @Autowired StringRedisTemplate redis;
   @Autowired MockMvc mvc;
 
   long user() {
@@ -82,6 +84,29 @@ class AuthFlowIntegrationTest extends IntegrationTestSupport {
                 assertThat(failure.getCode())
                     .isEqualTo(com.rallit.global.apiPayload.code.status.ErrorStatus._UNAUTHORIZED));
     assertThat(sessions.refresh(rotated.refreshToken(), LoginTarget.SERVICE)).isNotNull();
+  }
+
+  @Test
+  void refreshReuseAfterGraceRevokesOnlyThatSession() throws Exception {
+    long id = user();
+    var original = sessions.login(id, LoginTarget.SERVICE);
+    var other = sessions.login(id, LoginTarget.SERVICE);
+    var rotated = sessions.refresh(original.refreshToken(), LoginTarget.SERVICE);
+
+    var sid = jwt.verifyAccess(rotated.accessToken(), LoginTarget.SERVICE).sid();
+    String sessionKey = "auth:service:session:" + sid;
+    String graceKey = sessionKey + ":refresh-grace";
+    assertThat(redis.getExpire(graceKey, TimeUnit.MILLISECONDS)).isBetween(1L, 5_000L);
+    assertThat(redis.expire(graceKey, Duration.ZERO)).isTrue();
+
+    assertThatThrownBy(() -> sessions.refresh(original.refreshToken(), LoginTarget.SERVICE))
+        .isInstanceOfSatisfying(
+            com.rallit.global.apiPayload.exception.GeneralException.class,
+            failure -> assertThat(failure.getErrorReasonHttpStatus().getHttpStatus().value()).isEqualTo(401));
+    assertThat(redis.hasKey(sessionKey)).isFalse();
+    mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + rotated.accessToken()))
+        .andExpect(status().isUnauthorized());
+    assertThat(sessions.refresh(other.refreshToken(), LoginTarget.SERVICE)).isNotNull();
   }
 
   @Test
