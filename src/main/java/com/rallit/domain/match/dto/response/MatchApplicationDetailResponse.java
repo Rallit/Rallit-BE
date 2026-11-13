@@ -15,6 +15,7 @@ import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
 
@@ -40,6 +41,10 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 	private static List<ParticipantInfo> participants(User host, List<MatchApplication> confirmedApplications) {
 		return Stream.concat(Stream.of(ParticipantInfo.host(host)),
 				confirmedApplications.stream().map(ParticipantInfo::applicant)).toList();
+	}
+
+	private static String profileImageUrlOf(User user) {
+		return user.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(user.getId());
 	}
 
 	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, LocalDateTime startsAt,
@@ -69,7 +74,7 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 	public record HostInfo(Long userId, String nickname, String profileImageUrl, BigDecimal ntrp) {
 
 		private static HostInfo from(User host) {
-			return new HostInfo(host.getId(), host.getNickname(), host.getProfileImageUrl(), host.getNtrp());
+			return new HostInfo(host.getId(), host.getNickname(), profileImageUrlOf(host), host.getNtrp());
 		}
 	}
 
@@ -85,13 +90,13 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 			BigDecimal ntrp, boolean host) {
 
 		private static ParticipantInfo host(User host) {
-			return new ParticipantInfo(host.getId(), host.getNickname(), host.getProfileImageUrl(), host.getGender(),
+			return new ParticipantInfo(host.getId(), host.getNickname(), profileImageUrlOf(host), host.getGender(),
 					host.getNtrp(), true);
 		}
 
 		private static ParticipantInfo applicant(MatchApplication application) {
 			User applicant = application.getApplicant();
-			return new ParticipantInfo(applicant.getId(), applicant.getNickname(), applicant.getProfileImageUrl(),
+			return new ParticipantInfo(applicant.getId(), applicant.getNickname(), profileImageUrlOf(applicant),
 					application.getApplicantGender(), applicant.getNtrp(), false);
 		}
 	}

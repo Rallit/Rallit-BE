@@ -38,14 +38,20 @@ import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.match.exception.MatchApplicationErrorStatus;
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.match.service.MatchApplicationService;
+import com.rallit.domain.region.entity.Area;
+import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
+import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
+import com.rallit.domain.user.enums.PreferredMatchType;
+import com.rallit.domain.user.enums.PreferredTimeSlot;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.support.EntityFixtures;
 import com.rallit.support.IntegrationTestSupport;
 import com.zaxxer.hikari.HikariDataSource;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,6 +104,9 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 	@Autowired
 	private HikariDataSource dataSource;
+
+	@Autowired
+	private EntityManager entityManager;
 
 	private final ExecutorService executor = Executors.newFixedThreadPool(5);
 
@@ -283,7 +292,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		Match womensDoubles = match(activeUser(Gender.FEMALE), Set.of(MatchType.WOMENS_DOUBLES), 0, 3,
 				LocalDateTime.now().plusDays(1));
 		recruit(womensDoubles);
-		User female = saveUser(onboarded(Gender.FEMALE, new BigDecimal("5.5"), AgeGroup.FIFTIES));
+		User female = saveUser(onboarded(Gender.FEMALE, new BigDecimal("4.0"), AgeGroup.FIFTIES));
 
 		apply(activeUser(Gender.MALE), womensDoubles.getId(), AGREED)
 				.andExpect(status().isForbidden())
@@ -295,7 +304,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void rejectsUnauthenticatedAndOnboardingUsers() throws Exception {
 		Match match = recruitingMatch(activeUser(Gender.MALE));
-		User onboarding = saveUser(User.signUp(null));
+		User onboarding = saveUser(User.signUp());
 
 		mvc.perform(post("/api/v1/matches/{matchId}/applications", match.getId())
 						.contentType(MediaType.APPLICATION_JSON)
@@ -467,10 +476,13 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		apply(pending, match.getId(), AGREED).andExpect(status().isCreated());
 		jdbcTemplate.update("UPDATE match_application SET status = 'CONFIRMED', accepted_at = now() WHERE id IN (?, ?)",
 				applicationId, otherId);
+		jdbcTemplate.update("UPDATE users SET profile_image_key = 'host.png' WHERE id = ?", host.getId());
 
 		detail(applicant, applicationId)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.status").value("CONFIRMED"))
+				.andExpect(jsonPath("$.result.host.profileImageUrl")
+						.value("/api/v1/users/" + host.getId() + "/profile-image"))
 				.andExpect(jsonPath("$.result.acceptedAt").isString())
 				.andExpect(jsonPath("$.result.payment").doesNotExist())
 				.andExpect(jsonPath("$.result.participants.length()").value(3))
@@ -478,6 +490,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.participants[0].host").value(true))
 				.andExpect(jsonPath("$.result.participants[1].userId").value(applicant.getId()))
 				.andExpect(jsonPath("$.result.participants[1].host").value(false))
+				.andExpect(jsonPath("$.result.participants[1].profileImageUrl").value(nullValue()))
 				.andExpect(jsonPath("$.result.participants[2].userId").value(other.getId()))
 				.andExpect(jsonPath("$.result.participants[2].gender").value("FEMALE"));
 	}
@@ -603,7 +616,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private User activeUser(Gender gender) {
-		return saveUser(EntityFixtures.user(nickname(), gender));
+		return saveUser(EntityFixtures.user(entityManager, nickname(), gender));
 	}
 
 	private User saveUser(User user) {
@@ -613,13 +626,12 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private User onboarded(Gender gender, BigDecimal ntrp, AgeGroup ageGroup) {
-		User user = User.signUp(null);
-		user.onboarding()
-				.nickname(nickname())
-				.gender(gender)
-				.ntrp(ntrp)
-				.ageGroup(ageGroup)
-				.complete();
+		Area area = entityManager.createQuery("select a from Area a where a.code = '11440'", Area.class)
+				.getSingleResult();
+		User user = User.signUp();
+		user.completeOnboarding(new OnboardingProfile(nickname(), gender, ageGroup,
+				ExperiencePeriod.ONE_TO_THREE_YEARS, ntrp, false, Set.of(PreferredMatchType.SINGLES), Set.of(area),
+				Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		return user;
 	}
 
@@ -698,6 +710,6 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private static String nickname() {
-		return "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+		return "u" + UUID.randomUUID().toString().replace("-", "").substring(0, 11);
 	}
 }
