@@ -25,7 +25,7 @@ class GoogleAuthorizationIntegrationTest extends IntegrationTestSupport {
     String location = result.getResponse().getHeader("Location");
     assertThat(location)
         .startsWith("https://accounts.google.com/")
-        .contains("state=", "nonce=", "scope=openid%20email");
+        .contains("state=", "nonce=", "scope=openid%20email%20profile");
     assertThat(result.getRequest().getSession(false)).isNull();
   }
 

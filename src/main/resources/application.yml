@@ -23,7 +23,13 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 rallit:
+  profile-image:
+    storage-path: ${PROFILE_IMAGE_STORAGE_PATH:./build/profile-images}
   auth:
     service-origins: ${SERVICE_ORIGINS:https://rallit.co.kr}
     admin-origins: ${ADMIN_ORIGINS:https://admin.rallit.co.kr}

@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.util.Set;
 
-import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.region.entity.Area;
+import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.SocialAccount;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
 import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
+import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
 import com.rallit.domain.user.enums.SocialProvider;
 import com.rallit.domain.user.enums.UserRole;
@@ -46,36 +48,26 @@ class UserRepositoryTest extends IntegrationTestSupport {
 
 	@Test
 	void savesOnboardingUserRightAfterSocialLogin() {
-		User first = userRepository.saveAndFlush(User.signUp("https://k.kakaocdn.net/profile.png"));
-		User second = userRepository.saveAndFlush(User.signUp(null));
+		User first = userRepository.saveAndFlush(User.signUp());
 		entityManager.clear();
 
 		User found = userRepository.findById(first.getId()).orElseThrow();
 
 		assertThat(found.getRole()).isEqualTo(UserRole.USER);
 		assertThat(found.getStatus()).isEqualTo(UserStatus.ONBOARDING);
-		assertThat(found.getProfileImageUrl()).isEqualTo("https://k.kakaocdn.net/profile.png");
+		assertThat(found.getProfileImageKey()).isNull();
 		assertThat(found.getNickname()).isNull();
-		assertThat(userRepository.findById(second.getId()).orElseThrow().getNickname()).isNull();
 	}
 
 	@Test
 	void completesOnboardingWithTennisProfileAndPreferences() {
-		User user = User.signUp(null);
-		user.onboarding()
-				.nickname("테니스곰123")
-				.gender(Gender.FEMALE)
-				.ageGroup(AgeGroup.TWENTIES)
-				.experiencePeriod(ExperiencePeriod.SIX_YEARS_OR_MORE)
-				.ntrp(new BigDecimal("3.0"))
-				.tournamentHistory("2025 대학 연맹전 3위")
-				.sameGenderOnly(true)
-				.activityLatitude(new BigDecimal("37.556600"))
-				.activityLongitude(new BigDecimal("126.923600"))
-				.activityRadiusKm(10)
-				.preferredMatchTypes(Set.of(MatchType.SINGLES, MatchType.WOMENS_DOUBLES))
-				.preferredTimeSlots(Set.of(PreferredTimeSlot.WEEKEND_MORNING))
-				.complete();
+		User user = User.signUp();
+		Area area = entityManager.createQuery("select a from Area a where a.code = '11440'", Area.class)
+				.getSingleResult();
+		user.completeOnboarding(new OnboardingProfile("테니스곰123", Gender.FEMALE, AgeGroup.TWENTIES,
+				ExperiencePeriod.THREE_YEARS_OR_MORE, new BigDecimal("3.0"), true,
+				Set.of(PreferredMatchType.SINGLES, PreferredMatchType.DOUBLES), Set.of(area),
+				Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		userRepository.saveAndFlush(user);
 		entityManager.clear();
 
@@ -84,55 +76,38 @@ class UserRepositoryTest extends IntegrationTestSupport {
 		assertThat(found.getStatus()).isEqualTo(UserStatus.ACTIVE);
 		assertThat(found.getNickname()).isEqualTo("테니스곰123");
 		assertThat(found.getNtrp()).isEqualByComparingTo("3.0");
-		assertThat(found.getExperiencePeriod()).isEqualTo(ExperiencePeriod.SIX_YEARS_OR_MORE);
+		assertThat(found.getExperiencePeriod()).isEqualTo(ExperiencePeriod.THREE_YEARS_OR_MORE);
 		assertThat(found.isSameGenderOnly()).isTrue();
-		assertThat(found.getActivityRadiusKm()).isEqualTo(10);
+		assertThat(found.getActivityAreas()).extracting(Area::getCode).containsExactly("11440");
 		assertThat(found.getPreferredMatchTypes())
-				.containsExactlyInAnyOrder(MatchType.SINGLES, MatchType.WOMENS_DOUBLES);
+				.containsExactlyInAnyOrder(PreferredMatchType.SINGLES, PreferredMatchType.DOUBLES);
 		assertThat(found.getPreferredTimeSlots()).containsExactly(PreferredTimeSlot.WEEKEND_MORNING);
 		assertThat(found.getCreatedAt()).isNotNull();
 		assertThat(jdbcTemplate.queryForObject("SELECT experience_period FROM users WHERE id = ?", String.class,
-				user.getId())).isEqualTo("SIX_YEARS_OR_MORE");
+				user.getId())).isEqualTo("THREE_YEARS_OR_MORE");
 	}
 
 	@Test
 	void rejectsDuplicateNickname() {
-		userRepository.saveAndFlush(EntityFixtures.user("랠리왕", Gender.MALE));
+		userRepository.saveAndFlush(EntityFixtures.user(entityManager, "랠리왕", Gender.MALE));
 
-		assertThatThrownBy(() -> userRepository.saveAndFlush(EntityFixtures.user("랠리왕", Gender.FEMALE)))
+		assertThatThrownBy(() -> userRepository.saveAndFlush(EntityFixtures.user(entityManager, "랠리왕", Gender.FEMALE)))
 				.isInstanceOf(DataIntegrityViolationException.class)
 				.hasMessageContaining("uk_users_nickname");
 	}
 
 	@Test
 	void rejectsActiveUserWithoutGender() {
-		User user = User.signUp(null);
-		user.onboarding()
-				.nickname("성별누락")
-				.complete();
-
-		assertThatThrownBy(() -> userRepository.saveAndFlush(user))
+		User user = userRepository.saveAndFlush(User.signUp());
+		assertThatThrownBy(() -> jdbcTemplate.update(
+				"UPDATE users SET status = 'ACTIVE', nickname = '성별누락' WHERE id = ?", user.getId()))
 				.isInstanceOf(DataIntegrityViolationException.class)
 				.hasMessageContaining("ck_users_active_profile");
 	}
 
 	@Test
-	void rejectsActivityLatitudeWithoutLongitude() {
-		User user = User.signUp(null);
-		user.onboarding()
-				.nickname("위치누락")
-				.gender(Gender.MALE)
-				.activityLatitude(new BigDecimal("37.556600"))
-				.complete();
-
-		assertThatThrownBy(() -> userRepository.saveAndFlush(user))
-				.isInstanceOf(DataIntegrityViolationException.class)
-				.hasMessageContaining("ck_users_activity_location");
-	}
-
-	@Test
 	void savesSocialAccountsOfDifferentProvidersForOneUser() {
-		User user = userRepository.save(EntityFixtures.user("소셜회원", Gender.MALE));
+		User user = userRepository.save(EntityFixtures.user(entityManager, "소셜회원", Gender.MALE));
 		socialAccountRepository.saveAndFlush(socialAccount(user, SocialProvider.KAKAO, "1234567890"));
 		socialAccountRepository.saveAndFlush(socialAccount(user, SocialProvider.GOOGLE, "1234567890"));
 
@@ -143,8 +118,8 @@ class UserRepositoryTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsDuplicateProviderUserId() {
-		User first = userRepository.save(EntityFixtures.user("첫번째", Gender.MALE));
-		User second = userRepository.save(EntityFixtures.user("두번째", Gender.FEMALE));
+		User first = userRepository.save(EntityFixtures.user(entityManager, "첫번째", Gender.MALE));
+		User second = userRepository.save(EntityFixtures.user(entityManager, "두번째", Gender.FEMALE));
 		socialAccountRepository.saveAndFlush(socialAccount(first, SocialProvider.KAKAO, "1234567890"));
 
 		assertThatThrownBy(() -> socialAccountRepository.saveAndFlush(
@@ -155,7 +130,7 @@ class UserRepositoryTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsSecondAccountOfSameProviderForOneUser() {
-		User user = userRepository.save(EntityFixtures.user("카카오두개", Gender.MALE));
+		User user = userRepository.save(EntityFixtures.user(entityManager, "카카오두개", Gender.MALE));
 		socialAccountRepository.saveAndFlush(socialAccount(user, SocialProvider.KAKAO, "1111111111"));
 
 		assertThatThrownBy(() -> socialAccountRepository.saveAndFlush(

@@ -42,6 +42,9 @@ services:
       SERVICE_ORIGINS: ${SERVICE_ORIGINS:?SERVICE_ORIGINS를 .env에 설정하세요}
       ADMIN_ORIGINS: ${ADMIN_ORIGINS:?ADMIN_ORIGINS를 .env에 설정하세요}
       AUTH_SECURE_COOKIES: "true"
+      PROFILE_IMAGE_STORAGE_PATH: /app/profile-images
+    volumes:
+      - profile-images:/app/profile-images
     mem_limit: ${APP_MEM_LIMIT:-700m}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/actuator/health"]
@@ -103,3 +106,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  profile-images:

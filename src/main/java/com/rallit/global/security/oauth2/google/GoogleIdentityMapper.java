@@ -16,6 +16,7 @@ public final class GoogleIdentityMapper {
         OAuthProvider.GOOGLE,
         token.getSubject(),
         token.getEmail(),
-        Boolean.TRUE.equals(token.getEmailVerified()));
+        Boolean.TRUE.equals(token.getEmailVerified()),
+        oidc.getFullName());
   }
 }
