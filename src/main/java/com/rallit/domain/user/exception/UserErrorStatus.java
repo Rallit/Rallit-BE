@@ -13,8 +13,7 @@ public enum UserErrorStatus implements BaseErrorCode {
   ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 온보딩을 완료했습니다."),
   INVALID_PROFILE_IMAGE(HttpStatus.BAD_REQUEST, "JPG, JPEG 또는 PNG 사진을 선택해 주세요."),
   PROFILE_IMAGE_DIMENSIONS_TOO_LARGE(HttpStatus.BAD_REQUEST,
-      "프로필 사진은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 올릴 수 있습니다."),
-  PROFILE_IMAGE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "프로필 사진은 최대 5MB까지 올릴 수 있습니다.");
+      "프로필 사진은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 올릴 수 있습니다.");
 
   private final HttpStatus status;
   private final String message;

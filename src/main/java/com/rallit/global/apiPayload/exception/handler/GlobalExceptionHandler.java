@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @Slf4j
@@ -85,6 +86,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		ErrorReasonDTO reason = ErrorStatus._BAD_REQUEST.getReasonHttpStatus();
 		ApiResponse<Map<String, String>> body = ApiResponse.onFailure(reason.getCode(), reason.getMessage(), errors);
 		return handleExceptionInternal(exception, body, headers, status, request);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+			MaxUploadSizeExceededException exception, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		ErrorReasonDTO reason = ErrorStatus._UPLOAD_TOO_LARGE.getReasonHttpStatus();
+		return handleExceptionInternal(exception,
+				ApiResponse.onFailure(reason.getCode(), reason.getMessage(), null), headers, status, request);
 	}
 
 	@Override

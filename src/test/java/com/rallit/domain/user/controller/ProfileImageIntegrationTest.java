@@ -151,7 +151,9 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
     upload(owner, "avatar.png", "image/png", Arrays.copyOf(image("png"), 33))
         .andExpect(status().isBadRequest());
     upload(owner, "avatar.png", "image/png", new byte[5 * 1024 * 1024 + 1])
-        .andExpect(status().is(413));
+        .andExpect(status().is(413))
+        .andExpect(jsonPath("$.code").value("COMMON413"))
+        .andExpect(jsonPath("$.message").value("파일은 최대 5MB까지 올릴 수 있습니다."));
     assertThat(view(owner, url, "image/jpeg")).isEqualTo(stored);
     mvc.perform(delete(PATH).header("Authorization", owner.bearer()))
         .andExpect(status().isNoContent());

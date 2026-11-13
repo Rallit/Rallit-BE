@@ -38,7 +38,7 @@ class ProfileImageNormalizer {
 
   NormalizedImage normalize(MultipartFile file) {
     if (file.getSize() > MAX_BYTES) {
-      throw new GeneralException(UserErrorStatus.PROFILE_IMAGE_TOO_LARGE);
+      throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE);
     }
     String filename = file.getOriginalFilename();
     if (file.isEmpty() || filename == null) {
