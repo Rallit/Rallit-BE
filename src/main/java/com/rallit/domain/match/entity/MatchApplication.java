@@ -56,7 +56,7 @@ public class MatchApplication extends BaseEntity {
 	private MatchApplicationRejectReason rejectReason;
 
 	@Enumerated(EnumType.STRING)
-	@Column(length = 500)
+	@Column(length = 30)
 	private MatchApplicationCancelReason cancelReason;
 
 	@Column(nullable = false)
