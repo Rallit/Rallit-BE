@@ -24,7 +24,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProfileImageController {
   private final ProfileImageService images;
 
-  @Operation(summary = "내 프로필 사진 등록 및 교체", description = "JPG, JPEG, PNG 사진을 최대 5MB까지 올릴 수 있습니다.")
+  @Operation(
+      summary = "내 프로필 사진 등록 및 교체",
+      description = "JPG·JPEG·PNG, 최대 5MB입니다. 원본은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 지원합니다. 처리 요청이 몰리면 503을 반환합니다.")
   @PutMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<ApiResponse<ProfileImageResponse>> upload(
       @AuthenticationPrincipal UserDetails principal, @RequestPart("file") MultipartFile file) {

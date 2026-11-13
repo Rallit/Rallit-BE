@@ -7,6 +7,7 @@ import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifReader;
 import com.rallit.domain.user.exception.UserErrorStatus;
+import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.awt.AlphaComposite;
 import java.awt.geom.AffineTransform;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Semaphore;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.MemoryCacheImageInputStream;
@@ -26,11 +28,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Component
 class ProfileImageNormalizer {
   private static final long MAX_BYTES = 5L * 1024 * 1024;
-  private static final int MAX_DIMENSION = 16_384;
-  private static final long MAX_PIXELS = 64_000_000L;
+  private static final int MAX_DIMENSION = 4_096;
+  private static final long MAX_PIXELS = 12_500_000L;
   private static final int OUTPUT_MAX_DIMENSION = 1_024;
+  private static final int MAX_CONCURRENT_NORMALIZATIONS = 2;
   private static final int PNG_EXIF_CHUNK_TYPE = 0x65584966; // eXIf
   private static final int PNG_END_CHUNK_TYPE = 0x49454e44; // IEND
+  private final Semaphore normalizationSlots = new Semaphore(MAX_CONCURRENT_NORMALIZATIONS);
 
   NormalizedImage normalize(MultipartFile file) {
     if (file.getSize() > MAX_BYTES) {
@@ -40,10 +44,15 @@ class ProfileImageNormalizer {
     if (file.isEmpty() || filename == null) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
     }
+    if (!normalizationSlots.tryAcquire()) {
+      throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
+    }
     try {
       return normalize(file.getBytes(), filename.toLowerCase(Locale.ROOT));
     } catch (IOException | ImageProcessingException | IllegalArgumentException failure) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
+    } finally {
+      normalizationSlots.release();
     }
   }
 
@@ -78,9 +87,12 @@ class ProfileImageNormalizer {
     });
     int width = reader.getWidth(0);
     int height = reader.getHeight(0);
-    if (width <= 0 || height <= 0 || width > MAX_DIMENSION || height > MAX_DIMENSION
-        || (long) width * height > MAX_PIXELS) {
+    if (width <= 0 || height <= 0) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+    }
+    // A reader may allocate memory for the original image even when subsampling.
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION || (long) width * height > MAX_PIXELS) {
+      throw new GeneralException(UserErrorStatus.PROFILE_IMAGE_DIMENSIONS_TOO_LARGE);
     }
     var parameters = reader.getDefaultReadParam();
     int step = Math.ceilDiv(Math.max(width, height), OUTPUT_MAX_DIMENSION);
