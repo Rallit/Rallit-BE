@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -108,6 +109,9 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Autowired
 	private EntityManager entityManager;
 
+	@Autowired
+	private Clock clock;
+
 	private final ExecutorService executor = Executors.newFixedThreadPool(5);
 
 	private final List<Long> userIds = new ArrayList<>();
@@ -130,7 +134,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	void applyCreatesPendingApplicationWithServerTimes() throws Exception {
 		Match match = recruitingMatch(activeUser(Gender.MALE));
 		User applicant = activeUser(Gender.FEMALE);
-		LocalDateTime before = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
+		LocalDateTime before = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MILLIS);
 
 		long applicationId = id(apply(applicant, match.getId(), AGREED)
 				.andExpect(status().isCreated())
@@ -244,10 +248,10 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	void rejectsMatchThatIsNotRecruitingOrPastDeadline() throws Exception {
 		User host = activeUser(Gender.MALE);
 		User applicant = activeUser(Gender.FEMALE);
-		Match pendingApproval = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now().plusDays(1));
-		Match closed = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now().minusMinutes(1));
+		Match pendingApproval = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now(clock).plusDays(1));
+		Match closed = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now(clock).minusMinutes(1));
 		recruit(closed);
-		Match started = recruitingMatch(host, LocalDateTime.now().minusMinutes(1));
+		Match started = recruitingMatch(host, LocalDateTime.now(clock).minusMinutes(1));
 
 		apply(applicant, pendingApproval.getId(), AGREED)
 				.andExpect(status().isConflict())
@@ -290,7 +294,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void validatesGenderRecruitmentButNotNtrpOrAgePreference() throws Exception {
 		Match womensDoubles = match(activeUser(Gender.FEMALE), Set.of(MatchType.WOMENS_DOUBLES), 0, 3,
-				LocalDateTime.now().plusDays(1));
+				LocalDateTime.now(clock).plusDays(1));
 		recruit(womensDoubles);
 		User female = saveUser(onboarded(Gender.FEMALE, new BigDecimal("4.0"), AgeGroup.FIFTIES));
 
@@ -321,11 +325,11 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void listsMyActiveApplicationsFromTodayInMatchTimeOrderWithParticipantCounts() throws Exception {
 		User host = activeUser(Gender.MALE);
-		LocalDate today = LocalDate.now();
+		LocalDate today = LocalDate.now(clock);
 		Match yesterday = recruitingMatch(host);
 		Match earlyToday = recruitingMatch(host);
 		Match tomorrow = match(host, Set.of(MatchType.MENS_DOUBLES, MatchType.RALLY), 1, 2,
-				LocalDateTime.now().plusDays(1), today.plusDays(1).atTime(10, 0));
+				LocalDateTime.now(clock).plusDays(1), today.plusDays(1).atTime(10, 0));
 		recruit(tomorrow);
 		Match canceledTomorrow = recruitingMatch(host, today.plusDays(1).atTime(14, 0));
 		Match nextWeek = recruitingMatch(host, today.plusDays(7).atTime(9, 0));
@@ -636,11 +640,11 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private Match recruitingMatch(User host) {
-		return recruitingMatch(host, LocalDateTime.now().plusDays(3).truncatedTo(ChronoUnit.HOURS));
+		return recruitingMatch(host, LocalDateTime.now(clock).plusDays(3).truncatedTo(ChronoUnit.HOURS));
 	}
 
 	private Match recruitingMatch(User host, LocalDateTime startsAt) {
-		Match match = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now().plusDays(1), startsAt);
+		Match match = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now(clock).plusDays(1), startsAt);
 		recruit(match);
 		return match;
 	}
@@ -648,7 +652,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	private Match match(User host, Set<MatchType> matchTypes, int maleRecruitCount, int femaleRecruitCount,
 			LocalDateTime recruitmentDeadline) {
 		return match(host, matchTypes, maleRecruitCount, femaleRecruitCount, recruitmentDeadline,
-				LocalDateTime.now().plusDays(3).truncatedTo(ChronoUnit.HOURS));
+				LocalDateTime.now(clock).plusDays(3).truncatedTo(ChronoUnit.HOURS));
 	}
 
 	private Match match(User host, Set<MatchType> matchTypes, int maleRecruitCount, int femaleRecruitCount,
