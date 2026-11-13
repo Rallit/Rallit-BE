@@ -31,7 +31,7 @@ class ProfileImageNormalizer {
   private static final int MAX_DIMENSION = 4_096;
   private static final long MAX_PIXELS = 12_500_000L;
   private static final int OUTPUT_MAX_DIMENSION = 1_024;
-  private static final int MAX_CONCURRENT_NORMALIZATIONS = 2;
+  private static final int MAX_CONCURRENT_NORMALIZATIONS = 1;
   private static final int PNG_EXIF_CHUNK_TYPE = 0x65584966; // eXIf
   private static final int PNG_END_CHUNK_TYPE = 0x49454e44; // IEND
   private final Semaphore normalizationSlots = new Semaphore(MAX_CONCURRENT_NORMALIZATIONS);

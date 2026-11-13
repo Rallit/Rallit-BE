@@ -33,9 +33,9 @@ class ProfileImageNormalizerTest {
   }
 
   @Test
-  void rejectsConcurrentProcessingBeyondCapacityAndReleasesSlots() throws Exception {
+  void rejectsASecondConcurrentImageAndReleasesTheSlot() throws Exception {
     var file = spy(png(2, 2));
-    var started = new CountDownLatch(2);
+    var started = new CountDownLatch(1);
     var finish = new CountDownLatch(1);
     doAnswer(call -> {
       started.countDown();
@@ -43,20 +43,18 @@ class ProfileImageNormalizerTest {
       return call.callRealMethod();
     }).when(file).getBytes();
 
-    try (var executor = Executors.newFixedThreadPool(2)) {
+    try (var executor = Executors.newSingleThreadExecutor()) {
       var first = executor.submit(() -> normalizer.normalize(file));
-      var second = executor.submit(() -> normalizer.normalize(file));
       try {
         assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
-        var third = png(2, 2);
-        assertThatThrownBy(() -> normalizer.normalize(third))
+        var second = png(2, 2);
+        assertThatThrownBy(() -> normalizer.normalize(second))
             .isInstanceOfSatisfying(GeneralException.class,
                 failure -> assertThat(failure.getCode()).isEqualTo(ErrorStatus._SERVICE_UNAVAILABLE));
       } finally {
         finish.countDown();
       }
       assertThat(first.get(10, TimeUnit.SECONDS).extension()).isEqualTo(".png");
-      assertThat(second.get(10, TimeUnit.SECONDS).extension()).isEqualTo(".png");
     }
     assertThat(normalizer.normalize(png(2, 2)).extension()).isEqualTo(".png");
   }
