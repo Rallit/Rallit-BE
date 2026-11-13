@@ -82,7 +82,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
             }
             byte[] body =
                 (profile == null
-                        ? "{\"id\":12345678,\"kakao_account\":{\"email\":\"12345678@example.test\",\"is_email_valid\":true,\"is_email_verified\":true}}"
+                        ? "{\"id\":12345678,\"kakao_account\":{\"email\":\"12345678@example.test\",\"is_email_valid\":true,\"is_email_verified\":true,\"profile\":{\"nickname\":\"카카오 이름\"}}}"
                         : profile)
                     .getBytes(StandardCharsets.UTF_8);
             e.getResponseHeaders().set("Content-Type", "application/json");
@@ -279,7 +279,8 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
     String access =
         mapper.readTree(rotated.getContentAsString()).path("result").path("accessToken").asText();
     mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + access))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.socialDisplayName").value("카카오 이름"));
     Cookie nextRefresh = cookie(rotated.getHeaders("Set-Cookie"), "__Host-rallit_refresh");
     mvc.perform(
             post("/api/v1/auth/logout")

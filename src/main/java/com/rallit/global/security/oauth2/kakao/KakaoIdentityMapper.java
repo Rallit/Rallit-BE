@@ -18,6 +18,8 @@ public final class KakaoIdentityMapper {
     boolean verified =
         Boolean.TRUE.equals(account.get("is_email_valid"))
             && Boolean.TRUE.equals(account.get("is_email_verified"));
-    return new SocialIdentity(OAuthProvider.KAKAO, id.toString(), email, verified);
+    Map<?, ?> profile = account.get("profile") instanceof Map<?, ?> value ? value : Map.of();
+    String displayName = profile.get("nickname") instanceof String value ? value : null;
+    return new SocialIdentity(OAuthProvider.KAKAO, id.toString(), email, verified, displayName);
   }
 }

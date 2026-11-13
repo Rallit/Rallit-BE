@@ -74,8 +74,8 @@ class PaymentRepositoryTest extends IntegrationTestSupport {
 
 	@BeforeEach
 	void setUp() {
-		User host = userRepository.save(EntityFixtures.user("호스트", Gender.MALE));
-		User applicant = userRepository.save(EntityFixtures.user("참가자", Gender.FEMALE));
+		User host = userRepository.save(EntityFixtures.user(entityManager, "호스트", Gender.MALE));
+		User applicant = userRepository.save(EntityFixtures.user(entityManager, "참가자", Gender.FEMALE));
 		CourtSlot courtSlot = courtSlotRepository.save(
 				EntityFixtures.courtSlot(courtRepository.save(EntityFixtures.court()), host, "3", MATCH_STARTS_AT));
 		match = matchRepository.save(EntityFixtures.match(courtSlot, host));

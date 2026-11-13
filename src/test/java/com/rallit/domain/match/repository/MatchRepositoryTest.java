@@ -64,7 +64,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 
 	@BeforeEach
 	void setUp() {
-		host = userRepository.save(EntityFixtures.user("호스트", Gender.MALE));
+		host = userRepository.save(EntityFixtures.user(entityManager, "호스트", Gender.MALE));
 		court = courtRepository.save(EntityFixtures.court());
 	}
 
@@ -157,7 +157,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	@Test
 	void savesApplicationWithApplicantGenderSnapshot() {
 		Match match = savedMatch();
-		User applicant = userRepository.save(EntityFixtures.user("신청자", Gender.FEMALE));
+		User applicant = userRepository.save(EntityFixtures.user(entityManager, "신청자", Gender.FEMALE));
 		MatchApplication application = matchApplicationRepository.saveAndFlush(
 				EntityFixtures.matchApplication(match, applicant));
 		entityManager.clear();
@@ -171,7 +171,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	@Test
 	void rejectsApplicationFromOnboardingApplicant() {
 		Match match = savedMatch();
-		User applicant = userRepository.save(User.signUp(null));
+		User applicant = userRepository.save(User.signUp());
 
 		assertThatThrownBy(() -> matchApplicationRepository.saveAndFlush(
 				EntityFixtures.matchApplication(match, applicant)))
@@ -182,7 +182,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	@Test
 	void rejectsDuplicateActiveApplication() {
 		Match match = savedMatch();
-		User applicant = userRepository.save(EntityFixtures.user("중복신청", Gender.FEMALE));
+		User applicant = userRepository.save(EntityFixtures.user(entityManager, "중복신청", Gender.FEMALE));
 		matchApplicationRepository.saveAndFlush(EntityFixtures.matchApplication(match, applicant));
 
 		assertThatThrownBy(() -> matchApplicationRepository.saveAndFlush(
@@ -194,7 +194,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	@Test
 	void allowsReapplicationAfterCancellation() {
 		Match match = savedMatch();
-		User applicant = userRepository.save(EntityFixtures.user("재신청", Gender.FEMALE));
+		User applicant = userRepository.save(EntityFixtures.user(entityManager, "재신청", Gender.FEMALE));
 		MatchApplication canceled = matchApplicationRepository.saveAndFlush(
 				EntityFixtures.matchApplication(match, applicant));
 		jdbcTemplate.update("UPDATE match_application SET status = 'CANCELED' WHERE id = ?", canceled.getId());

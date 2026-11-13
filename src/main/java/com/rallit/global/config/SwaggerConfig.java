@@ -5,6 +5,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.QueryParameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.tags.Tag;
 import java.util.List;
+import java.util.Set;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,6 +50,20 @@ public class SwaggerConfig {
 					item.readOperations().forEach(operation -> operation.setTags(List.of(ADMIN_TAG)));
 				}
 			});
+		};
+	}
+
+	@Bean
+	OpenApiCustomizer nullableUserProfileDocs() {
+		return openApi -> {
+			Schema<?> userResponse = openApi.getComponents().getSchemas().get("UserResponse");
+			if (userResponse == null) return;
+			var profile = userResponse.getProperties().get("profile");
+			if (profile == null || profile.get$ref() == null) return;
+			String reference = profile.get$ref();
+			profile.set$ref(null);
+			profile.addOneOfItem(new Schema<>().$ref(reference));
+			profile.addOneOfItem(new Schema<>().types(Set.of("null")));
 		};
 	}
 
