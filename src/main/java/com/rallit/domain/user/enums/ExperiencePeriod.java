@@ -1,11 +1,8 @@
 package com.rallit.domain.user.enums;
 
 public enum ExperiencePeriod {
-	BEGINNER,
-	ONE_YEAR,
-	TWO_YEARS,
-	THREE_YEARS,
-	FOUR_YEARS,
-	FIVE_YEARS,
-	SIX_YEARS_OR_MORE
+	UNDER_SIX_MONTHS,
+	SIX_MONTHS_TO_ONE_YEAR,
+	ONE_TO_THREE_YEARS,
+	THREE_YEARS_OR_MORE
 }

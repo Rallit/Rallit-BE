@@ -5,11 +5,13 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.enums.AgeGroup;
 import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
+import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
 import com.rallit.domain.user.enums.UserRole;
 import com.rallit.domain.user.enums.UserStatus;
@@ -24,9 +26,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -54,8 +57,8 @@ public class User extends BaseEntity {
 	@Column(length = 320)
 	private String email;
 
-	@Column(length = 500)
-	private String profileImageUrl;
+	@Column(length = 80)
+	private String profileImageKey;
 
 	@Enumerated(EnumType.STRING)
 	@Column(length = 30)
@@ -72,19 +75,8 @@ public class User extends BaseEntity {
 	@Column(precision = 2, scale = 1)
 	private BigDecimal ntrp;
 
-	@Column(length = 500)
-	private String tournamentHistory;
-
 	@Column(nullable = false)
 	private boolean sameGenderOnly;
-
-	@Column(precision = 9, scale = 6)
-	private BigDecimal activityLatitude;
-
-	@Column(precision = 9, scale = 6)
-	private BigDecimal activityLongitude;
-
-	private Integer activityRadiusKm;
 
 	private LocalDateTime withdrawnAt;
 
@@ -92,7 +84,13 @@ public class User extends BaseEntity {
 	@CollectionTable(name = "user_preferred_match_type", joinColumns = @JoinColumn(name = "user_id"))
 	@Enumerated(EnumType.STRING)
 	@Column(name = "match_type", nullable = false, length = 30)
-	private Set<MatchType> preferredMatchTypes = new HashSet<>();
+	private Set<PreferredMatchType> preferredMatchTypes = new HashSet<>();
+
+	@ManyToMany
+	@JoinTable(name = "user_activity_areas",
+			joinColumns = @JoinColumn(name = "user_id"),
+			inverseJoinColumns = @JoinColumn(name = "area_id"))
+	private Set<Area> activityAreas = new HashSet<>();
 
 	@ElementCollection
 	@CollectionTable(name = "user_preferred_time_slot", joinColumns = @JoinColumn(name = "user_id"))
@@ -100,21 +98,24 @@ public class User extends BaseEntity {
 	@Column(name = "time_slot", nullable = false, length = 30)
 	private Set<PreferredTimeSlot> preferredTimeSlots = new HashSet<>();
 
-	private User(String profileImageUrl) {
-		this.role = UserRole.USER;
-		this.status = UserStatus.ONBOARDING;
-		this.profileImageUrl = profileImageUrl;
+	public static User signUp() {
+		User user = new User();
+		user.role = UserRole.USER;
+		user.status = UserStatus.ONBOARDING;
+		return user;
 	}
 
-	public static User signUp(String profileImageUrl) {
-		return new User(profileImageUrl);
-	}
-
-	public static User signUp(String profileImageUrl, String nickname, String verifiedEmail) {
-		User user = signUp(profileImageUrl);
+	public static User signUp(String nickname, String verifiedEmail) {
+		User user = signUp();
 		user.nickname = nickname;
 		user.updateVerifiedEmail(verifiedEmail);
 		return user;
+	}
+
+	public String replaceProfileImage(String key) {
+		String previous = profileImageKey;
+		profileImageKey = key;
+		return previous;
 	}
 
 	public void updateVerifiedEmail(String email) {
@@ -129,29 +130,42 @@ public class User extends BaseEntity {
 		return status == UserStatus.ACTIVE;
 	}
 
-	@Builder(builderMethodName = "onboarding", buildMethodName = "complete", builderClassName = "OnboardingBuilder")
-	private void completeOnboarding(String nickname, Gender gender, AgeGroup ageGroup,
-			ExperiencePeriod experiencePeriod, BigDecimal ntrp, String tournamentHistory, boolean sameGenderOnly,
-			BigDecimal activityLatitude, BigDecimal activityLongitude, Integer activityRadiusKm,
-			Set<MatchType> preferredMatchTypes, Set<PreferredTimeSlot> preferredTimeSlots) {
-		this.status = UserStatus.ACTIVE;
-		this.nickname = nickname;
-		this.gender = gender;
-		this.ageGroup = ageGroup;
-		this.experiencePeriod = experiencePeriod;
-		this.ntrp = ntrp;
-		this.tournamentHistory = tournamentHistory;
-		this.sameGenderOnly = sameGenderOnly;
-		this.activityLatitude = activityLatitude;
-		this.activityLongitude = activityLongitude;
-		this.activityRadiusKm = activityRadiusKm;
-		this.preferredMatchTypes.clear();
-		if (preferredMatchTypes != null) {
-			this.preferredMatchTypes.addAll(preferredMatchTypes);
+	public void completeOnboarding(OnboardingProfile profile) {
+		if (status != UserStatus.ONBOARDING) {
+			throw new IllegalStateException("User is not awaiting onboarding");
 		}
-		this.preferredTimeSlots.clear();
-		if (preferredTimeSlots != null) {
-			this.preferredTimeSlots.addAll(preferredTimeSlots);
-		}
+		nickname = profile.nickname();
+		gender = profile.gender();
+		ageGroup = profile.ageGroup();
+		experiencePeriod = profile.experiencePeriod();
+		ntrp = profile.ntrp();
+		applyMatchPreferences(profile);
+		status = UserStatus.ACTIVE;
+	}
+
+	public boolean hasOnboardingProfile(OnboardingProfile profile) {
+		return Objects.equals(nickname, profile.nickname())
+				&& gender == profile.gender()
+				&& ageGroup == profile.ageGroup()
+				&& experiencePeriod == profile.experiencePeriod()
+				&& ntrp != null && ntrp.compareTo(profile.ntrp()) == 0
+				&& sameGenderOnly == profile.sameGenderOnly()
+				&& preferredMatchTypes.equals(profile.preferredMatchTypes())
+				&& areaCodes(activityAreas).equals(areaCodes(profile.activityAreas()))
+				&& preferredTimeSlots.equals(profile.preferredTimeSlots());
+	}
+
+	private void applyMatchPreferences(OnboardingProfile profile) {
+		sameGenderOnly = profile.sameGenderOnly();
+		preferredMatchTypes.clear();
+		preferredMatchTypes.addAll(profile.preferredMatchTypes());
+		activityAreas.clear();
+		activityAreas.addAll(profile.activityAreas());
+		preferredTimeSlots.clear();
+		preferredTimeSlots.addAll(profile.preferredTimeSlots());
+	}
+
+	private Set<String> areaCodes(Set<Area> areas) {
+		return areas.stream().map(Area::getCode).collect(Collectors.toSet());
 	}
 }
