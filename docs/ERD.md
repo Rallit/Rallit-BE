@@ -14,6 +14,7 @@ erDiagram
     USERS ||--o{ COURT_SLOT : registers
     COURT_SLOT ||--o| MATCH : "opened as"
     USERS ||--o{ MATCH : hosts
+    MATCH ||--o{ MATCH_MATCH_TYPE : offers
     MATCH ||--o{ MATCH_PREFERRED_AGE_GROUP : targets
     MATCH ||--o{ MATCH_APPLICATION : receives
     USERS ||--o{ MATCH_APPLICATION : applies
@@ -81,7 +82,6 @@ erDiagram
         bigint id PK
         bigint court_slot_id FK,UK
         bigint host_user_id FK
-        varchar match_type
         varchar status
         int male_recruit_count
         int female_recruit_count
@@ -93,6 +93,10 @@ erDiagram
         timestamp completed_at
         timestamp canceled_at
         varchar cancel_reason
+    }
+    MATCH_MATCH_TYPE {
+        bigint match_id PK,FK
+        varchar match_type PK
     }
     MATCH_PREFERRED_AGE_GROUP {
         bigint match_id PK,FK

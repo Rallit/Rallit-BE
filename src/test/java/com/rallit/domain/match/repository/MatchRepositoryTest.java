@@ -4,6 +4,8 @@ import static com.rallit.support.EntityFixtures.MATCH_STARTS_AT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Set;
+
 import com.rallit.domain.court.entity.Court;
 import com.rallit.domain.court.entity.CourtSlot;
 import com.rallit.domain.court.enums.CourtSlotStatus;
@@ -75,11 +77,11 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 		Match found = matchRepository.findById(match.getId()).orElseThrow();
 
 		assertThat(found.getStatus()).isEqualTo(MatchStatus.PENDING_APPROVAL);
-		assertThat(found.getMatchType()).isEqualTo(MatchType.MIXED_DOUBLES);
+		assertThat(found.getMatchTypes()).containsExactly(MatchType.MIXED_DOUBLES);
 		assertThat(found.getCourtSlot().getStatus()).isEqualTo(CourtSlotStatus.PENDING);
 		assertThat(found.getHost().getId()).isEqualTo(host.getId());
 		assertThat(found.getPreferredAgeGroups()).containsExactlyInAnyOrder(AgeGroup.TWENTIES, AgeGroup.THIRTIES);
-		assertThat(jdbcTemplate.queryForObject("SELECT match_type FROM match WHERE id = ?", String.class,
+		assertThat(jdbcTemplate.queryForObject("SELECT match_type FROM match_match_type WHERE match_id = ?", String.class,
 				match.getId())).isEqualTo("MIXED_DOUBLES");
 	}
 
@@ -122,7 +124,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 		Match match = Match.builder()
 				.courtSlot(courtSlot)
 				.host(host)
-				.matchType(MatchType.RALLY)
+				.matchTypes(Set.of(MatchType.RALLY))
 				.maleRecruitCount(3)
 				.femaleRecruitCount(3)
 				.participationFee(3000)
@@ -140,7 +142,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 		Match match = Match.builder()
 				.courtSlot(courtSlot)
 				.host(host)
-				.matchType(MatchType.SINGLES)
+				.matchTypes(Set.of(MatchType.SINGLES))
 				.maleRecruitCount(0)
 				.femaleRecruitCount(0)
 				.participationFee(7000)

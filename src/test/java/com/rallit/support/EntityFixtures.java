@@ -56,7 +56,7 @@ public final class EntityFixtures {
 		return Match.builder()
 				.courtSlot(courtSlot)
 				.host(host)
-				.matchType(MatchType.MIXED_DOUBLES)
+				.matchTypes(Set.of(MatchType.MIXED_DOUBLES))
 				.maleRecruitCount(1)
 				.femaleRecruitCount(2)
 				.minNtrp(new BigDecimal("2.5"))
