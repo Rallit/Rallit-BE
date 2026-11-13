@@ -17,6 +17,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -111,7 +112,7 @@ public class SecurityConfig {
                     r -> {
                       var c = new CorsConfiguration();
                       c.setAllowedOrigins(p.origins(target == LoginTarget.ADMIN));
-                      c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                      c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                       c.setAllowedHeaders(
                           List.of("Content-Type", "Authorization", "X-Requested-With"));
                       c.setAllowCredentials(true);
@@ -222,6 +223,16 @@ public class SecurityConfig {
                         "/actuator/health/**")
                     .permitAll()
                     .requestMatchers("/api/v1/users/me")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
+                    .authenticated()
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/v1/users/me/applications",
+                        "/api/v1/users/me/applications/closed",
+                        "/api/v1/applications/*")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.PATCH, "/api/v1/applications/*/cancel")
                     .authenticated()
                     .anyRequest()
                     .denyAll())
