@@ -3,7 +3,6 @@ package com.rallit.domain.match.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -74,16 +73,16 @@ public class MatchApplicationService {
 	@Transactional(readOnly = true)
 	public MyMatchApplicationListResponse getMyScheduledApplications(Long userId, LocalDate date, int page,
 			int size) {
-		LocalDateTime from = (date == null ? LocalDate.now(zonedClock()) : date).atStartOfDay();
+		LocalDateTime from = (date == null ? LocalDate.now(clock) : date).atStartOfDay();
 		LocalDateTime to = date == null ? null : from.plusDays(1);
 		return listResponse(matchApplicationRepository.findScheduledSliceByApplicantId(userId,
-				MatchApplicationRepository.ACTIVE_STATUSES, from, to, PageRequest.of(page, size)));
+				MatchApplicationStatus.ACTIVE, from, to, PageRequest.of(page, size)));
 	}
 
 	@Transactional(readOnly = true)
 	public MyMatchApplicationListResponse getMyClosedApplications(Long userId, int page, int size) {
 		return listResponse(matchApplicationRepository.findRecentSliceByApplicantId(userId,
-				MatchApplicationRepository.CLOSED_STATUSES, PageRequest.of(page, size)));
+				MatchApplicationStatus.CLOSED, PageRequest.of(page, size)));
 	}
 
 	@Transactional(readOnly = true)
@@ -109,7 +108,7 @@ public class MatchApplicationService {
 		if (match.getStatus() != MatchStatus.RECRUITING) {
 			throw new GeneralException(MatchErrorStatus.MATCH_NOT_RECRUITING);
 		}
-		if (!now.isBefore(match.getRecruitmentDeadline())) {
+		if (!now.isBefore(match.getRecruitmentDeadline()) || !now.isBefore(match.getCourtSlot().getStartsAt())) {
 			throw new GeneralException(MatchErrorStatus.MATCH_RECRUITMENT_CLOSED);
 		}
 		if (match.getHost().getId().equals(applicant.getId())) {
@@ -119,6 +118,10 @@ public class MatchApplicationService {
 				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
 		if (recruitCount <= 0) {
 			throw new GeneralException(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
+		}
+		if (matchApplicationRepository.countByMatchIdAndApplicantGenderAndStatus(match.getId(),
+				applicant.getGender(), MatchApplicationStatus.CONFIRMED) >= recruitCount) {
+			throw new GeneralException(MatchApplicationErrorStatus.RECRUITMENT_FULL);
 		}
 	}
 
@@ -132,16 +135,12 @@ public class MatchApplicationService {
 		}
 		List<Long> matchIds = applications.stream().map(application -> application.getMatch().getId()).toList();
 		return matchApplicationRepository.countByMatchIdsAndStatuses(matchIds,
-						MatchApplicationRepository.SEAT_OCCUPYING_STATUSES)
+						MatchApplicationStatus.SEAT_OCCUPYING)
 				.stream()
 				.collect(Collectors.toMap(MatchApplicationCount::getMatchId, MatchApplicationCount::getCount));
 	}
 
 	private LocalDateTime now() {
-		return LocalDateTime.now(zonedClock()).truncatedTo(ChronoUnit.MICROS);
-	}
-
-	private Clock zonedClock() {
-		return clock.withZone(ZoneId.systemDefault());
+		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
 	}
 }

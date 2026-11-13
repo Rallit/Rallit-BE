@@ -2,12 +2,12 @@ package com.rallit.domain.match.repository;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
+import com.rallit.domain.user.enums.Gender;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -18,20 +18,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchApplicationRepository extends JpaRepository<MatchApplication, Long> {
 
-	Collection<MatchApplicationStatus> ACTIVE_STATUSES = EnumSet.of(MatchApplicationStatus.PENDING,
-			MatchApplicationStatus.PAYMENT_PENDING, MatchApplicationStatus.CONFIRMED);
-
-	Collection<MatchApplicationStatus> CLOSED_STATUSES = EnumSet.of(MatchApplicationStatus.REJECTED,
-			MatchApplicationStatus.CANCELED, MatchApplicationStatus.EXPIRED);
-
-	Collection<MatchApplicationStatus> SEAT_OCCUPYING_STATUSES = EnumSet.of(MatchApplicationStatus.PAYMENT_PENDING,
-			MatchApplicationStatus.CONFIRMED);
-
 	boolean existsByMatchIdAndApplicantIdAndStatusIn(Long matchId, Long applicantId,
 			Collection<MatchApplicationStatus> statuses);
 
+	long countByMatchIdAndApplicantGenderAndStatus(Long matchId, Gender applicantGender,
+			MatchApplicationStatus status);
+
 	default boolean existsActiveApplication(Long matchId, Long applicantId) {
-		return existsByMatchIdAndApplicantIdAndStatusIn(matchId, applicantId, ACTIVE_STATUSES);
+		return existsByMatchIdAndApplicantIdAndStatusIn(matchId, applicantId, MatchApplicationStatus.ACTIVE);
 	}
 
 	@Query("""

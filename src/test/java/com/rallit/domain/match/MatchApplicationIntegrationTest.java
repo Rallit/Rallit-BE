@@ -238,11 +238,15 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		Match pendingApproval = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now().plusDays(1));
 		Match closed = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now().minusMinutes(1));
 		recruit(closed);
+		Match started = recruitingMatch(host, LocalDateTime.now().minusMinutes(1));
 
 		apply(applicant, pendingApproval.getId(), AGREED)
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("MATCH409"));
 		apply(applicant, closed.getId(), AGREED)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("MATCH409_1"));
+		apply(applicant, started.getId(), AGREED)
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("MATCH409_1"));
 		apply(applicant, Long.MAX_VALUE, AGREED)
@@ -259,6 +263,19 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("APPLICATION403_1"));
 		assertThat(applicationCount(match.getId())).isZero();
+	}
+
+	@Test
+	void rejectsGenderWhoseSeatsAreAllConfirmedButNotOnlyPending() throws Exception {
+		Match match = recruitingMatch(activeUser(Gender.MALE));
+		long firstMaleId = id(apply(activeUser(Gender.MALE), match.getId(), AGREED));
+		apply(activeUser(Gender.MALE), match.getId(), AGREED).andExpect(status().isCreated());
+		jdbcTemplate.update("UPDATE match_application SET status = 'CONFIRMED' WHERE id = ?", firstMaleId);
+
+		apply(activeUser(Gender.MALE), match.getId(), AGREED)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("APPLICATION409_2"));
+		apply(activeUser(Gender.FEMALE), match.getId(), AGREED).andExpect(status().isCreated());
 	}
 
 	@Test
@@ -296,8 +313,8 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	void listsMyActiveApplicationsFromTodayInMatchTimeOrderWithParticipantCounts() throws Exception {
 		User host = activeUser(Gender.MALE);
 		LocalDate today = LocalDate.now();
-		Match yesterday = recruitingMatch(host, today.minusDays(1).atTime(10, 0));
-		Match earlyToday = recruitingMatch(host, today.atStartOfDay());
+		Match yesterday = recruitingMatch(host);
+		Match earlyToday = recruitingMatch(host);
 		Match tomorrow = match(host, Set.of(MatchType.MENS_DOUBLES, MatchType.RALLY), 1, 2,
 				LocalDateTime.now().plusDays(1), today.plusDays(1).atTime(10, 0));
 		recruit(tomorrow);
@@ -316,6 +333,8 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		jdbcTemplate.update("UPDATE match_application SET status = 'CONFIRMED' WHERE id IN (?, ?)", confirmedOtherId,
 				nextWeekId);
 		cancel(applicant, canceledId, null).andExpect(status().isOk());
+		reschedule(yesterday, today.minusDays(1).atTime(10, 0));
+		reschedule(earlyToday, today.atStartOfDay());
 
 		myApplications(applicant)
 				.andExpect(status().isOk())
@@ -639,6 +658,11 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.build());
 		matchIds.add(match.getId());
 		return match;
+	}
+
+	private void reschedule(Match match, LocalDateTime startsAt) {
+		jdbcTemplate.update("UPDATE court_slot SET starts_at = ?, ends_at = ? WHERE id = ?", startsAt,
+				startsAt.plusHours(2), match.getCourtSlot().getId());
 	}
 
 	private void recruit(Match match) {

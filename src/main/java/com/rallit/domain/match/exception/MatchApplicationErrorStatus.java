@@ -15,7 +15,8 @@ public enum MatchApplicationErrorStatus implements BaseErrorCode {
 	GENDER_NOT_RECRUITED(HttpStatus.FORBIDDEN, "APPLICATION403_2", "모집 대상 성별이 아닙니다."),
 	APPLICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "APPLICATION404", "참가 신청 내역을 찾을 수 없습니다."),
 	APPLICATION_DUPLICATED(HttpStatus.CONFLICT, "APPLICATION409", "이미 진행 중인 참가 신청이 있습니다."),
-	APPLICATION_NOT_CANCELABLE(HttpStatus.CONFLICT, "APPLICATION409_1", "현재 상태에서는 참가 신청을 취소할 수 없습니다.");
+	APPLICATION_NOT_CANCELABLE(HttpStatus.CONFLICT, "APPLICATION409_1", "현재 상태에서는 참가 신청을 취소할 수 없습니다."),
+	RECRUITMENT_FULL(HttpStatus.CONFLICT, "APPLICATION409_2", "해당 성별의 모집 인원이 모두 확정되었습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String code;
