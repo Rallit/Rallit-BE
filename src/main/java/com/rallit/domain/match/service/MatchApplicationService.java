@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 import com.rallit.domain.match.dto.response.MatchApplicationCancelResponse;
 import com.rallit.domain.match.dto.response.MatchApplicationCreateResponse;
 import com.rallit.domain.match.dto.response.MatchApplicationDetailResponse;
-import com.rallit.domain.match.dto.response.MyMatchApplicationListResponse;
+import com.rallit.domain.match.dto.response.MyMatchApplicationListItemResponse;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
@@ -25,6 +25,7 @@ import com.rallit.domain.match.repository.MatchApplicationRepository.MatchApplic
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.global.apiPayload.SliceResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +71,7 @@ public class MatchApplicationService {
 	}
 
 	@Transactional(readOnly = true)
-	public MyMatchApplicationListResponse getMyScheduledApplications(Long userId, LocalDate date, int page,
+	public SliceResponse<MyMatchApplicationListItemResponse> getMyScheduledApplications(Long userId, LocalDate date, int page,
 			int size) {
 		LocalDateTime from = (date == null ? LocalDate.now(clock) : date).atStartOfDay();
 		LocalDateTime to = date == null ? null : from.plusDays(1);
@@ -79,7 +80,7 @@ public class MatchApplicationService {
 	}
 
 	@Transactional(readOnly = true)
-	public MyMatchApplicationListResponse getMyClosedApplications(Long userId, int page, int size) {
+	public SliceResponse<MyMatchApplicationListItemResponse> getMyClosedApplications(Long userId, int page, int size) {
 		return listResponse(matchApplicationRepository.findRecentSliceByApplicantId(userId,
 				MatchApplicationStatus.CLOSED, PageRequest.of(page, size)));
 	}
@@ -107,8 +108,10 @@ public class MatchApplicationService {
 		return MatchApplicationCancelResponse.from(application);
 	}
 
-	private MyMatchApplicationListResponse listResponse(Slice<MatchApplication> applications) {
-		return MyMatchApplicationListResponse.of(applications, occupiedSeatCounts(applications.getContent()));
+	private SliceResponse<MyMatchApplicationListItemResponse> listResponse(Slice<MatchApplication> applications) {
+		Map<Long, Long> counts = occupiedSeatCounts(applications.getContent());
+		return SliceResponse.from(applications.map(
+				application -> MyMatchApplicationListItemResponse.of(application, counts)));
 	}
 
 	private Map<Long, Long> occupiedSeatCounts(List<MatchApplication> applications) {

@@ -5,11 +5,12 @@ import java.time.LocalTime;
 import java.util.List;
 
 import com.rallit.domain.match.dto.response.MatchDetailResponse;
-import com.rallit.domain.match.dto.response.MatchListResponse;
+import com.rallit.domain.match.dto.response.MatchListItemResponse;
 import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.service.MatchDiscoveryService;
 import com.rallit.global.apiPayload.ApiResponse;
+import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +48,8 @@ public class MatchDiscoveryController {
 					+ "날짜 없는 시간 필터는 MATCH_DATE_REQUIRED_FOR_TIME_FILTER, "
 					+ "잘못된 시간 범위는 MATCH_INVALID_TIME_RANGE를 반환합니다. "
 					+ "온보딩 미완료는 403(MATCH_ONBOARDING_REQUIRED)입니다.")
-	public ResponseEntity<ApiResponse<MatchListResponse>> list(@AuthenticationPrincipal UserDetails principal,
+	public ResponseEntity<ApiResponse<PageResponse<MatchListItemResponse>>> list(
+			@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeTo,

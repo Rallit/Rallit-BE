@@ -57,13 +57,15 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 						.param("date", date.toString()).param("size", "1"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.code").value("COMMON200"))
-				.andExpect(jsonPath("$.result.matches", hasSize(1)))
-				.andExpect(jsonPath("$.result.matches[0].currentParticipantCount").value(1))
-				.andExpect(jsonPath("$.result.matches[0].startsAt").value(date + "T10:00:00+09:00"))
+				.andExpect(jsonPath("$.result.items", hasSize(1)))
+				.andExpect(jsonPath("$.result.items[0].currentParticipantCount").value(1))
+				.andExpect(jsonPath("$.result.items[0].startsAt").value(date + "T10:00:00+09:00"))
+				.andExpect(jsonPath("$.result.page").value(0))
+				.andExpect(jsonPath("$.result.size").value(1))
 				.andExpect(jsonPath("$.result.hasNext").value(true))
 				.andExpect(jsonPath("$.result.totalElements").value(3))
 				.andReturn().getResponse().getContentAsString();
-		long matchId = json.readTree(list).path("result").path("matches").get(0).path("matchId").asLong();
+		long matchId = json.readTree(list).path("result").path("items").get(0).path("matchId").asLong();
 
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
 				.andExpect(status().isOk())
@@ -84,8 +86,8 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(3))
-				.andExpect(jsonPath("$.result.matches[0].matchId").value(matchId))
-				.andExpect(jsonPath("$.result.matches[0].currentParticipantCount").value(1));
+				.andExpect(jsonPath("$.result.items[0].matchId").value(matchId))
+				.andExpect(jsonPath("$.result.items[0].currentParticipantCount").value(1));
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.canApply").value(false))
@@ -114,7 +116,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("matchTypes", "WOMENS_DOUBLES").param("page", "0"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.matches", hasSize(0)));
+				.andExpect(jsonPath("$.result.items", hasSize(0)));
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("matchTypes", "WOMENS_DOUBLES").param("page", "1"))
 				.andExpect(status().isBadRequest())
@@ -131,7 +133,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 						.param("matchTypes", "SINGLES", "RALLY"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(1))
-				.andExpect(jsonPath("$.result.matches[0].matchTypes[0]").value("SINGLES"));
+				.andExpect(jsonPath("$.result.items[0].matchTypes[0]").value("SINGLES"));
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("startTimeFrom", "10:00").param("startTimeTo", "11:00"))
 				.andExpect(status().isOk())

@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 import com.rallit.domain.court.enums.CourtSlotStatus;
 import com.rallit.domain.match.dto.response.MatchDetailResponse;
-import com.rallit.domain.match.dto.response.MatchListResponse;
+import com.rallit.domain.match.dto.response.MatchListItemResponse;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.enums.MatchStatus;
@@ -22,6 +22,7 @@ import com.rallit.domain.match.repository.MatchApplicationRepository;
 import com.rallit.domain.match.repository.MatchApplicationRepository.MatchApplicationCount;
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,7 @@ public class MatchDiscoveryService {
 	private final UserRepository users;
 	private final Clock clock;
 
-	public MatchListResponse list(LocalDate date, LocalTime startTimeFrom, LocalTime startTimeTo,
+	public PageResponse<MatchListItemResponse> list(LocalDate date, LocalTime startTimeFrom, LocalTime startTimeTo,
 			List<MatchType> matchTypes, int page, int size) {
 		if (date == null && (startTimeFrom != null || startTimeTo != null)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_DATE_REQUIRED_FOR_TIME_FILTER);
@@ -59,9 +60,8 @@ public class MatchDiscoveryService {
 			throw new GeneralException(MatchErrorStatus.MATCH_PAGE_OUT_OF_RANGE);
 		}
 		var counts = occupiedSeats(result.stream().map(Match::getId).toList());
-		var cards = result.stream().map(match -> MatchListResponse.Item.from(match,
-				counts.getOrDefault(match.getId(), 0L), clock.getZone())).toList();
-		return new MatchListResponse(cards, result.getNumber(), result.getSize(), result.hasNext(), result.getTotalElements());
+		return PageResponse.from(result.map(match -> MatchListItemResponse.from(match,
+				counts.getOrDefault(match.getId(), 0L), clock.getZone())));
 	}
 
 	public MatchDetailResponse detail(Long matchId, Long userId) {

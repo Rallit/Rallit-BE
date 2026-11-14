@@ -1,5 +1,6 @@
 package com.rallit.global.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,12 +13,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @ActiveProfiles("local")
 @AutoConfigureMockMvc
 class LocalDocsIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
+  @Autowired ObjectMapper json;
 
   @Test
   void swaggerDocumentsSocialLoginAndSeparatesAdminOperations() throws Exception {
@@ -65,5 +69,31 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath(profile + ".oneOf[1].type").value("null"))
         .andExpect(jsonPath(cityCode).isString())
         .andExpect(jsonPath(cityCode).value("11"));
+  }
+
+  @Test
+  void swaggerDocumentsPaginatedMatchAndApplicationItems() throws Exception {
+    var response = mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andReturn().getResponse();
+    JsonNode openApi = json.readTree(response.getContentAsString());
+
+    JsonNode matches = paginationProperties(openApi, "/api/v1/matches");
+    assertThat(matches.propertyNames()).containsExactlyInAnyOrder("items", "page", "size", "hasNext", "totalElements");
+    assertThat(matches.at("/items/items/$ref").asText()).isEqualTo("#/components/schemas/MatchListItemResponse");
+
+    for (String path : new String[]{"/api/v1/users/me/applications", "/api/v1/users/me/applications/closed"}) {
+      JsonNode applications = paginationProperties(openApi, path);
+      assertThat(applications.propertyNames()).containsExactlyInAnyOrder("items", "page", "size", "hasNext");
+      assertThat(applications.at("/items/items/$ref").asText())
+          .isEqualTo("#/components/schemas/MyMatchApplicationListItemResponse");
+    }
+  }
+
+  private JsonNode paginationProperties(JsonNode openApi, String path) {
+    String envelopeRef = openApi.path("paths").path(path)
+        .at("/get/responses/200/content/*~1*/schema/$ref").asText();
+    String resultRef = openApi.at(envelopeRef.substring(1)).at("/properties/result/$ref").asText();
+    return openApi.at(resultRef.substring(1)).path("properties");
   }
 }

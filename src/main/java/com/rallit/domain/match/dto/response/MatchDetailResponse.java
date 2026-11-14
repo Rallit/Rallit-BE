@@ -21,7 +21,7 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 
 	public static MatchDetailResponse from(Match match, long occupiedSeats, ZoneId zone, boolean recruitmentOpen,
 			BaseErrorCode blockReason) {
-		var card = MatchListResponse.Item.from(match, occupiedSeats, zone);
+		var card = MatchListItemResponse.from(match, occupiedSeats, zone);
 		var slot = match.getCourtSlot();
 		var court = slot.getCourt();
 		var host = match.getHost();
