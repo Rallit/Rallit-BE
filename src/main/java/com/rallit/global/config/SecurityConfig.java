@@ -243,6 +243,8 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
                 .authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}")
+                .authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
                 .authenticated()
                 .requestMatchers(

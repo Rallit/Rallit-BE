@@ -16,7 +16,6 @@ import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
-import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.exception.MatchApplicationErrorStatus;
 import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
 import com.rallit.domain.match.exception.MatchErrorStatus;
@@ -25,7 +24,6 @@ import com.rallit.domain.match.repository.MatchApplicationRepository;
 import com.rallit.domain.match.repository.MatchApplicationRepository.MatchApplicationCount;
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.user.entity.User;
-import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
@@ -44,6 +42,7 @@ public class MatchApplicationService {
 	private final MatchRepository matchRepository;
 	private final UserRepository userRepository;
 	private final Clock clock;
+	private final MatchApplicationEligibility eligibility;
 
 	@Transactional
 	public MatchApplicationCreateResponse apply(Long userId, Long matchId) {
@@ -55,10 +54,9 @@ public class MatchApplicationService {
 		Match match = matchRepository.findById(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
 		LocalDateTime now = now();
-		validateApplicable(match, applicant, now);
-		if (matchApplicationRepository.existsActiveApplication(matchId, userId)) {
-			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_DUPLICATED);
-		}
+		eligibility.blockReason(match, applicant, now).ifPresent(reason -> {
+			throw new GeneralException(reason);
+		});
 		try {
 			MatchApplication application = matchApplicationRepository.saveAndFlush(
 					MatchApplication.create(match, applicant, now));
@@ -107,27 +105,6 @@ public class MatchApplicationService {
 			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_CANCELABLE, failure);
 		}
 		return MatchApplicationCancelResponse.from(application);
-	}
-
-	private void validateApplicable(Match match, User applicant, LocalDateTime now) {
-		if (match.getStatus() != MatchStatus.RECRUITING) {
-			throw new GeneralException(MatchErrorStatus.MATCH_NOT_RECRUITING);
-		}
-		if (!now.isBefore(match.getRecruitmentDeadline()) || !now.isBefore(match.getCourtSlot().getStartsAt())) {
-			throw new GeneralException(MatchErrorStatus.MATCH_RECRUITMENT_CLOSED);
-		}
-		if (match.getHost().getId().equals(applicant.getId())) {
-			throw new GeneralException(MatchApplicationErrorStatus.HOST_NOT_ALLOWED);
-		}
-		int recruitCount = applicant.getGender() == Gender.MALE
-				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
-		if (recruitCount <= 0) {
-			throw new GeneralException(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
-		}
-		if (matchApplicationRepository.countByMatchIdAndApplicantGenderAndStatus(match.getId(),
-				applicant.getGender(), MatchApplicationStatus.CONFIRMED) >= recruitCount) {
-			throw new GeneralException(MatchApplicationErrorStatus.RECRUITMENT_FULL);
-		}
 	}
 
 	private MyMatchApplicationListResponse listResponse(Slice<MatchApplication> applications) {
