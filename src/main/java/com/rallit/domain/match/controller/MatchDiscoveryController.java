@@ -68,10 +68,15 @@ public class MatchDiscoveryController {
 	@GetMapping
 	@Operation(summary = "모집 중 매치 목록",
 			description = """
-					승인된 코트 슬롯에서 모집 마감과 경기 시작이 모두 지나지 않은 매치를 찾습니다.
-					경기 시작 시각과 매치 ID 오름차순으로 반환합니다. 응답 시각에는 서울 오프셋(`+09:00`)이 포함됩니다.
+					승인된 코트 슬롯의 매치 중 모집 마감과 경기 시작 전인 매치를 조회합니다.
 
-					`result.items`는 현재 페이지입니다. `result.totalElements`는 필터를 적용한 뒤 페이지를 나누기 전의 전체 건수입니다.
+					- 경기 시작 시각이 빠른 순으로 정렬합니다. 시작 시각이 같으면 매치 ID가 작은 순으로 정렬합니다.
+					- 응답 시각에는 서울 시간대 오프셋 `+09:00`이 포함됩니다.
+
+					**페이지 응답**
+
+					- `result.items` — 현재 페이지의 매치 목록
+					- `result.totalElements` — 필터가 적용된 전체 매치 수
 					""")
 	@ApiResponses({
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
@@ -122,12 +127,16 @@ public class MatchDiscoveryController {
 	@GetMapping("/{matchId}")
 	@Operation(summary = "모집 매치 상세",
 			description = """
-					목록에서 받은 `matchId`로 코트와 호스트 정보를 조회합니다.
-					응답 시각에는 서울 오프셋(`+09:00`)이 포함됩니다.
+					목록에서 받은 매치 ID로 코트와 호스트 정보를 조회합니다.
 
-					- `recruitmentOpen`은 모집 기간과 경기 시작 시각을 기준으로 합니다. 조회 가능한 매치가 모집 마감된 경우에도 상세는 반환합니다.
-					- `canApply`는 현재 회원의 조회 시점 신청 가능 여부입니다. 신청 불가 사유는 `applicationBlockReason`을 확인합니다.
-					- 참가 신청은 같은 `matchId`로 `POST /api/v1/matches/{matchId}/applications`에 보내면 됩니다.
+					응답 시각에는 서울 시간대 오프셋 `+09:00`이 포함됩니다.
+
+					**신청 상태**
+
+					- 모집 마감과 경기 시작 전이면 `recruitmentOpen` 값이 `true`입니다. 경기 시작 전에는 모집이 마감돼도 상세를 조회할 수 있습니다.
+					- 조회 시점에 현재 회원이 신청할 수 있으면 `canApply` 값이 `true`입니다. 신청할 수 없는 이유는 `applicationBlockReason` 필드에 표시됩니다.
+
+					참가 신청은 같은 매치 ID로 `POST /api/v1/matches/{matchId}/applications`를 호출합니다.
 					""")
 	@ApiResponses({
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
