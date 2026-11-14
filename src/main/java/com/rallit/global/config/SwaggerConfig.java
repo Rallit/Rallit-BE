@@ -34,6 +34,7 @@ public class SwaggerConfig {
 				.tags(List.of(
 						new Tag().name(AUTH_TAG).description("소셜 로그인, 토큰 재발급, 로그아웃"),
 						new Tag().name("회원").description("일반 서비스의 내 정보 조회"),
+						new Tag().name("매치 조회").description("모집 매치 목록과 상세 조회"),
 						new Tag().name("매치 참가 신청").description("매치 참가 신청, 내 신청 내역 조회, 신청 취소"),
 						new Tag().name(ADMIN_TAG).description("운영자 정보 조회와 운영자 세션 관리")))
 				.components(new Components().addSecuritySchemes("bearerAuth",

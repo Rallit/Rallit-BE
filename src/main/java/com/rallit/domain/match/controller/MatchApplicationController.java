@@ -8,9 +8,10 @@ import com.rallit.domain.match.dto.request.MatchApplicationCreateRequest;
 import com.rallit.domain.match.dto.response.MatchApplicationCancelResponse;
 import com.rallit.domain.match.dto.response.MatchApplicationCreateResponse;
 import com.rallit.domain.match.dto.response.MatchApplicationDetailResponse;
-import com.rallit.domain.match.dto.response.MyMatchApplicationListResponse;
+import com.rallit.domain.match.dto.response.MyMatchApplicationListItemResponse;
 import com.rallit.domain.match.service.MatchApplicationService;
 import com.rallit.global.apiPayload.ApiResponse;
+import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.SuccessStatus;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -55,10 +56,11 @@ public class MatchApplicationController {
 	@Operation(
 			summary = "매치 현황 조회",
 			description = "진행 중인 참가 신청(PENDING, PAYMENT_PENDING, CONFIRMED)을 경기 시작 일시 오름차순으로 조회합니다. "
-					+ "date가 없으면 오늘 이후 경기를, date가 있으면 해당 날짜의 경기만 조회합니다.",
+					+ "date가 없으면 오늘 이후 경기를, date가 있으면 해당 날짜의 경기만 조회합니다. "
+					+ "startsAt과 endsAt에는 서울 오프셋(+09:00)이 포함됩니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/users/me/applications")
-	public ResponseEntity<ApiResponse<MyMatchApplicationListResponse>> getMyScheduledApplications(
+	public ResponseEntity<ApiResponse<PageResponse<MyMatchApplicationListItemResponse>>> getMyScheduledApplications(
 			@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
 			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
@@ -69,10 +71,11 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "거절·취소·기한 만료 신청 조회",
-			description = "종료된 참가 신청(REJECTED, CANCELED, EXPIRED)을 최근 처리순으로 조회합니다.",
+			description = "종료된 참가 신청(REJECTED, CANCELED, EXPIRED)을 최근 처리순으로 조회합니다. "
+					+ "startsAt과 endsAt에는 서울 오프셋(+09:00)이 포함됩니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/users/me/applications/closed")
-	public ResponseEntity<ApiResponse<MyMatchApplicationListResponse>> getMyClosedApplications(
+	public ResponseEntity<ApiResponse<PageResponse<MyMatchApplicationListItemResponse>>> getMyClosedApplications(
 			@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
@@ -82,7 +85,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "참가 신청 상세 조회",
-			description = "본인의 참가 신청 상세를 조회합니다. 상태에 따라 값이 있는 필드만 응답합니다.",
+			description = "본인의 참가 신청 상세를 조회합니다. 상태에 따라 값이 있는 필드만 응답합니다. "
+					+ "match의 startsAt, endsAt, recruitmentDeadline에는 서울 오프셋(+09:00)이 포함됩니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/applications/{applicationId}")
 	public ResponseEntity<ApiResponse<MatchApplicationDetailResponse>> getApplication(

@@ -9,8 +9,8 @@ import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.user.enums.Gender;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -28,7 +28,7 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 		return existsByMatchIdAndApplicantIdAndStatusIn(matchId, applicantId, MatchApplicationStatus.ACTIVE);
 	}
 
-	@Query("""
+	@Query(value = """
 			select a from MatchApplication a
 			join fetch a.match m
 			join fetch m.courtSlot s
@@ -36,20 +36,29 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 			where a.applicant.id = :applicantId and a.status in :statuses
 			and s.startsAt >= :from and (cast(:to as LocalDateTime) is null or s.startsAt < :to)
 			order by s.startsAt, a.id
+			""", countQuery = """
+			select count(a) from MatchApplication a
+			join a.match m
+			join m.courtSlot s
+			where a.applicant.id = :applicantId and a.status in :statuses
+			and s.startsAt >= :from and (cast(:to as LocalDateTime) is null or s.startsAt < :to)
 			""")
-	Slice<MatchApplication> findScheduledSliceByApplicantId(@Param("applicantId") Long applicantId,
+	Page<MatchApplication> findScheduledByApplicantId(@Param("applicantId") Long applicantId,
 			@Param("statuses") Collection<MatchApplicationStatus> statuses, @Param("from") LocalDateTime from,
 			@Param("to") LocalDateTime to, Pageable pageable);
 
-	@Query("""
+	@Query(value = """
 			select a from MatchApplication a
 			join fetch a.match m
 			join fetch m.courtSlot s
 			join fetch s.court
 			where a.applicant.id = :applicantId and a.status in :statuses
 			order by a.updatedAt desc, a.id desc
+			""", countQuery = """
+			select count(a) from MatchApplication a
+			where a.applicant.id = :applicantId and a.status in :statuses
 			""")
-	Slice<MatchApplication> findRecentSliceByApplicantId(@Param("applicantId") Long applicantId,
+	Page<MatchApplication> findRecentByApplicantId(@Param("applicantId") Long applicantId,
 			@Param("statuses") Collection<MatchApplicationStatus> statuses, Pageable pageable);
 
 	@Query("""

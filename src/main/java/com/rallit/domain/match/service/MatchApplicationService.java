@@ -11,12 +11,11 @@ import java.util.stream.Collectors;
 import com.rallit.domain.match.dto.response.MatchApplicationCancelResponse;
 import com.rallit.domain.match.dto.response.MatchApplicationCreateResponse;
 import com.rallit.domain.match.dto.response.MatchApplicationDetailResponse;
-import com.rallit.domain.match.dto.response.MyMatchApplicationListResponse;
+import com.rallit.domain.match.dto.response.MyMatchApplicationListItemResponse;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
-import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.exception.MatchApplicationErrorStatus;
 import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
 import com.rallit.domain.match.exception.MatchErrorStatus;
@@ -25,14 +24,14 @@ import com.rallit.domain.match.repository.MatchApplicationRepository;
 import com.rallit.domain.match.repository.MatchApplicationRepository.MatchApplicationCount;
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.user.entity.User;
-import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.repository.UserRepository;
+import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +43,7 @@ public class MatchApplicationService {
 	private final MatchRepository matchRepository;
 	private final UserRepository userRepository;
 	private final Clock clock;
+	private final MatchApplicationEligibility eligibility;
 
 	@Transactional
 	public MatchApplicationCreateResponse apply(Long userId, Long matchId) {
@@ -55,10 +55,9 @@ public class MatchApplicationService {
 		Match match = matchRepository.findById(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
 		LocalDateTime now = now();
-		validateApplicable(match, applicant, now);
-		if (matchApplicationRepository.existsActiveApplication(matchId, userId)) {
-			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_DUPLICATED);
-		}
+		eligibility.blockReason(match, applicant, now).ifPresent(reason -> {
+			throw new GeneralException(reason);
+		});
 		try {
 			MatchApplication application = matchApplicationRepository.saveAndFlush(
 					MatchApplication.create(match, applicant, now));
@@ -72,17 +71,17 @@ public class MatchApplicationService {
 	}
 
 	@Transactional(readOnly = true)
-	public MyMatchApplicationListResponse getMyScheduledApplications(Long userId, LocalDate date, int page,
+	public PageResponse<MyMatchApplicationListItemResponse> getMyScheduledApplications(Long userId, LocalDate date, int page,
 			int size) {
 		LocalDateTime from = (date == null ? LocalDate.now(clock) : date).atStartOfDay();
 		LocalDateTime to = date == null ? null : from.plusDays(1);
-		return listResponse(matchApplicationRepository.findScheduledSliceByApplicantId(userId,
+		return listResponse(matchApplicationRepository.findScheduledByApplicantId(userId,
 				MatchApplicationStatus.ACTIVE, from, to, PageRequest.of(page, size)));
 	}
 
 	@Transactional(readOnly = true)
-	public MyMatchApplicationListResponse getMyClosedApplications(Long userId, int page, int size) {
-		return listResponse(matchApplicationRepository.findRecentSliceByApplicantId(userId,
+	public PageResponse<MyMatchApplicationListItemResponse> getMyClosedApplications(Long userId, int page, int size) {
+		return listResponse(matchApplicationRepository.findRecentByApplicantId(userId,
 				MatchApplicationStatus.CLOSED, PageRequest.of(page, size)));
 	}
 
@@ -94,7 +93,7 @@ public class MatchApplicationService {
 				? matchApplicationRepository.findAllWithApplicantByMatchIdAndStatus(application.getMatch().getId(),
 						MatchApplicationStatus.CONFIRMED)
 				: List.of();
-		return MatchApplicationDetailResponse.of(application, confirmedApplications);
+		return MatchApplicationDetailResponse.of(application, confirmedApplications, clock.getZone());
 	}
 
 	@Transactional
@@ -109,29 +108,10 @@ public class MatchApplicationService {
 		return MatchApplicationCancelResponse.from(application);
 	}
 
-	private void validateApplicable(Match match, User applicant, LocalDateTime now) {
-		if (match.getStatus() != MatchStatus.RECRUITING) {
-			throw new GeneralException(MatchErrorStatus.MATCH_NOT_RECRUITING);
-		}
-		if (!now.isBefore(match.getRecruitmentDeadline()) || !now.isBefore(match.getCourtSlot().getStartsAt())) {
-			throw new GeneralException(MatchErrorStatus.MATCH_RECRUITMENT_CLOSED);
-		}
-		if (match.getHost().getId().equals(applicant.getId())) {
-			throw new GeneralException(MatchApplicationErrorStatus.HOST_NOT_ALLOWED);
-		}
-		int recruitCount = applicant.getGender() == Gender.MALE
-				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
-		if (recruitCount <= 0) {
-			throw new GeneralException(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
-		}
-		if (matchApplicationRepository.countByMatchIdAndApplicantGenderAndStatus(match.getId(),
-				applicant.getGender(), MatchApplicationStatus.CONFIRMED) >= recruitCount) {
-			throw new GeneralException(MatchApplicationErrorStatus.RECRUITMENT_FULL);
-		}
-	}
-
-	private MyMatchApplicationListResponse listResponse(Slice<MatchApplication> applications) {
-		return MyMatchApplicationListResponse.of(applications, occupiedSeatCounts(applications.getContent()));
+	private PageResponse<MyMatchApplicationListItemResponse> listResponse(Page<MatchApplication> applications) {
+		Map<Long, Long> counts = occupiedSeatCounts(applications.getContent());
+		return PageResponse.from(applications.map(
+				application -> MyMatchApplicationListItemResponse.of(application, counts, clock.getZone())));
 	}
 
 	private Map<Long, Long> occupiedSeatCounts(List<MatchApplication> applications) {
