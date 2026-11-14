@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -175,7 +174,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		apply(applicant, match.getId(), AGREED)
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("APPLICATION409"));
+				.andExpect(jsonPath("$.code").value("APPLICATION_DUPLICATED"));
 
 		assertThat(applicationCount(match.getId())).isEqualTo(1);
 	}
@@ -255,16 +254,16 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		apply(applicant, pendingApproval.getId(), AGREED)
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("MATCH409"));
+				.andExpect(jsonPath("$.code").value("MATCH_NOT_RECRUITING"));
 		apply(applicant, closed.getId(), AGREED)
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("MATCH409_1"));
+				.andExpect(jsonPath("$.code").value("MATCH_RECRUITMENT_CLOSED"));
 		apply(applicant, started.getId(), AGREED)
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("MATCH409_1"));
+				.andExpect(jsonPath("$.code").value("MATCH_RECRUITMENT_CLOSED"));
 		apply(applicant, Long.MAX_VALUE, AGREED)
 				.andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.code").value("MATCH404"));
+				.andExpect(jsonPath("$.code").value("MATCH_NOT_FOUND"));
 	}
 
 	@Test
@@ -274,7 +273,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		apply(host, match.getId(), AGREED)
 				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("APPLICATION403_1"));
+				.andExpect(jsonPath("$.code").value("HOST_NOT_ALLOWED"));
 		assertThat(applicationCount(match.getId())).isZero();
 	}
 
@@ -287,7 +286,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		apply(activeUser(Gender.MALE), match.getId(), AGREED)
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("APPLICATION409_2"));
+				.andExpect(jsonPath("$.code").value("RECRUITMENT_FULL"));
 		apply(activeUser(Gender.FEMALE), match.getId(), AGREED).andExpect(status().isCreated());
 	}
 
@@ -300,7 +299,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		apply(activeUser(Gender.MALE), womensDoubles.getId(), AGREED)
 				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("APPLICATION403_2"));
+				.andExpect(jsonPath("$.code").value("GENDER_NOT_RECRUITED"));
 		apply(female, womensDoubles.getId(), AGREED)
 				.andExpect(status().isCreated());
 	}
@@ -318,7 +317,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isUnauthorized());
 		apply(onboarding, match.getId(), AGREED)
 				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.code").value("APPLICATION403"));
+				.andExpect(jsonPath("$.code").value("ONBOARDING_REQUIRED"));
 		assertThat(applicationCount(match.getId())).isZero();
 	}
 
@@ -385,6 +384,9 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.applications.length()").value(0));
 		myApplications(applicant, "date", "2026-13-01").andExpect(status().isBadRequest());
 		myApplications(applicant, "size", "51").andExpect(status().isBadRequest());
+		myApplications(applicant, "page", "10001")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
 	}
 
 	@Test
@@ -410,6 +412,10 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.applications[2].applicationId").value(rejectedId))
 				.andExpect(jsonPath("$.result.applications[2].applicationStatus").value("REJECTED"))
 				.andExpect(jsonPath("$.result.hasNext").value(false));
+		mvc.perform(get("/api/v1/users/me/applications/closed").param("page", "10001")
+						.header("Authorization", bearer(applicant)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
 		mvc.perform(get("/api/v1/users/me/applications/closed"))
 				.andExpect(status().isUnauthorized());
 	}
@@ -447,7 +453,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		detail(host, applicationId)
 				.andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.code").value("APPLICATION404"));
+				.andExpect(jsonPath("$.code").value("APPLICATION_NOT_FOUND"));
 	}
 
 	@Test
@@ -500,7 +506,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void rejectedDetailIncludesRejectReason() throws Exception {
+	void rejectedDetailHidesRejectReason() throws Exception {
 		Match match = recruitingMatch(activeUser(Gender.MALE));
 		User applicant = activeUser(Gender.FEMALE);
 		long applicationId = id(apply(applicant, match.getId(), AGREED));
@@ -510,7 +516,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		detail(applicant, applicationId)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.status").value("REJECTED"))
-				.andExpect(jsonPath("$.result.rejection.reason").value("SKILL_GAP"))
+				.andExpect(jsonPath("$.result.rejection").doesNotExist())
 				.andExpect(jsonPath("$.result.participants").doesNotExist());
 	}
 
@@ -571,14 +577,14 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 		cancel(stranger, applicationId, null)
 				.andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.code").value("APPLICATION404"));
+				.andExpect(jsonPath("$.code").value("APPLICATION_NOT_FOUND"));
 		assertThat(applicationStatus(applicationId)).isEqualTo("PENDING");
 
 		for (String status : List.of("PAYMENT_PENDING", "CONFIRMED", "REJECTED", "EXPIRED")) {
 			jdbcTemplate.update("UPDATE match_application SET status = ? WHERE id = ?", status, applicationId);
 			cancel(applicant, applicationId, null)
 					.andExpect(status().isConflict())
-					.andExpect(jsonPath("$.code").value("APPLICATION409_1"));
+					.andExpect(jsonPath("$.code").value("APPLICATION_NOT_CANCELABLE"));
 			assertThat(applicationStatus(applicationId)).isEqualTo(status);
 		}
 	}
@@ -603,7 +609,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private ResultActions cancel(User user, long applicationId, String body) throws Exception {
-		var request = patch("/api/v1/applications/{id}/cancel", applicationId).header("Authorization", bearer(user));
+		var request = post("/api/v1/applications/{id}/cancel", applicationId).header("Authorization", bearer(user));
 		if (body != null) {
 			request.contentType(MediaType.APPLICATION_JSON).content(body);
 		}

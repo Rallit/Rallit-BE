@@ -24,7 +24,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 public class MatchApplicationController {
+
+	private static final int MAX_PAGE = 10_000;
 
 	private final MatchApplicationService matchApplicationService;
 
@@ -60,7 +61,7 @@ public class MatchApplicationController {
 	public ResponseEntity<ApiResponse<MyMatchApplicationListResponse>> getMyScheduledApplications(
 			@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		return ResponseEntity.ok(ApiResponse.onSuccess(
 				matchApplicationService.getMyScheduledApplications(principal.userId(), date, page, size)));
@@ -73,7 +74,7 @@ public class MatchApplicationController {
 	@GetMapping("/api/v1/users/me/applications/closed")
 	public ResponseEntity<ApiResponse<MyMatchApplicationListResponse>> getMyClosedApplications(
 			@AuthenticationPrincipal UserDetails principal,
-			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		return ResponseEntity.ok(ApiResponse.onSuccess(
 				matchApplicationService.getMyClosedApplications(principal.userId(), page, size)));
@@ -94,7 +95,7 @@ public class MatchApplicationController {
 			summary = "결제 전 참가 신청 취소",
 			description = "PENDING 상태의 본인 신청을 취소합니다. 이미 취소된 신청은 기존 취소 정보를 그대로 반환합니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
-	@PatchMapping("/api/v1/applications/{applicationId}/cancel")
+	@PostMapping("/api/v1/applications/{applicationId}/cancel")
 	public ResponseEntity<ApiResponse<MatchApplicationCancelResponse>> cancel(
 			@AuthenticationPrincipal UserDetails principal, @PathVariable Long applicationId,
 			@RequestBody(required = false) MatchApplicationCancelRequest request) {

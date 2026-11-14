@@ -113,7 +113,7 @@ public class SecurityConfig {
                     r -> {
                       var c = new CorsConfiguration();
                       c.setAllowedOrigins(p.origins(target == LoginTarget.ADMIN));
-                      c.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+                      c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                       c.setAllowedHeaders(
                           List.of("Content-Type", "Authorization", "X-Requested-With"));
                       c.setAllowCredentials(true);
@@ -251,7 +251,7 @@ public class SecurityConfig {
                     "/api/v1/users/me/applications/closed",
                     "/api/v1/applications/*")
                 .authenticated()
-                .requestMatchers(HttpMethod.PATCH, "/api/v1/applications/*/cancel")
+                .requestMatchers(HttpMethod.POST, "/api/v1/applications/*/cancel")
                 .authenticated()
                 .anyRequest()
                 .denyAll());

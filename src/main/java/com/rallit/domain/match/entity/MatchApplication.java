@@ -5,10 +5,9 @@ import java.time.LocalDateTime;
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
-import com.rallit.domain.match.exception.MatchApplicationErrorStatus;
+import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
-import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -85,7 +84,7 @@ public class MatchApplication extends BaseEntity {
 			return;
 		}
 		if (status != MatchApplicationStatus.PENDING) {
-			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_CANCELABLE);
+			throw new MatchApplicationNotCancelableException(status);
 		}
 		this.status = MatchApplicationStatus.CANCELED;
 		this.cancelReason = cancelReason;

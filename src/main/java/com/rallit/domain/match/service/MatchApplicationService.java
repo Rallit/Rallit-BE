@@ -18,6 +18,7 @@ import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.exception.MatchApplicationErrorStatus;
+import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
 import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.repository.MatchApplicationConstraintViolations;
 import com.rallit.domain.match.repository.MatchApplicationRepository;
@@ -100,7 +101,11 @@ public class MatchApplicationService {
 	public MatchApplicationCancelResponse cancel(Long userId, Long applicationId, MatchApplicationCancelReason reason) {
 		MatchApplication application = matchApplicationRepository.findByIdAndApplicantIdForUpdate(applicationId, userId)
 				.orElseThrow(() -> new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_FOUND));
-		application.cancel(reason, now());
+		try {
+			application.cancel(reason, now());
+		} catch (MatchApplicationNotCancelableException failure) {
+			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_CANCELABLE, failure);
+		}
 		return MatchApplicationCancelResponse.from(application);
 	}
 

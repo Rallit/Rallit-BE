@@ -11,7 +11,6 @@ import com.rallit.domain.court.entity.CourtSlot;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
-import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
@@ -22,8 +21,7 @@ import com.rallit.domain.user.enums.Gender;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MatchApplicationDetailResponse(Long applicationId, MatchApplicationStatus status,
 		LocalDateTime appliedAt, LocalDateTime refundPolicyAgreedAt, LocalDateTime acceptedAt, MatchInfo match,
-		HostInfo host, PaymentInfo payment, List<ParticipantInfo> participants, RejectionInfo rejection,
-		CancellationInfo cancellation) {
+		HostInfo host, PaymentInfo payment, List<ParticipantInfo> participants, CancellationInfo cancellation) {
 
 	public static MatchApplicationDetailResponse of(MatchApplication application,
 			List<MatchApplication> confirmedApplications) {
@@ -34,7 +32,6 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 				HostInfo.from(match.getHost()),
 				status == MatchApplicationStatus.PAYMENT_PENDING ? PaymentInfo.from(application) : null,
 				status == MatchApplicationStatus.CONFIRMED ? participants(match.getHost(), confirmedApplications) : null,
-				status == MatchApplicationStatus.REJECTED ? new RejectionInfo(application.getRejectReason()) : null,
 				status == MatchApplicationStatus.CANCELED ? CancellationInfo.from(application) : null);
 	}
 
@@ -99,10 +96,6 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 			return new ParticipantInfo(applicant.getId(), applicant.getNickname(), profileImageUrlOf(applicant),
 					application.getApplicantGender(), applicant.getNtrp(), false);
 		}
-	}
-
-	@JsonInclude(JsonInclude.Include.NON_NULL)
-	public record RejectionInfo(MatchApplicationRejectReason reason) {
 	}
 
 	@JsonInclude(JsonInclude.Include.NON_NULL)
