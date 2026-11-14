@@ -7,14 +7,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.UUID;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
+import com.rallit.domain.court.entity.Court;
+import com.rallit.domain.match.entity.Match;
+import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.repository.UserRepository;
@@ -45,14 +48,14 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Autowired private Clock clock;
 
 	@Test
-	void seedListDetailAndApplicationUseTheSameMatchId() throws Exception {
+	void listDetailAndApplicationUseTheSameMatchId() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(0));
 
-		seed(date);
+		createRecruitingMatches(date);
 		String list = mvc.perform(get("/api/v1/matches").header("Authorization", bearer)
 						.param("date", date.toString()).param("size", "1"))
 				.andExpect(status().isOk())
@@ -95,7 +98,6 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.match.endsAt").value(date + "T12:00:00+09:00"))
 				.andExpect(jsonPath("$.result.match.recruitmentDeadline").value(date + "T09:00:00+09:00"));
 
-		seed(date);
 		assertThat(jdbc.queryForObject("select count(*) from match_application where match_id = ? and status = 'PENDING'",
 				Long.class, matchId)).isEqualTo(1L);
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
@@ -113,7 +115,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	void rejectsPagesBeyondFilteredResults() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
+		createRecruitingMatches(date);
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("size", "1").param("page", "2"))
@@ -142,7 +144,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	void rejectsBlankMatchTypesAndAcceptsRepeatedValues() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
+		createRecruitingMatches(date);
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("matchTypes", "SINGLES,"))
@@ -163,11 +165,11 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		User viewer = activeUser();
 		String bearer = bearer(viewer);
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
+		var fixtures = createRecruitingMatches(date);
 
-		long singlesId = demoMatchId(date, "singles");
-		long rallyId = demoMatchId(date, "rally");
-		long doublesId = demoMatchId(date, "mixed-doubles");
+		long singlesId = fixtures.singlesId();
+		long rallyId = fixtures.rallyId();
+		long doublesId = fixtures.doublesId();
 		mvc.perform(post("/api/v1/matches/{matchId}/applications", singlesId)
 						.header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"refundPolicyAgreed\":true}"))
@@ -209,13 +211,13 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		String bearer = bearer(users.saveAndFlush(EntityFixtures.user(entityManager,
 				"탐색" + UUID.randomUUID().toString().substring(0, 8), Gender.MALE)));
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
+		var fixtures = createRecruitingMatches(date);
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("matchTypes", "SINGLES", "RALLY").param("applicableOnly", "true"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(1))
-				.andExpect(jsonPath("$.result.items[0].matchId").value(demoMatchId(date, "rally")));
+				.andExpect(jsonPath("$.result.items[0].matchId").value(fixtures.rallyId()));
 	}
 
 	@Test
@@ -236,7 +238,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	void filtersByEntireTimeRangeAndMatchType() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
+		createRecruitingMatches(date);
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("startTimeFrom", "10:00").param("startTimeTo", "12:00")
 						.param("matchTypes", "SINGLES", "RALLY"))
@@ -267,11 +269,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
-		long matchId = jdbc.queryForObject("""
-				select m.id from match m join court_slot s on s.id = m.court_slot_id
-				where s.evidence_file_key = ?
-				""", Long.class, "local-demo/21/" + date + "/singles");
+		long matchId = createRecruitingMatches(date).singlesId();
 		jdbc.update("update court_slot set status = 'PENDING' where id = (select court_slot_id from match where id = ?)",
 				matchId);
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
@@ -286,11 +284,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		User viewer = activeUser();
 		String bearer = bearer(viewer);
 		LocalDate date = LocalDate.now(clock).plusDays(7);
-		seed(date);
-		long matchId = jdbc.queryForObject("""
-				select m.id from match m join court_slot s on s.id = m.court_slot_id
-				where s.evidence_file_key = ?
-				""", Long.class, "local-demo/21/" + date + "/singles");
+		long matchId = createRecruitingMatches(date).singlesId();
 		User confirmed = activeUser();
 		jdbc.update("""
 				insert into match_application (match_id, applicant_user_id, applicant_gender, status,
@@ -314,24 +308,55 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.applicationBlockReason").value("MATCH_RECRUITMENT_CLOSED"));
 	}
 
-	private void seed(LocalDate date) throws Exception {
-		jdbc.queryForObject("select set_config('rallit.demo_date', ?, true)", String.class, date.toString());
-		jdbc.execute(Files.readString(Path.of("scripts/local/seed-matches.sql")));
+	private RecruitingMatches createRecruitingMatches(LocalDate date) {
+		User host = activeUser(Gender.MALE);
+		Court court = EntityFixtures.court();
+		entityManager.persist(court);
+		var singles = createMatch(host, court, date, 10, MatchType.SINGLES, 0, 1);
+		var rally = createMatch(host, court, date, 13, MatchType.RALLY, 1, 1);
+		var doubles = createMatch(host, court, date, 18, MatchType.MIXED_DOUBLES, 1, 2);
+		entityManager.flush();
+
+		jdbc.update("update court_slot set status = 'APPROVED' where court_id = ?", court.getId());
+		jdbc.update("update match set status = 'RECRUITING' where id in (?, ?, ?)",
+				singles.getId(), rally.getId(), doubles.getId());
+		entityManager.clear();
+		return new RecruitingMatches(singles.getId(), rally.getId(), doubles.getId());
 	}
 
-	private long demoMatchId(LocalDate date, String seedKey) {
-		return jdbc.queryForObject("""
-				select m.id from match m join court_slot s on s.id = m.court_slot_id
-				where s.evidence_file_key = ?
-				""", Long.class, "local-demo/21/" + date + "/" + seedKey);
+	private Match createMatch(User host, Court court, LocalDate date, int hour, MatchType type,
+			int maleRecruitCount, int femaleRecruitCount) {
+		var startsAt = date.atTime(hour, 0);
+		var slot = EntityFixtures.courtSlot(court, host, "1", startsAt);
+		entityManager.persist(slot);
+		var match = Match.builder()
+				.courtSlot(slot)
+				.host(host)
+				.matchTypes(Set.of(type))
+				.maleRecruitCount(maleRecruitCount)
+				.femaleRecruitCount(femaleRecruitCount)
+				.minNtrp(new BigDecimal("2.5"))
+				.maxNtrp(new BigDecimal("3.5"))
+				.participationFee(3500)
+				.recruitmentDeadline(startsAt.minusHours(1))
+				.build();
+		entityManager.persist(match);
+		return match;
 	}
 
 	private User activeUser() {
+		return activeUser(Gender.FEMALE);
+	}
+
+	private User activeUser(Gender gender) {
 		return users.saveAndFlush(EntityFixtures.user(entityManager, "탐색" + UUID.randomUUID().toString().substring(0, 8),
-				Gender.FEMALE));
+				gender));
 	}
 
 	private String bearer(User user) {
 		return "Bearer " + sessions.login(user.getId(), LoginTarget.SERVICE).accessToken();
+	}
+
+	private record RecruitingMatches(long singlesId, long rallyId, long doublesId) {
 	}
 }
