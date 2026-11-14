@@ -17,7 +17,10 @@ import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
@@ -27,6 +30,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,33 +41,77 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/matches")
+@RequestMapping(value = "/api/v1/matches", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "매치 조회")
 @SecurityRequirement(name = "bearerAuth")
+@ApiResponses({
+		@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
+				description = "서비스 Bearer 토큰 누락, 만료 또는 인증 실패",
+				content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+						schema = @Schema(implementation = ApiResponse.class),
+						examples = @ExampleObject(name = "인증 필요", value = MatchDiscoveryExamples.UNAUTHORIZED))),
+		@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403",
+				description = "온보딩을 완료해야 매치를 조회할 수 있습니다.",
+				content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+						schema = @Schema(implementation = ApiResponse.class),
+						examples = @ExampleObject(name = "온보딩 미완료", value = MatchDiscoveryExamples.ONBOARDING_REQUIRED))),
+		@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503",
+				description = "인증 세션 저장소를 일시적으로 사용할 수 없습니다.",
+				content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+						schema = @Schema(implementation = ApiResponse.class),
+						examples = @ExampleObject(name = "세션 저장소 장애", value = MatchDiscoveryExamples.SERVICE_UNAVAILABLE)))
+})
 public class MatchDiscoveryController {
 
 	private final MatchDiscoveryService discovery;
 
 	@GetMapping
 	@Operation(summary = "모집 중 매치 목록",
-			description = "서울 시간 기준 날짜와 시간대를 사용합니다. 시간대는 경기 전체를 포함해야 합니다. "
-					+ "복수 경기 방식 중 하나 이상이 일치하면 포함하며, 경기 시작 시각과 매치 ID 순으로 정렬합니다. "
-					+ "applicableOnly=true이면 본인이 신청할 수 있는 매치만 목록과 전체 건수에 포함합니다. "
-					+ "페이지는 0부터 시작합니다. 검색 결과가 없어도 첫 페이지는 조회할 수 있으며, "
-					+ "페이지 범위를 벗어나면 400(MATCH_PAGE_OUT_OF_RANGE)을 반환합니다. "
-					+ "날짜 없는 시간 필터는 MATCH_DATE_REQUIRED_FOR_TIME_FILTER, "
-					+ "잘못된 시간 범위는 MATCH_INVALID_TIME_RANGE를 반환합니다. "
-					+ "온보딩 미완료는 403(MATCH_ONBOARDING_REQUIRED)입니다.")
+			description = """
+					승인된 코트 슬롯에서 모집 마감과 경기 시작이 모두 지나지 않은 매치를 찾습니다.
+					경기 시작 시각과 매치 ID 오름차순으로 반환합니다. 응답 시각에는 서울 오프셋(`+09:00`)이 포함됩니다.
+
+					`result.items`는 현재 페이지입니다. `result.totalElements`는 필터를 적용한 뒤 페이지를 나누기 전의 전체 건수입니다.
+					""")
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+					description = "목록 조회 성공. 검색 결과가 없어도 첫 페이지는 빈 목록을 반환합니다.",
+					useReturnTypeSchema = true, content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+							examples = {
+									@ExampleObject(name = "모집 매치 목록", value = MatchDiscoveryExamples.LIST),
+									@ExampleObject(name = "검색 결과 없음", value = MatchDiscoveryExamples.EMPTY_LIST)
+							})),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+					description = "요청 형식, 날짜와 시간 조건의 조합 또는 페이지가 유효하지 않습니다.",
+					content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+							schema = @Schema(implementation = ApiResponse.class), examples = {
+									@ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST),
+									@ExampleObject(name = "시간 필터에 날짜 필요", value = MatchDiscoveryExamples.DATE_REQUIRED),
+									@ExampleObject(name = "잘못된 시간 범위", value = MatchDiscoveryExamples.INVALID_TIME_RANGE),
+									@ExampleObject(name = "페이지 범위 초과", value = MatchDiscoveryExamples.PAGE_OUT_OF_RANGE)
+							}))
+	})
 	public ResponseEntity<ApiResponse<PageResponse<MatchListItemResponse>>> list(
-			@AuthenticationPrincipal UserDetails principal,
-			@Parameter(description = "서울 시간 기준 조회 날짜. 연도는 0001~9999입니다.",
+			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
+			@Parameter(description = "경기 시작일(서울 기준). 연도 0001~9999. 생략하면 현재 모집 중인 향후 경기를 조회합니다.",
 					schema = @Schema(type = "string", format = "date", example = "2026-11-15"))
 			@RequestParam(required = false) @Pattern(regexp = "[0-9]{4}-[0-9]{2}-[0-9]{2}") String date,
+			@Parameter(description = "가장 이른 경기 시작 시각(HH:mm, 경계 포함). 입력 시 date가 필요합니다.",
+					schema = @Schema(type = "string", example = "14:00"))
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,
+			@Parameter(description = "가장 늦은 경기 종료 시각(HH:mm, 경계 포함). 입력 시 date가 필요하며, "
+					+ "두 시간 조건을 함께 쓰면 시작 시간보다 늦어야 합니다.",
+					schema = @Schema(type = "string", example = "18:00"))
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeTo,
+			@Parameter(description = "경기 방식 중 하나 이상이 일치하면 포함합니다. "
+					+ "`matchTypes=SINGLES&matchTypes=RALLY` 또는 `matchTypes=SINGLES,RALLY`로 전달할 수 있습니다.")
 			@RequestParam(required = false) List<@NotNull MatchType> matchTypes,
+			@Parameter(description = "true이면 본인 개설, 진행 중인 신청, 모집 성별과 확정 인원 기준 정원을 확인해 "
+					+ "내가 신청할 수 있는 매치만 목록과 전체 건수에 포함합니다.")
 			@RequestParam(defaultValue = "false") boolean applicableOnly,
+			@Parameter(description = "0부터 시작하는 페이지. 첫 페이지 이후 결과 범위를 벗어나면 400입니다.")
 			@RequestParam(defaultValue = "0") @Min(0) @Max(10000) int page,
+			@Parameter(description = "페이지당 요청할 최대 항목 수")
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		requireOnboarding(principal);
 		return ResponseEntity.ok(ApiResponse.onSuccess(
@@ -73,9 +121,33 @@ public class MatchDiscoveryController {
 
 	@GetMapping("/{matchId}")
 	@Operation(summary = "모집 매치 상세",
-			description = "matchId를 참가 신청에 그대로 사용합니다. canApply는 조회 시점의 신청 가능 여부입니다. "
-					+ "온보딩 미완료는 403(MATCH_ONBOARDING_REQUIRED), 조회할 수 없는 매치는 404(MATCH_NOT_FOUND)입니다.")
-	public ResponseEntity<ApiResponse<MatchDetailResponse>> detail(@AuthenticationPrincipal UserDetails principal,
+			description = """
+					목록에서 받은 `matchId`로 코트와 호스트 정보를 조회합니다.
+					응답 시각에는 서울 오프셋(`+09:00`)이 포함됩니다.
+
+					- `recruitmentOpen`은 모집 기간과 경기 시작 시각을 기준으로 합니다. 조회 가능한 매치가 모집 마감된 경우에도 상세는 반환합니다.
+					- `canApply`는 현재 회원의 조회 시점 신청 가능 여부입니다. 신청 불가 사유는 `applicationBlockReason`을 확인합니다.
+					- 참가 신청은 같은 `matchId`로 `POST /api/v1/matches/{matchId}/applications`에 보내면 됩니다.
+					""")
+	@ApiResponses({
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+					description = "상세 조회 성공",
+					useReturnTypeSchema = true, content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+							examples = @ExampleObject(name = "신청 가능", value = MatchDiscoveryExamples.DETAIL))),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+					description = "매치 ID는 양의 정수여야 합니다.",
+					content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+							schema = @Schema(implementation = ApiResponse.class),
+							examples = @ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST))),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+					description = "매치가 없거나 승인 슬롯의 모집 매치가 아니거나 이미 경기가 시작됐습니다.",
+					content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+							schema = @Schema(implementation = ApiResponse.class),
+							examples = @ExampleObject(name = "조회 불가", value = MatchDiscoveryExamples.MATCH_NOT_FOUND)))
+	})
+	public ResponseEntity<ApiResponse<MatchDetailResponse>> detail(
+			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
+			@Parameter(description = "목록 응답의 matchId", example = "42")
 			@PathVariable @Positive Long matchId) {
 		requireOnboarding(principal);
 		return ResponseEntity.ok(ApiResponse.onSuccess(discovery.detail(matchId, principal.userId())));

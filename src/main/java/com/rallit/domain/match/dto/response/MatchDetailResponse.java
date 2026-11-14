@@ -12,11 +12,19 @@ import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.domain.user.enums.AgeGroup;
 import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.global.apiPayload.code.BaseErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes,
-		OffsetDateTime startsAt, OffsetDateTime endsAt, Integer participationFee, BigDecimal minNtrp, BigDecimal maxNtrp,
-		long currentParticipantCount, int capacity, OffsetDateTime recruitmentDeadline, boolean recruitmentOpen,
-		boolean canApply, String applicationBlockReason, Integer maleRecruitCount, Integer femaleRecruitCount,
+		OffsetDateTime startsAt, OffsetDateTime endsAt, Integer participationFee,
+		@Schema(description = "모집 NTRP 하한. 미설정이면 null", types = {"number", "null"}) BigDecimal minNtrp,
+		@Schema(description = "모집 NTRP 상한. 미설정이면 null", types = {"number", "null"}) BigDecimal maxNtrp,
+		long currentParticipantCount, int capacity, OffsetDateTime recruitmentDeadline,
+		@Schema(description = "모집 마감과 경기 시작이 모두 지나지 않았는지 여부") boolean recruitmentOpen,
+		@Schema(description = "조회 시점에 현재 로그인 회원이 신청 가능한지 여부") boolean canApply,
+		@Schema(description = "신청 가능하면 null. 신청 불가 사유는 MATCH_RECRUITMENT_CLOSED, HOST_NOT_ALLOWED, "
+				+ "GENDER_NOT_RECRUITED, RECRUITMENT_FULL, APPLICATION_DUPLICATED 중 하나입니다.",
+				types = {"string", "null"}) String applicationBlockReason,
+		Integer maleRecruitCount, Integer femaleRecruitCount,
 		List<AgeGroup> preferredAgeGroups, CourtInfo court, HostInfo host) {
 
 	public static MatchDetailResponse from(Match match, long occupiedSeats, ZoneId zone, boolean recruitmentOpen,
@@ -39,9 +47,13 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 	}
 
 	public record CourtInfo(Long courtId, String name, String address, String courtNumber, BigDecimal latitude,
-			BigDecimal longitude, boolean hasParking, boolean hasShower, String facilityNotes) {
+			BigDecimal longitude, boolean hasParking, boolean hasShower,
+			@Schema(types = {"string", "null"}) String facilityNotes) {
 	}
 
-	public record HostInfo(Long userId, String nickname, ExperiencePeriod experiencePeriod, String profileImageUrl) {
+	public record HostInfo(Long userId, String nickname,
+			@Schema(types = {"string", "null"}) ExperiencePeriod experiencePeriod,
+			@Schema(description = "Bearer 인증이 필요한 API 상대 경로. 등록된 사진이 없으면 null",
+					types = {"string", "null"}) String profileImageUrl) {
 	}
 }
