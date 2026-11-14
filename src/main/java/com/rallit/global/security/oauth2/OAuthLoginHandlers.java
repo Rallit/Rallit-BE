@@ -47,7 +47,7 @@ public class OAuthLoginHandlers {
       stage = LoginStage.RESPONSE;
       cookies.writeRefresh(response, tokens, target);
       response.setHeader("Cache-Control", "no-store");
-      response.sendRedirect(destination(target));
+      response.sendRedirect(destination(request, target));
     } catch (SocialLoginRejectedException rejected) {
       String error =
           switch (rejected.reason()) {
@@ -56,7 +56,7 @@ public class OAuthLoginHandlers {
                 "account_exists&existingProvider=" + rejected.existingProvider().registrationId();
           };
       response.setHeader("Cache-Control", "no-store");
-      response.sendRedirect(destination(target) + "?error=" + error);
+      response.sendRedirect(destination(request, target) + "?error=" + error);
     } catch (GeneralException rejected) {
       if (rejected.getCode() == ErrorStatus._UNAUTHORIZED
           || rejected.getCode() == ErrorStatus._FORBIDDEN) {
@@ -96,12 +96,17 @@ public class OAuthLoginHandlers {
         request.getAttribute(RedisAuthorizationRequestRepository.TARGET) instanceof LoginTarget t
             ? t
             : LoginTarget.SERVICE;
-    String destination = destination(target);
+    String destination = destination(request, target);
     response.setHeader("Cache-Control", "no-store");
     response.sendRedirect(destination + "?error=login_failed");
   }
 
-  public String destination(LoginTarget target) {
+  private String destination(HttpServletRequest request, LoginTarget target) {
+    if (target == LoginTarget.SERVICE
+        && request.getAttribute(RedisAuthorizationRequestRepository.FRONTEND_CALLBACK)
+            instanceof String callback) {
+      return callback;
+    }
     return properties.callbackUrl(target);
   }
 

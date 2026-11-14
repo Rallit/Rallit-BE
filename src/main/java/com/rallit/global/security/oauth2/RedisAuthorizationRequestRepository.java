@@ -23,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
 public class RedisAuthorizationRequestRepository
     implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
   public static final String TARGET = "rallit.loginTarget";
+  static final String FRONTEND_CALLBACK = "rallit.frontendCallback";
   static final String STORE_UNAVAILABLE = "authorization_request_store_unavailable";
   private final StringRedisTemplate redis;
   private final ObjectMapper mapper;
@@ -134,6 +135,7 @@ public class RedisAuthorizationRequestRepository
         request.removeAttribute(TARGET);
         return null;
       }
+      request.setAttribute(FRONTEND_CALLBACK, s.attributes().get(FRONTEND_CALLBACK));
       cookies.add(
           response,
           name(state),

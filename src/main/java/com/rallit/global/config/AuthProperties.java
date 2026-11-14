@@ -67,8 +67,9 @@ public record AuthProperties(
 
   public List<String> origins(boolean admin) {
     var list = admin ? adminOrigins : serviceOrigins;
-    return list == null
-        ? List.of(admin ? "https://admin.rallit.co.kr" : "https://rallit.co.kr")
-        : List.copyOf(list);
+    if (list != null) return List.copyOf(list);
+    return admin
+        ? List.of("https://admin.rallit.co.kr")
+        : List.of("https://rallit.co.kr", "https://dev.rallit.co.kr");
   }
 }

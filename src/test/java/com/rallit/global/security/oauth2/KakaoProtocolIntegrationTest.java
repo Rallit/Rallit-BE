@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.enums.SocialProvider;
 import com.rallit.domain.user.repository.SocialAccountRepository;
 import com.rallit.support.IntegrationTestSupport;
@@ -33,6 +34,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
 class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
+  static final String DEV_ORIGIN = "https://dev.rallit.co.kr";
+  static final String DEV_CALLBACK = DEV_ORIGIN + "/auth/callback";
+  static final String SERVICE_CALLBACK = "https://rallit.co.kr/auth/callback";
   static final HttpServer server;
   static final Map<String, String> profiles = new java.util.concurrent.ConcurrentHashMap<>();
   static final AtomicInteger exchanges = new AtomicInteger();
@@ -112,9 +116,11 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
 
   record Attempt(String state, Cookie binding) {}
 
-  Attempt start(String target) throws Exception {
+  Attempt start(String target, String... callbacks) throws Exception {
+    var request = get("/api/v1/auth/kakao").param("target", target);
+    if (callbacks.length > 0) request.param("callback", callbacks);
     var response =
-        mvc.perform(get("/api/v1/auth/kakao").param("target", target))
+        mvc.perform(request)
             .andExpect(status().is3xxRedirection())
             .andReturn()
             .getResponse();
@@ -196,9 +202,26 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
     assertThat(response.getHeaders("Set-Cookie")).noneMatch(cookie -> cookie.contains("_refresh="));
   }
 
-  @Test
-  void realOAuthFiltersExchangeCodeAndBindToOriginalTarget() throws Exception {
-    var a = start("service");
+  @ParameterizedTest
+  @CsvSource({
+    ", " + SERVICE_CALLBACK + ", false",
+    SERVICE_CALLBACK + ", " + SERVICE_CALLBACK + ", true",
+    DEV_CALLBACK + ", " + DEV_CALLBACK + ", true",
+    DEV_CALLBACK + "/, " + SERVICE_CALLBACK + ", false",
+    DEV_CALLBACK + "?next=other, " + SERVICE_CALLBACK + ", false",
+    "https://dev.rallit.co.kr.example.test/auth/callback, " + SERVICE_CALLBACK + ", false"
+  })
+  void realOAuthFiltersExchangeCodeAndBindToOriginalTargetAndAllowedCallback(
+      String requestedCallback, String destination, boolean stored) throws Exception {
+    var a = requestedCallback == null ? start("service") : start("service", requestedCallback);
+    var snapshot =
+        mapper.readTree(
+            stateRedis.opsForValue().get("auth:oauth:" + TokenSessionService.hash(a.state())));
+    var savedCallback =
+        snapshot.path("attributes").path(RedisAuthorizationRequestRepository.FRONTEND_CALLBACK);
+    if (stored) assertThat(savedCallback.asText()).isEqualTo(requestedCallback);
+    else assertThat(savedCallback.isMissingNode()).isTrue();
+
     int before = exchanges.get();
     var response =
         mvc.perform(
@@ -206,9 +229,10 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
                     .param("code", "test-code")
                     .param("state", a.state())
                     .param("target", "admin")
+                    .param("callback", stored ? "https://example.test/callback" : DEV_CALLBACK)
                     .cookie(a.binding()))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("https://rallit.co.kr/auth/callback"))
+            .andExpect(redirectedUrl(destination))
             .andReturn()
             .getResponse();
     assertThat(exchanges.get()).isEqualTo(before + 1);
@@ -229,8 +253,19 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
+  void repeatedCallbackUsesDefaultDestination() throws Exception {
+    var attempt = start("service", DEV_CALLBACK, DEV_CALLBACK);
+    mvc.perform(
+            get("/api/v1/auth/kakao/callback")
+                .param("code", "test-code")
+                .param("state", attempt.state())
+                .cookie(attempt.binding()))
+        .andExpect(redirectedUrl(SERVICE_CALLBACK));
+  }
+
+  @Test
   void wrongBrowserDoesNotConsumeLegitimateState() throws Exception {
-    var a = start("service");
+    var a = start("service", DEV_CALLBACK);
     mvc.perform(
             get("/api/v1/auth/kakao/callback")
                 .param("code", "test-code")
@@ -242,19 +277,36 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
                 .param("code", "test-code")
                 .param("state", a.state())
                 .cookie(a.binding()))
-        .andExpect(redirectedUrl("https://rallit.co.kr/auth/callback"));
+        .andExpect(redirectedUrl(DEV_CALLBACK));
+  }
+
+  @Test
+  void devOriginCanPreflightServiceRefreshOnly() throws Exception {
+    mvc.perform(
+            options("/api/v1/auth/refresh")
+                .header("Origin", DEV_ORIGIN)
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "content-type,x-requested-with"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Access-Control-Allow-Origin", DEV_ORIGIN))
+        .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    mvc.perform(
+            options("/api/v1/admin/auth/refresh")
+                .header("Origin", DEV_ORIGIN)
+                .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isForbidden());
   }
 
   @Test
   void refreshSuppliesMemoryAccessTokenAndLogoutNeedsNoCsrfEndpoint() throws Exception {
-    var attempt = start("service");
+    var attempt = start("service", DEV_CALLBACK);
     var logged =
         mvc.perform(
                 get("/api/v1/auth/kakao/callback")
                     .param("code", "test-code")
                     .param("state", attempt.state())
                     .cookie(attempt.binding()))
-            .andExpect(redirectedUrl("https://rallit.co.kr/auth/callback"))
+            .andExpect(redirectedUrl(DEV_CALLBACK))
             .andReturn()
             .getResponse();
     Cookie refresh = cookie(logged.getHeaders("Set-Cookie"), "__Host-rallit_refresh");
@@ -268,11 +320,12 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
         mvc.perform(
                 post("/api/v1/auth/refresh")
                     .cookie(refresh, new Cookie("__Host-rallit_access", "retired-cookie"))
-                    .header("Origin", "https://rallit.co.kr")
+                    .header("Origin", DEV_ORIGIN)
                     .header("X-Requested-With", "XMLHttpRequest")
                     .contentType("application/json")
                     .content("{}"))
             .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", DEV_ORIGIN))
             .andExpect(jsonPath("$.result.refreshToken").doesNotExist())
             .andReturn()
             .getResponse();
@@ -285,7 +338,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
     mvc.perform(
             post("/api/v1/auth/logout")
                 .cookie(nextRefresh)
-                .header("Origin", "https://rallit.co.kr")
+                .header("Origin", DEV_ORIGIN)
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType("application/json"))
         .andExpect(status().isNoContent());

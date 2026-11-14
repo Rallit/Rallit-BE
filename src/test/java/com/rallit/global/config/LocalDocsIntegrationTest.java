@@ -27,8 +27,12 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.tags[*].name", containsInAnyOrder("인증", "회원", "매치 참가 신청", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.parameters[*].name",
+            containsInAnyOrder("target", "callback")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/google'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/google'].get.responses['302']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/auth/google'].get.parameters[*].name",
+            containsInAnyOrder("target", "callback")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/refresh'].post.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['204']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/users/me'].get.tags[0]").value("회원"))

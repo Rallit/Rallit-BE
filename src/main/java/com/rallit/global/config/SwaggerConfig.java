@@ -80,6 +80,10 @@ public class SwaggerConfig {
 				.addParametersItem(new QueryParameter().name("target")
 						.description("일반 서비스 또는 운영자 로그인")
 						.schema(target))
+				.addParametersItem(new QueryParameter().name("callback")
+						.description("일반 서비스 로그인 후 돌아갈 전체 URL. 허용 목록과 정확히 일치할 때 사용하며, "
+								+ "그 외에는 기본 콜백으로 이동합니다.")
+						.schema(new StringSchema().example("https://dev.rallit.co.kr/auth/callback")))
 				.responses(new ApiResponses()
 						.addApiResponse("302", new ApiResponse().description("소셜 인증 화면으로 이동"))
 						.addApiResponse("400", new ApiResponse().description("지원하지 않는 로그인 목적"))));

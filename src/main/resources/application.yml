@@ -31,7 +31,7 @@ rallit:
   profile-image:
     storage-path: ${PROFILE_IMAGE_STORAGE_PATH:./build/profile-images}
   auth:
-    service-origins: ${SERVICE_ORIGINS:https://rallit.co.kr}
+    service-origins: ${SERVICE_ORIGINS:https://rallit.co.kr,https://dev.rallit.co.kr}
     admin-origins: ${ADMIN_ORIGINS:https://admin.rallit.co.kr}
     service-key: ${JWT_SERVICE_KEY:}
     admin-key: ${JWT_ADMIN_KEY:}
