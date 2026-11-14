@@ -124,6 +124,86 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void rejectsBlankMatchTypesAndAcceptsRepeatedValues() throws Exception {
+		String bearer = bearer(activeUser());
+		LocalDate date = LocalDate.now(clock).plusDays(7);
+		seed(date);
+
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "SINGLES,"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "SINGLES", ""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "SINGLES", "SINGLES", "SINGLES", "SINGLES", "SINGLES", "SINGLES"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(1));
+	}
+
+	@Test
+	void filtersApplicantEligibilityBeforeCountingAndPaging() throws Exception {
+		User viewer = activeUser();
+		String bearer = bearer(viewer);
+		LocalDate date = LocalDate.now(clock).plusDays(7);
+		seed(date);
+
+		long singlesId = demoMatchId(date, "singles");
+		long rallyId = demoMatchId(date, "rally");
+		long doublesId = demoMatchId(date, "mixed-doubles");
+		mvc.perform(post("/api/v1/matches/{matchId}/applications", singlesId)
+						.header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
+						.content("{\"refundPolicyAgreed\":true}"))
+				.andExpect(status().isCreated());
+		jdbc.update("update match set host_user_id = ? where id = ?", viewer.getId(), rallyId);
+		jdbc.update("update match set female_recruit_count = 1 where id = ?", doublesId);
+		jdbc.update("""
+				insert into match_application (match_id, applicant_user_id, applicant_gender, status,
+					refund_policy_agreed_at, created_at, updated_at)
+				values (?, ?, 'FEMALE', 'PAYMENT_PENDING', localtimestamp, localtimestamp, localtimestamp)
+				""", doublesId, activeUser().getId());
+
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("size", "1").param("applicableOnly", "false"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(3))
+				.andExpect(jsonPath("$.result.items[0].matchId").value(singlesId));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("size", "1").param("applicableOnly", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(1))
+				.andExpect(jsonPath("$.result.hasNext").value(false))
+				.andExpect(jsonPath("$.result.items[0].matchId").value(doublesId));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("size", "1").param("page", "1").param("applicableOnly", "true"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_PAGE_OUT_OF_RANGE"));
+
+		jdbc.update("update match_application set status = 'CONFIRMED' where match_id = ?", doublesId);
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("applicableOnly", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(0))
+				.andExpect(jsonPath("$.result.items", hasSize(0)));
+	}
+
+	@Test
+	void applicableOnlyChecksTheViewersRecruitmentGenderAndKeepsMatchTypeFilter() throws Exception {
+		String bearer = bearer(users.saveAndFlush(EntityFixtures.user(entityManager,
+				"탐색" + UUID.randomUUID().toString().substring(0, 8), Gender.MALE)));
+		LocalDate date = LocalDate.now(clock).plusDays(7);
+		seed(date);
+
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "SINGLES", "RALLY").param("applicableOnly", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(1))
+				.andExpect(jsonPath("$.result.items[0].matchId").value(demoMatchId(date, "rally")));
+	}
+
+	@Test
 	void filtersByEntireTimeRangeAndMatchType() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
@@ -208,6 +288,13 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	private void seed(LocalDate date) throws Exception {
 		jdbc.queryForObject("select set_config('rallit.demo_date', ?, true)", String.class, date.toString());
 		jdbc.execute(Files.readString(Path.of("scripts/local/seed-matches.sql")));
+	}
+
+	private long demoMatchId(LocalDate date, String seedKey) {
+		return jdbc.queryForObject("""
+				select m.id from match m join court_slot s on s.id = m.court_slot_id
+				where s.evidence_file_key = ?
+				""", Long.class, "local-demo/21/" + date + "/" + seedKey);
 	}
 
 	private User activeUser() {

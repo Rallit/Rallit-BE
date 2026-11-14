@@ -26,6 +26,7 @@ import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,8 +42,8 @@ public class MatchDiscoveryService {
 	private final UserRepository users;
 	private final Clock clock;
 
-	public PageResponse<MatchListItemResponse> list(LocalDate date, LocalTime startTimeFrom, LocalTime startTimeTo,
-			List<MatchType> matchTypes, int page, int size) {
+	public PageResponse<MatchListItemResponse> list(Long userId, LocalDate date, LocalTime startTimeFrom,
+			LocalTime startTimeTo, List<MatchType> matchTypes, boolean applicableOnly, int page, int size) {
 		if (date == null && (startTimeFrom != null || startTimeTo != null)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_DATE_REQUIRED_FOR_TIME_FILTER);
 		}
@@ -54,8 +55,18 @@ public class MatchDiscoveryService {
 		var endsBy = startTimeTo == null ? null : date.atTime(startTimeTo);
 		boolean allTypes = matchTypes == null || matchTypes.isEmpty();
 		var types = allTypes ? EnumSet.allOf(MatchType.class) : EnumSet.copyOf(matchTypes);
-		var result = matches.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(), from,
-				before, endsBy, allTypes, types, PageRequest.of(page, size));
+		var pageable = PageRequest.of(page, size);
+		var now = now();
+		Page<Match> result;
+		if (applicableOnly) {
+			var applicant = users.findById(userId).orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
+			result = matches.findApplicableMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
+					before, endsBy, allTypes, types, userId, applicant.getGender(), MatchApplicationStatus.ACTIVE,
+					pageable);
+		} else {
+			result = matches.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
+					before, endsBy, allTypes, types, pageable);
+		}
 		if (page > 0 && page >= result.getTotalPages()) {
 			throw new GeneralException(MatchErrorStatus.MATCH_PAGE_OUT_OF_RANGE);
 		}

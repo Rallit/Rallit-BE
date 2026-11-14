@@ -18,8 +18,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +43,7 @@ public class MatchDiscoveryController {
 	@Operation(summary = "모집 중 매치 목록",
 			description = "서울 시간 기준 날짜와 시간대를 사용합니다. 시간대는 경기 전체를 포함해야 합니다. "
 					+ "복수 경기 방식 중 하나 이상이 일치하면 포함하며, 경기 시작 시각과 매치 ID 순으로 정렬합니다. "
+					+ "applicableOnly=true이면 본인이 신청할 수 있는 매치만 목록과 전체 건수에 포함합니다. "
 					+ "페이지는 0부터 시작합니다. 검색 결과가 없어도 첫 페이지는 조회할 수 있으며, "
 					+ "페이지 범위를 벗어나면 400(MATCH_PAGE_OUT_OF_RANGE)을 반환합니다. "
 					+ "날짜 없는 시간 필터는 MATCH_DATE_REQUIRED_FOR_TIME_FILTER, "
@@ -53,12 +54,14 @@ public class MatchDiscoveryController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeTo,
-			@RequestParam(required = false) @Size(max = 5) List<MatchType> matchTypes,
+			@RequestParam(required = false) List<@NotNull MatchType> matchTypes,
+			@RequestParam(defaultValue = "false") boolean applicableOnly,
 			@RequestParam(defaultValue = "0") @Min(0) @Max(10000) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		requireOnboarding(principal);
 		return ResponseEntity.ok(ApiResponse.onSuccess(
-				discovery.list(date, startTimeFrom, startTimeTo, matchTypes, page, size)));
+				discovery.list(principal.userId(), date, startTimeFrom, startTimeTo, matchTypes, applicableOnly,
+						page, size)));
 	}
 
 	@GetMapping("/{matchId}")
