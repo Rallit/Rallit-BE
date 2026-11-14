@@ -2,6 +2,7 @@ package com.rallit.domain.match.controller;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import com.rallit.domain.match.dto.response.MatchDetailResponse;
@@ -11,14 +12,18 @@ import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.service.MatchDiscoveryService;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.apiPayload.PageResponse;
+import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -51,7 +56,9 @@ public class MatchDiscoveryController {
 					+ "온보딩 미완료는 403(MATCH_ONBOARDING_REQUIRED)입니다.")
 	public ResponseEntity<ApiResponse<PageResponse<MatchListItemResponse>>> list(
 			@AuthenticationPrincipal UserDetails principal,
-			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+			@Parameter(description = "서울 시간 기준 조회 날짜. 연도는 0001~9999입니다.",
+					schema = @Schema(type = "string", format = "date", example = "2026-11-15"))
+			@RequestParam(required = false) @Pattern(regexp = "[0-9]{4}-[0-9]{2}-[0-9]{2}") String date,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeTo,
 			@RequestParam(required = false) List<@NotNull MatchType> matchTypes,
@@ -60,7 +67,7 @@ public class MatchDiscoveryController {
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		requireOnboarding(principal);
 		return ResponseEntity.ok(ApiResponse.onSuccess(
-				discovery.list(principal.userId(), date, startTimeFrom, startTimeTo, matchTypes, applicableOnly,
+				discovery.list(principal.userId(), parseDate(date), startTimeFrom, startTimeTo, matchTypes, applicableOnly,
 						page, size)));
 	}
 
@@ -78,5 +85,20 @@ public class MatchDiscoveryController {
 		if (!principal.onboardingCompleted()) {
 			throw new GeneralException(MatchErrorStatus.MATCH_ONBOARDING_REQUIRED);
 		}
+	}
+
+	private LocalDate parseDate(String value) {
+		if (value == null) {
+			return null;
+		}
+		try {
+			LocalDate date = LocalDate.parse(value);
+			if (date.getYear() > 0) {
+				return date;
+			}
+		} catch (DateTimeParseException e) {
+			throw new GeneralException(ErrorStatus._BAD_REQUEST, e);
+		}
+		throw new GeneralException(ErrorStatus._BAD_REQUEST);
 	}
 }

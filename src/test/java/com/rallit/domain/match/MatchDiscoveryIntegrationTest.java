@@ -204,6 +204,20 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void rejectsInvalidCalendarDatesAndYearsOutsideFourDigits() throws Exception {
+		String bearer = bearer(activeUser());
+		for (String date : new String[]{"+999999999-12-31", "+500000-01-01", "0000-01-01", "2026-02-30"}) {
+			mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.code").value("COMMON400"));
+		}
+
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", "9999-12-31"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(0));
+	}
+
+	@Test
 	void filtersByEntireTimeRangeAndMatchType() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
