@@ -56,7 +56,8 @@ public class MatchApplicationController {
 	@Operation(
 			summary = "매치 현황 조회",
 			description = "진행 중인 참가 신청(PENDING, PAYMENT_PENDING, CONFIRMED)을 경기 시작 일시 오름차순으로 조회합니다. "
-					+ "date가 없으면 오늘 이후 경기를, date가 있으면 해당 날짜의 경기만 조회합니다.",
+					+ "date가 없으면 오늘 이후 경기를, date가 있으면 해당 날짜의 경기만 조회합니다. "
+					+ "startsAt과 endsAt에는 서울 오프셋(+09:00)이 포함됩니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/users/me/applications")
 	public ResponseEntity<ApiResponse<PageResponse<MyMatchApplicationListItemResponse>>> getMyScheduledApplications(
@@ -70,7 +71,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "거절·취소·기한 만료 신청 조회",
-			description = "종료된 참가 신청(REJECTED, CANCELED, EXPIRED)을 최근 처리순으로 조회합니다.",
+			description = "종료된 참가 신청(REJECTED, CANCELED, EXPIRED)을 최근 처리순으로 조회합니다. "
+					+ "startsAt과 endsAt에는 서울 오프셋(+09:00)이 포함됩니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/users/me/applications/closed")
 	public ResponseEntity<ApiResponse<PageResponse<MyMatchApplicationListItemResponse>>> getMyClosedApplications(
@@ -83,7 +85,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "참가 신청 상세 조회",
-			description = "본인의 참가 신청 상세를 조회합니다. 상태에 따라 값이 있는 필드만 응답합니다.",
+			description = "본인의 참가 신청 상세를 조회합니다. 상태에 따라 값이 있는 필드만 응답합니다. "
+					+ "match의 startsAt, endsAt, recruitmentDeadline에는 서울 오프셋(+09:00)이 포함됩니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/applications/{applicationId}")
 	public ResponseEntity<ApiResponse<MatchApplicationDetailResponse>> getApplication(

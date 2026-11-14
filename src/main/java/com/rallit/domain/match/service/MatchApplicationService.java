@@ -93,7 +93,7 @@ public class MatchApplicationService {
 				? matchApplicationRepository.findAllWithApplicantByMatchIdAndStatus(application.getMatch().getId(),
 						MatchApplicationStatus.CONFIRMED)
 				: List.of();
-		return MatchApplicationDetailResponse.of(application, confirmedApplications);
+		return MatchApplicationDetailResponse.of(application, confirmedApplications, clock.getZone());
 	}
 
 	@Transactional
@@ -111,7 +111,7 @@ public class MatchApplicationService {
 	private PageResponse<MyMatchApplicationListItemResponse> listResponse(Page<MatchApplication> applications) {
 		Map<Long, Long> counts = occupiedSeatCounts(applications.getContent());
 		return PageResponse.from(applications.map(
-				application -> MyMatchApplicationListItemResponse.of(application, counts)));
+				application -> MyMatchApplicationListItemResponse.of(application, counts, clock.getZone())));
 	}
 
 	private Map<Long, Long> occupiedSeatCounts(List<MatchApplication> applications) {

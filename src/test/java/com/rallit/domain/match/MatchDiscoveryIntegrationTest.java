@@ -70,15 +70,30 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.matchId").value(matchId))
+				.andExpect(jsonPath("$.result.endsAt").value(date + "T12:00:00+09:00"))
+				.andExpect(jsonPath("$.result.recruitmentDeadline").value(date + "T09:00:00+09:00"))
 				.andExpect(jsonPath("$.result.canApply").value(true))
 				.andExpect(jsonPath("$.result.court.address").isString())
 				.andExpect(jsonPath("$.result.court.evidenceFileKey").doesNotExist());
-		mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId)
+		var application = mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId)
 						.header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"refundPolicyAgreed\":true}"))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.result.matchId").value(matchId))
-				.andExpect(jsonPath("$.result.status").value("PENDING"));
+				.andExpect(jsonPath("$.result.status").value("PENDING"))
+				.andReturn().getResponse();
+
+		mvc.perform(get("/api/v1/users/me/applications").header("Authorization", bearer)
+						.param("date", date.toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items[0].matchId").value(matchId))
+				.andExpect(jsonPath("$.result.items[0].startsAt").value(date + "T10:00:00+09:00"))
+				.andExpect(jsonPath("$.result.items[0].endsAt").value(date + "T12:00:00+09:00"));
+		mvc.perform(get(application.getHeader("Location")).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.match.startsAt").value(date + "T10:00:00+09:00"))
+				.andExpect(jsonPath("$.result.match.endsAt").value(date + "T12:00:00+09:00"))
+				.andExpect(jsonPath("$.result.match.recruitmentDeadline").value(date + "T09:00:00+09:00"));
 
 		seed(date);
 		assertThat(jdbc.queryForObject("select count(*) from match_application where match_id = ? and status = 'PENDING'",

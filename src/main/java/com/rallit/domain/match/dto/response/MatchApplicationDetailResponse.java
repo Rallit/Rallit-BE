@@ -2,6 +2,8 @@ package com.rallit.domain.match.dto.response;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -24,11 +26,11 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 		HostInfo host, PaymentInfo payment, List<ParticipantInfo> participants, CancellationInfo cancellation) {
 
 	public static MatchApplicationDetailResponse of(MatchApplication application,
-			List<MatchApplication> confirmedApplications) {
+			List<MatchApplication> confirmedApplications, ZoneId zone) {
 		Match match = application.getMatch();
 		MatchApplicationStatus status = application.getStatus();
 		return new MatchApplicationDetailResponse(application.getId(), status, application.getCreatedAt(),
-				application.getRefundPolicyAgreedAt(), application.getAcceptedAt(), MatchInfo.from(match),
+				application.getRefundPolicyAgreedAt(), application.getAcceptedAt(), MatchInfo.from(match, zone),
 				HostInfo.from(match.getHost()),
 				status == MatchApplicationStatus.PAYMENT_PENDING ? PaymentInfo.from(application) : null,
 				status == MatchApplicationStatus.CONFIRMED ? participants(match.getHost(), confirmedApplications) : null,
@@ -44,15 +46,17 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 		return user.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(user.getId());
 	}
 
-	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, LocalDateTime startsAt,
-			LocalDateTime endsAt, Integer participationFee, LocalDateTime recruitmentDeadline,
+	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, OffsetDateTime startsAt,
+			OffsetDateTime endsAt, Integer participationFee, OffsetDateTime recruitmentDeadline,
 			Integer maleRecruitCount, Integer femaleRecruitCount, CourtInfo court) {
 
-		private static MatchInfo from(Match match) {
+		private static MatchInfo from(Match match, ZoneId zone) {
 			CourtSlot courtSlot = match.getCourtSlot();
 			return new MatchInfo(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
-					courtSlot.getStartsAt(), courtSlot.getEndsAt(), match.getParticipationFee(),
-					match.getRecruitmentDeadline(), match.getMaleRecruitCount(), match.getFemaleRecruitCount(),
+					courtSlot.getStartsAt().atZone(zone).toOffsetDateTime(),
+					courtSlot.getEndsAt().atZone(zone).toOffsetDateTime(), match.getParticipationFee(),
+					match.getRecruitmentDeadline().atZone(zone).toOffsetDateTime(),
+					match.getMaleRecruitCount(), match.getFemaleRecruitCount(),
 					CourtInfo.from(courtSlot));
 		}
 	}
