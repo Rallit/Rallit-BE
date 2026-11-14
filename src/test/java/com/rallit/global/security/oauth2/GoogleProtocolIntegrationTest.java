@@ -40,6 +40,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   static final Map<String, Exchange> codes = new ConcurrentHashMap<>();
   static final Map<String, Exchange> accessTokens = new ConcurrentHashMap<>();
   static final String CALLBACK = "https://rallit.co.kr/auth/callback";
+  static final String DEV_CALLBACK = "https://dev.rallit.co.kr/auth/callback";
 
   record Exchange(String subject, String email, boolean verified, String nonce, String invalid) {}
 
@@ -158,8 +159,14 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   @Autowired TokenSessionService sessions;
 
   Attempt start(String target) throws Exception {
+    return start(target, null);
+  }
+
+  Attempt start(String target, String callback) throws Exception {
+    var request = get("/api/v1/auth/google").param("target", target);
+    if (callback != null) request.param("callback", callback);
     var response =
-        mvc.perform(get("/api/v1/auth/google").param("target", target))
+        mvc.perform(request)
             .andExpect(status().is3xxRedirection())
             .andReturn()
             .getResponse();
@@ -195,8 +202,8 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   @Test
   void signedOidcTokenCreatesMemberAndKeepsSameMemberOnRelogin() throws Exception {
     String subject = "profile-" + UUID.randomUUID(), email = subject + "@example.test";
-    var first = callback(start("service"), subject, email, true, "");
-    assertThat(first.getHeader("Location")).isEqualTo(CALLBACK);
+    var first = callback(start("service", DEV_CALLBACK), subject, email, true, "");
+    assertThat(first.getHeader("Location")).isEqualTo(DEV_CALLBACK);
     assertThat(first.getHeaders("Set-Cookie"))
         .anyMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
     var member =
@@ -220,10 +227,11 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   void invalidOidcEvidenceCannotCreateMemberOrSession() throws Exception {
     for (String invalid : List.of("signature", "issuer", "audience", "expiry", "nonce")) {
       String subject = UUID.randomUUID().toString();
-      var result = callback(start("service"), subject, subject + "@example.test", true, invalid);
+      var result =
+          callback(start("service", DEV_CALLBACK), subject, subject + "@example.test", true, invalid);
       assertThat(result.getHeader("Location"))
           .as(invalid)
-          .isEqualTo(CALLBACK + "?error=login_failed");
+          .isEqualTo(DEV_CALLBACK + "?error=login_failed");
       assertThat(result.getHeaders("Set-Cookie"))
           .noneMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
       assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
@@ -234,9 +242,9 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   void collisionShowsExistingProviderAndDoesNotIssueRefreshCookie() throws Exception {
     String subject = UUID.randomUUID().toString(), email = subject + "@example.test";
     registration.getOrCreateUser(new SocialIdentity(OAuthProvider.KAKAO, subject, email, true));
-    var response = callback(start("service"), subject, email, true, "");
+    var response = callback(start("service", DEV_CALLBACK), subject, email, true, "");
     assertThat(response.getHeader("Location"))
-        .isEqualTo(CALLBACK + "?error=account_exists&existingProvider=kakao");
+        .isEqualTo(DEV_CALLBACK + "?error=account_exists&existingProvider=kakao");
     assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
     assertThat(response.getHeaders("Set-Cookie"))
         .noneMatch(c -> c.startsWith("__Host-rallit_refresh=") && !c.contains("Max-Age=0"));
@@ -260,7 +268,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
     var member =
         registration.getOrCreateUser(new SocialIdentity(OAuthProvider.KAKAO, subject, email, true));
     jdbc.update("update users set role='ADMIN' where id=?", member.getId());
-    var result = callback(start("admin"), subject, email, true, "");
+    var result = callback(start("admin", DEV_CALLBACK), subject, email, true, "");
     assertThat(result.getHeader("Location"))
         .isEqualTo("https://admin.rallit.co.kr/auth/callback?error=login_failed");
     assertThat(accounts.findUserByProviderAndProviderUserId(SocialProvider.GOOGLE, subject)).isEmpty();
