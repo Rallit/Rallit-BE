@@ -29,6 +29,6 @@ public enum UserErrorStatus implements BaseErrorCode {
   }
 
   private ErrorReasonDTO.ErrorReasonDTOBuilder reason() {
-    return ErrorReasonDTO.builder().isSuccess(false).code("COMMON" + status.value()).message(message);
+    return ErrorReasonDTO.builder().isSuccess(false).code(name()).message(message);
   }
 }

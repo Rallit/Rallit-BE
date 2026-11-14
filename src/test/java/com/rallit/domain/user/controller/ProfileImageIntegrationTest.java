@@ -145,7 +145,9 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
     var url = "/api/v1/users/" + owner.id() + "/profile-image";
     upload(owner, "avatar.jpeg", "image/jpeg", original).andExpect(status().isOk());
     var stored = view(owner, url, "image/jpeg");
-    upload(owner, "avatar.png", "image/png", original).andExpect(status().isBadRequest());
+    upload(owner, "avatar.png", "image/png", original)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_PROFILE_IMAGE"));
     upload(owner, "avatar.png", "image/png", "not an image".getBytes(java.nio.charset.StandardCharsets.UTF_8))
         .andExpect(status().isBadRequest());
     upload(owner, "avatar.png", "image/png", Arrays.copyOf(image("png"), 33))

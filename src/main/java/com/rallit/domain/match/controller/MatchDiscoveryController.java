@@ -7,9 +7,9 @@ import java.util.List;
 import com.rallit.domain.match.dto.response.MatchDetailResponse;
 import com.rallit.domain.match.dto.response.MatchListResponse;
 import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.service.MatchDiscoveryService;
 import com.rallit.global.apiPayload.ApiResponse;
-import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,7 +41,12 @@ public class MatchDiscoveryController {
 	@GetMapping
 	@Operation(summary = "모집 중 매치 목록",
 			description = "서울 시간 기준 날짜와 시간대를 사용합니다. 시간대는 경기 전체를 포함해야 합니다. "
-					+ "복수 경기 방식 중 하나 이상이 일치하면 포함하며, 경기 시작 시각과 매치 ID 순으로 정렬합니다.")
+					+ "복수 경기 방식 중 하나 이상이 일치하면 포함하며, 경기 시작 시각과 매치 ID 순으로 정렬합니다. "
+					+ "페이지는 0부터 시작합니다. 검색 결과가 없어도 첫 페이지는 조회할 수 있으며, "
+					+ "페이지 범위를 벗어나면 400(MATCH_PAGE_OUT_OF_RANGE)을 반환합니다. "
+					+ "날짜 없는 시간 필터는 MATCH_DATE_REQUIRED_FOR_TIME_FILTER, "
+					+ "잘못된 시간 범위는 MATCH_INVALID_TIME_RANGE를 반환합니다. "
+					+ "온보딩 미완료는 403(MATCH_ONBOARDING_REQUIRED)입니다.")
 	public ResponseEntity<ApiResponse<MatchListResponse>> list(@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,
@@ -56,7 +61,8 @@ public class MatchDiscoveryController {
 
 	@GetMapping("/{matchId}")
 	@Operation(summary = "모집 매치 상세",
-			description = "matchId를 참가 신청에 그대로 사용합니다. canApply는 조회 시점의 신청 가능 여부입니다.")
+			description = "matchId를 참가 신청에 그대로 사용합니다. canApply는 조회 시점의 신청 가능 여부입니다. "
+					+ "온보딩 미완료는 403(MATCH_ONBOARDING_REQUIRED), 조회할 수 없는 매치는 404(MATCH_NOT_FOUND)입니다.")
 	public ResponseEntity<ApiResponse<MatchDetailResponse>> detail(@AuthenticationPrincipal UserDetails principal,
 			@PathVariable @Positive Long matchId) {
 		requireOnboarding(principal);
@@ -65,7 +71,7 @@ public class MatchDiscoveryController {
 
 	private void requireOnboarding(UserDetails principal) {
 		if (!principal.onboardingCompleted()) {
-			throw new GeneralException(ErrorStatus._FORBIDDEN);
+			throw new GeneralException(MatchErrorStatus.MATCH_ONBOARDING_REQUIRED);
 		}
 	}
 }

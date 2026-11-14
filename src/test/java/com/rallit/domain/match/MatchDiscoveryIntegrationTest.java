@@ -93,6 +93,35 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void rejectsPagesBeyondFilteredResults() throws Exception {
+		String bearer = bearer(activeUser());
+		LocalDate date = LocalDate.now(clock).plusDays(7);
+		seed(date);
+
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("size", "1").param("page", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.hasNext").value(false));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "SINGLES").param("size", "1").param("page", "0"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(1))
+				.andExpect(jsonPath("$.result.hasNext").value(false));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "SINGLES").param("size", "1").param("page", "1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_PAGE_OUT_OF_RANGE"));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "WOMENS_DOUBLES").param("page", "0"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.matches", hasSize(0)));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("matchTypes", "WOMENS_DOUBLES").param("page", "1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_PAGE_OUT_OF_RANGE"));
+	}
+
+	@Test
 	void filtersByEntireTimeRangeAndMatchType() throws Exception {
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);
@@ -108,7 +137,12 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(0));
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("startTimeTo", "12:00"))
-				.andExpect(status().isBadRequest());
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_DATE_REQUIRED_FOR_TIME_FILTER"));
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("startTimeFrom", "12:00").param("startTimeTo", "11:00"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_INVALID_TIME_RANGE"));
 	}
 
 	@Test
@@ -117,7 +151,8 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		String suffix = UUID.randomUUID().toString().substring(0, 8);
 		User onboarding = User.signUp("대기" + suffix, "pending-" + suffix + "@example.test");
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer(users.saveAndFlush(onboarding))))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("MATCH_ONBOARDING_REQUIRED"));
 
 		String bearer = bearer(activeUser());
 		LocalDate date = LocalDate.now(clock).plusDays(7);

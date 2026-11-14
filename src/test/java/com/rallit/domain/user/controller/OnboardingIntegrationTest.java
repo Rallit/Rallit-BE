@@ -76,7 +76,8 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("\"11440\", \"11410\"", "\"11410\", \"11440\", \"11440\""))
         .andExpect(status().isOk());
     submit(member, body.replace("WEEKEND_MORNING", "WEEKEND_AFTERNOON"))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("ONBOARDING_ALREADY_COMPLETED"));
 
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(status().isOk())
@@ -89,14 +90,17 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     var member = login();
     var body = PAYLOAD.formatted(member.nickname());
     submit(member, body.replace("\"sameGenderOnly\": false,", ""))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COMMON400"));
     submit(member, body.replace("4.0+", "4.0")).andExpect(status().isBadRequest());
-    submit(member, body.replace("11440", "99999")).andExpect(status().isBadRequest());
+    submit(member, body.replace("11440", "99999"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_ACTIVITY_AREA"));
     submit(member, body.replace("\"11440\", \"11410\"", "\"11440\", \"11410\", \"11680\", \"11110\""))
         .andExpect(status().isBadRequest());
     submit(member, body.replace("false", "true").replace("DOUBLES", "MIXED_DOUBLES"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("COMMON400"))
+        .andExpect(jsonPath("$.code").value("INVALID_MATCH_PREFERENCES"))
         .andExpect(jsonPath("$.message").value("동성만 매칭과 혼합복식은 함께 선택할 수 없습니다."));
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(jsonPath("$.result.onboardingCompleted").value(false));
@@ -125,7 +129,9 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
             .header("Authorization", member.bearer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.available").value(false));
-    submit(member, PAYLOAD.formatted(candidate)).andExpect(status().isConflict());
+    submit(member, PAYLOAD.formatted(candidate))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("NICKNAME_CONFLICT"));
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(jsonPath("$.result.onboardingCompleted").value(false));
   }

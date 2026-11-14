@@ -42,9 +42,11 @@ public class MatchDiscoveryService {
 
 	public MatchListResponse list(LocalDate date, LocalTime startTimeFrom, LocalTime startTimeTo,
 			List<MatchType> matchTypes, int page, int size) {
-		if ((date == null && (startTimeFrom != null || startTimeTo != null))
-				|| (startTimeFrom != null && startTimeTo != null && !startTimeFrom.isBefore(startTimeTo))) {
-			throw new GeneralException(ErrorStatus._BAD_REQUEST);
+		if (date == null && (startTimeFrom != null || startTimeTo != null)) {
+			throw new GeneralException(MatchErrorStatus.MATCH_DATE_REQUIRED_FOR_TIME_FILTER);
+		}
+		if (startTimeFrom != null && startTimeTo != null && !startTimeFrom.isBefore(startTimeTo)) {
+			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_TIME_RANGE);
 		}
 		var from = date == null ? null : date.atTime(startTimeFrom == null ? LocalTime.MIDNIGHT : startTimeFrom);
 		var before = date == null ? null : date.plusDays(1).atStartOfDay();
@@ -53,6 +55,9 @@ public class MatchDiscoveryService {
 		var types = allTypes ? EnumSet.allOf(MatchType.class) : EnumSet.copyOf(matchTypes);
 		var result = matches.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(), from,
 				before, endsBy, allTypes, types, PageRequest.of(page, size));
+		if (page > 0 && page >= result.getTotalPages()) {
+			throw new GeneralException(MatchErrorStatus.MATCH_PAGE_OUT_OF_RANGE);
+		}
 		var counts = occupiedSeats(result.stream().map(Match::getId).toList());
 		var cards = result.stream().map(match -> MatchListResponse.Item.from(match,
 				counts.getOrDefault(match.getId(), 0L), clock.getZone())).toList();
