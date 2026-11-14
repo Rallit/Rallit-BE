@@ -26,9 +26,7 @@ public class ProfileImageController {
 
   @Operation(
       summary = "내 프로필 사진 등록 및 교체",
-      description = "JPG·JPEG·PNG, 최대 5MB입니다. 원본은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 지원합니다. "
-          + "사진 형식이나 내용이 올바르지 않으면 INVALID_PROFILE_IMAGE, "
-          + "해상도 제한을 넘으면 PROFILE_IMAGE_DIMENSIONS_TOO_LARGE를 반환합니다. 처리 요청이 몰리면 503을 반환합니다.")
+      description = "JPG·JPEG·PNG, 최대 5MB입니다. 원본은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 지원합니다. 처리 요청이 몰리면 503을 반환합니다.")
   @PutMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<ApiResponse<ProfileImageResponse>> upload(
       @AuthenticationPrincipal UserDetails principal, @RequestPart("file") MultipartFile file) {

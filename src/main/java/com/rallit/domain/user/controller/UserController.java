@@ -66,14 +66,11 @@ public class UserController {
               responseCode = "200", description = "가입 완료 또는 동일 내용 재제출",
               useReturnTypeSchema = true),
           @io.swagger.v3.oas.annotations.responses.ApiResponse(
-              responseCode = "400",
-              description = "필수값·형식 오류는 COMMON400, 활동 지역 오류는 INVALID_ACTIVITY_AREA, "
-                  + "경기 선호 조건 오류는 INVALID_MATCH_PREFERENCES",
+              responseCode = "400", description = "필수값 누락, 형식 오류 또는 유효하지 않은 선택",
               content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                   schema = @Schema(implementation = ApiResponse.class))),
           @io.swagger.v3.oas.annotations.responses.ApiResponse(
-              responseCode = "409",
-              description = "닉네임 중복은 NICKNAME_CONFLICT, 완료 후 다른 내용 제출은 ONBOARDING_ALREADY_COMPLETED",
+              responseCode = "409", description = "닉네임 중복 또는 완료 후 다른 내용 제출",
               content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                   schema = @Schema(implementation = ApiResponse.class)))
       })
