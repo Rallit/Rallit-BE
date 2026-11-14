@@ -24,7 +24,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.tags[*].name", containsInAnyOrder("인증", "회원", "운영자")))
+        .andExpect(jsonPath("$.tags[*].name", containsInAnyOrder("인증", "회원", "매치 참가 신청", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/auth/google'].get.tags[0]").value("인증"))

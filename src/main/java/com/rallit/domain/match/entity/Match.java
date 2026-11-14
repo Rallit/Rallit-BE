@@ -29,6 +29,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 @Getter
 @Entity
@@ -47,10 +48,6 @@ public class Match extends BaseEntity {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "host_user_id", nullable = false)
 	private User host;
-
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 30)
-	private MatchType matchType;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
@@ -89,13 +86,19 @@ public class Match extends BaseEntity {
 	@Column(name = "age_group", nullable = false, length = 30)
 	private Set<AgeGroup> preferredAgeGroups = new HashSet<>();
 
+	@BatchSize(size = 100)
+	@ElementCollection
+	@CollectionTable(name = "match_match_type", joinColumns = @JoinColumn(name = "match_id"))
+	@Enumerated(EnumType.STRING)
+	@Column(name = "match_type", nullable = false, length = 30)
+	private Set<MatchType> matchTypes = new HashSet<>();
+
 	@Builder
-	private Match(CourtSlot courtSlot, User host, MatchType matchType, Integer maleRecruitCount,
+	private Match(CourtSlot courtSlot, User host, Set<MatchType> matchTypes, Integer maleRecruitCount,
 			Integer femaleRecruitCount, BigDecimal minNtrp, BigDecimal maxNtrp, Integer participationFee,
 			LocalDateTime recruitmentDeadline, Set<AgeGroup> preferredAgeGroups) {
 		this.courtSlot = courtSlot;
 		this.host = host;
-		this.matchType = matchType;
 		this.status = MatchStatus.PENDING_APPROVAL;
 		this.maleRecruitCount = maleRecruitCount;
 		this.femaleRecruitCount = femaleRecruitCount;
@@ -105,6 +108,9 @@ public class Match extends BaseEntity {
 		this.recruitmentDeadline = recruitmentDeadline;
 		if (preferredAgeGroups != null) {
 			this.preferredAgeGroups.addAll(preferredAgeGroups);
+		}
+		if (matchTypes != null) {
+			this.matchTypes.addAll(matchTypes);
 		}
 	}
 }

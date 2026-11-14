@@ -11,6 +11,7 @@ import com.rallit.global.security.cookie.AuthCookieManager;
 import com.rallit.global.security.jwt.*;
 import com.rallit.global.security.oauth2.*;
 import java.time.Clock;
+import java.time.ZoneId;
 import java.util.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
@@ -35,7 +36,7 @@ import org.springframework.web.cors.*;
 public class SecurityConfig {
   @Bean
   Clock clock() {
-    return Clock.systemUTC();
+    return Clock.system(ZoneId.of("Asia/Seoul"));
   }
 
   @Bean
@@ -241,6 +242,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/profile-image")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
+                .authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
+                .authenticated()
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/users/me/applications",
+                    "/api/v1/users/me/applications/closed",
+                    "/api/v1/applications/*")
+                .authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/applications/*/cancel")
                 .authenticated()
                 .anyRequest()
                 .denyAll());

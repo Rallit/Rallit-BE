@@ -2,8 +2,10 @@ package com.rallit.domain.match.entity;
 
 import java.time.LocalDateTime;
 
+import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
+import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.global.entity.BaseEntity;
@@ -52,8 +54,9 @@ public class MatchApplication extends BaseEntity {
 	@Column(length = 30)
 	private MatchApplicationRejectReason rejectReason;
 
-	@Column(length = 500)
-	private String cancelReason;
+	@Enumerated(EnumType.STRING)
+	@Column(length = 30)
+	private MatchApplicationCancelReason cancelReason;
 
 	@Column(nullable = false)
 	private LocalDateTime refundPolicyAgreedAt;
@@ -74,5 +77,17 @@ public class MatchApplication extends BaseEntity {
 
 	public static MatchApplication create(Match match, User applicant, LocalDateTime refundPolicyAgreedAt) {
 		return new MatchApplication(match, applicant, refundPolicyAgreedAt);
+	}
+
+	public void cancel(MatchApplicationCancelReason cancelReason, LocalDateTime canceledAt) {
+		if (status == MatchApplicationStatus.CANCELED) {
+			return;
+		}
+		if (status != MatchApplicationStatus.PENDING) {
+			throw new MatchApplicationNotCancelableException(status);
+		}
+		this.status = MatchApplicationStatus.CANCELED;
+		this.cancelReason = cancelReason;
+		this.canceledAt = canceledAt;
 	}
 }
