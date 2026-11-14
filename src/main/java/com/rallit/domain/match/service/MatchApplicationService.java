@@ -25,13 +25,13 @@ import com.rallit.domain.match.repository.MatchApplicationRepository.MatchApplic
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.repository.UserRepository;
-import com.rallit.global.apiPayload.SliceResponse;
+import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,17 +71,17 @@ public class MatchApplicationService {
 	}
 
 	@Transactional(readOnly = true)
-	public SliceResponse<MyMatchApplicationListItemResponse> getMyScheduledApplications(Long userId, LocalDate date, int page,
+	public PageResponse<MyMatchApplicationListItemResponse> getMyScheduledApplications(Long userId, LocalDate date, int page,
 			int size) {
 		LocalDateTime from = (date == null ? LocalDate.now(clock) : date).atStartOfDay();
 		LocalDateTime to = date == null ? null : from.plusDays(1);
-		return listResponse(matchApplicationRepository.findScheduledSliceByApplicantId(userId,
+		return listResponse(matchApplicationRepository.findScheduledByApplicantId(userId,
 				MatchApplicationStatus.ACTIVE, from, to, PageRequest.of(page, size)));
 	}
 
 	@Transactional(readOnly = true)
-	public SliceResponse<MyMatchApplicationListItemResponse> getMyClosedApplications(Long userId, int page, int size) {
-		return listResponse(matchApplicationRepository.findRecentSliceByApplicantId(userId,
+	public PageResponse<MyMatchApplicationListItemResponse> getMyClosedApplications(Long userId, int page, int size) {
+		return listResponse(matchApplicationRepository.findRecentByApplicantId(userId,
 				MatchApplicationStatus.CLOSED, PageRequest.of(page, size)));
 	}
 
@@ -108,9 +108,9 @@ public class MatchApplicationService {
 		return MatchApplicationCancelResponse.from(application);
 	}
 
-	private SliceResponse<MyMatchApplicationListItemResponse> listResponse(Slice<MatchApplication> applications) {
+	private PageResponse<MyMatchApplicationListItemResponse> listResponse(Page<MatchApplication> applications) {
 		Map<Long, Long> counts = occupiedSeatCounts(applications.getContent());
-		return SliceResponse.from(applications.map(
+		return PageResponse.from(applications.map(
 				application -> MyMatchApplicationListItemResponse.of(application, counts)));
 	}
 

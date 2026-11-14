@@ -375,23 +375,27 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.page").value(0))
 				.andExpect(jsonPath("$.result.size").value(2))
 				.andExpect(jsonPath("$.result.hasNext").value(true))
-				.andExpect(jsonPath("$.result.totalElements").doesNotHaveJsonPath());
+				.andExpect(jsonPath("$.result.totalElements").value(3));
 		myApplications(applicant, "page", "4")
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.items.length()").value(0))
 				.andExpect(jsonPath("$.result.page").value(4))
 				.andExpect(jsonPath("$.result.size").value(20))
-				.andExpect(jsonPath("$.result.hasNext").value(false));
-		myApplications(applicant, "date", today.plusDays(1).toString())
+				.andExpect(jsonPath("$.result.hasNext").value(false))
+				.andExpect(jsonPath("$.result.totalElements").value(3));
+		myApplications(applicant, "date", today.plusDays(1).toString(), "size", "1")
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.items.length()").value(1))
-				.andExpect(jsonPath("$.result.items[0].applicationId").value(tomorrowId));
+				.andExpect(jsonPath("$.result.items[0].applicationId").value(tomorrowId))
+				.andExpect(jsonPath("$.result.totalElements").value(1))
+				.andExpect(jsonPath("$.result.hasNext").value(false));
 		myApplications(applicant, "date", today.minusDays(1).toString())
 				.andExpect(jsonPath("$.result.items.length()").value(1))
 				.andExpect(jsonPath("$.result.items[0].applicationId").value(yesterdayId));
 		myApplications(applicant, "date", today.plusDays(2).toString())
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.items.length()").value(0));
+				.andExpect(jsonPath("$.result.items.length()").value(0))
+				.andExpect(jsonPath("$.result.totalElements").value(0));
 		myApplications(applicant, "date", "2026-13-01").andExpect(status().isBadRequest());
 		myApplications(applicant, "size", "51").andExpect(status().isBadRequest());
 		myApplications(applicant, "page", "10001")
@@ -422,6 +426,18 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.items[2].applicationId").value(rejectedId))
 				.andExpect(jsonPath("$.result.items[2].applicationStatus").value("REJECTED"))
 				.andExpect(jsonPath("$.result.hasNext").value(false));
+		mvc.perform(get("/api/v1/users/me/applications/closed").param("size", "2")
+						.header("Authorization", bearer(applicant)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items.length()").value(2))
+				.andExpect(jsonPath("$.result.hasNext").value(true))
+				.andExpect(jsonPath("$.result.totalElements").value(3));
+		mvc.perform(get("/api/v1/users/me/applications/closed").param("page", "4")
+						.header("Authorization", bearer(applicant)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items.length()").value(0))
+				.andExpect(jsonPath("$.result.hasNext").value(false))
+				.andExpect(jsonPath("$.result.totalElements").value(3));
 		mvc.perform(get("/api/v1/users/me/applications/closed").param("page", "10001")
 						.header("Authorization", bearer(applicant)))
 				.andExpect(status().isBadRequest())

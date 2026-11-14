@@ -78,22 +78,27 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andReturn().getResponse();
     JsonNode openApi = json.readTree(response.getContentAsString());
 
-    JsonNode matches = paginationProperties(openApi, "/api/v1/matches");
+    JsonNode matchPage = paginationSchema(openApi, "/api/v1/matches");
+    assertThat(matchPage.path("required")).anyMatch(field -> field.asText().equals("totalElements"));
+    JsonNode matches = matchPage.path("properties");
     assertThat(matches.propertyNames()).containsExactlyInAnyOrder("items", "page", "size", "hasNext", "totalElements");
     assertThat(matches.at("/items/items/$ref").asText()).isEqualTo("#/components/schemas/MatchListItemResponse");
 
     for (String path : new String[]{"/api/v1/users/me/applications", "/api/v1/users/me/applications/closed"}) {
-      JsonNode applications = paginationProperties(openApi, path);
-      assertThat(applications.propertyNames()).containsExactlyInAnyOrder("items", "page", "size", "hasNext");
+      JsonNode applicationPage = paginationSchema(openApi, path);
+      assertThat(applicationPage.path("required")).anyMatch(field -> field.asText().equals("totalElements"));
+      JsonNode applications = applicationPage.path("properties");
+      assertThat(applications.propertyNames())
+          .containsExactlyInAnyOrder("items", "page", "size", "hasNext", "totalElements");
       assertThat(applications.at("/items/items/$ref").asText())
           .isEqualTo("#/components/schemas/MyMatchApplicationListItemResponse");
     }
   }
 
-  private JsonNode paginationProperties(JsonNode openApi, String path) {
+  private JsonNode paginationSchema(JsonNode openApi, String path) {
     String envelopeRef = openApi.path("paths").path(path)
         .at("/get/responses/200/content/*~1*/schema/$ref").asText();
     String resultRef = openApi.at(envelopeRef.substring(1)).at("/properties/result/$ref").asText();
-    return openApi.at(resultRef.substring(1)).path("properties");
+    return openApi.at(resultRef.substring(1));
   }
 }

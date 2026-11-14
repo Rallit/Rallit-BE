@@ -11,7 +11,7 @@ import com.rallit.domain.match.dto.response.MatchApplicationDetailResponse;
 import com.rallit.domain.match.dto.response.MyMatchApplicationListItemResponse;
 import com.rallit.domain.match.service.MatchApplicationService;
 import com.rallit.global.apiPayload.ApiResponse;
-import com.rallit.global.apiPayload.SliceResponse;
+import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.SuccessStatus;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,7 +59,7 @@ public class MatchApplicationController {
 					+ "date가 없으면 오늘 이후 경기를, date가 있으면 해당 날짜의 경기만 조회합니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/users/me/applications")
-	public ResponseEntity<ApiResponse<SliceResponse<MyMatchApplicationListItemResponse>>> getMyScheduledApplications(
+	public ResponseEntity<ApiResponse<PageResponse<MyMatchApplicationListItemResponse>>> getMyScheduledApplications(
 			@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
 			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
@@ -73,7 +73,7 @@ public class MatchApplicationController {
 			description = "종료된 참가 신청(REJECTED, CANCELED, EXPIRED)을 최근 처리순으로 조회합니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@GetMapping("/api/v1/users/me/applications/closed")
-	public ResponseEntity<ApiResponse<SliceResponse<MyMatchApplicationListItemResponse>>> getMyClosedApplications(
+	public ResponseEntity<ApiResponse<PageResponse<MyMatchApplicationListItemResponse>>> getMyClosedApplications(
 			@AuthenticationPrincipal UserDetails principal,
 			@RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
