@@ -244,7 +244,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}",
-                    "/api/v1/matches/recommendations")
+                    "/api/v1/matches/recommendations", "/api/v1/matches/search")
                 .authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
                 .authenticated()

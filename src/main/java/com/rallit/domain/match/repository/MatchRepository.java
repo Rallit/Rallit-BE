@@ -3,6 +3,7 @@ package com.rallit.domain.match.repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import com.rallit.domain.court.enums.CourtSlotStatus;
@@ -99,6 +100,21 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			boolean allTypes, Collection<MatchType> types, Long applicantId, Gender gender,
 			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly, Collection<String> areaCodes,
 			Collection<String> timeSlots, BigDecimal ntrp, Pageable pageable);
+
+	@Query("""
+			select m from Match m
+			join fetch m.courtSlot s
+			join fetch s.court c
+			join fetch c.area
+			""" + RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER + SAME_GENDER_FILTER + """
+			and s.startsAt >= :from and s.startsAt < :before and s.endsAt <= :endsBy
+			and (:filterNtrp = false or (m.minNtrp <= :minimumNtrp and m.maxNtrp >= :maximumNtrp))
+			order by s.startsAt, m.id
+			""")
+	List<Match> findSearchCandidates(CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now,
+			LocalDateTime from, LocalDateTime before, LocalDateTime endsBy, boolean allTypes,
+			Collection<MatchType> types, Long applicantId, Gender gender, Collection<MatchApplicationStatus> activeStatuses,
+			boolean sameGenderOnly, boolean filterNtrp, BigDecimal minimumNtrp, BigDecimal maximumNtrp);
 
 	@Query("""
 			select m from Match m
