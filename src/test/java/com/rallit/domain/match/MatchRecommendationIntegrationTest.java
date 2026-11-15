@@ -228,6 +228,24 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void ordersRelaxedTimeByRequiredChangeToTheSearchWindow() throws Exception {
+		var date = saturday();
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		long entirelyOutside = match(host, original, date, "13:00", "2.5", "4.0", MatchType.SINGLES, false);
+		long partlyOutside = match(host, original, date, "13:15", "2.5", "4.0", MatchType.SINGLES, false);
+		jdbc.update("update court_slot set ends_at = ? where id = (select court_slot_id from match where id = ?)",
+				date.atTime(13, 30), entirelyOutside);
+		jdbc.update("update court_slot set ends_at = ? where id = (select court_slot_id from match where id = ?)",
+				date.atTime(14, 15), partlyOutside);
+		mvc.perform(search(bearer(viewer()), date))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(partlyOutside))
+				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(entirelyOutside));
+	}
+
+	@Test
 	void rejectsOffsetAndImpossibleDatesWithCommonRequestError() throws Exception {
 		String auth = bearer(viewer());
 		for (String invalidDate : Set.of(saturday() + "+09:00", "+02026-11-21", "2026-11-31", "0000-01-01")) {

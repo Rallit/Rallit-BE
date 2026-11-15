@@ -36,25 +36,29 @@ final class MatchSearchRules {
 		for (Match match : candidates) {
 			var slot = match.getCourtSlot();
 			var court = slot.getCourt();
-			var timeDifference = window.timeOutside(slot);
-			boolean exactTime = timeDifference.isZero();
+			var timeExpansion = window.requiredTimeExpansion(slot);
+			boolean exactTime = timeExpansion.isZero();
 			if (areaCodes.contains(court.getArea().getCode())) {
 				if (exactTime) {
 					exact.add(match);
 				} else {
-					timeOnly.add(new Candidate(match, 0.0, timeDifference));
+					timeOnly.add(new Candidate(match, 0.0, timeExpansion));
 				}
 				continue;
 			}
 
 			double distance = distanceByCourt.computeIfAbsent(court.getId(), id -> nearestOrigin(court, origins));
 			if (distance <= REGION_RADIUS_METERS) {
-				(exactTime ? areaOnly : areaAndTime).add(new Candidate(match, distance, timeDifference));
+				(exactTime ? areaOnly : areaAndTime).add(new Candidate(match, distance, timeExpansion));
 			}
 		}
+		return selectSimilarMatches(exact, areaOnly, timeOnly, areaAndTime);
+	}
 
+	private static SearchResults selectSimilarMatches(List<Match> exact, List<Candidate> areaOnly,
+			List<Candidate> timeOnly, List<Candidate> areaAndTime) {
 		var byDistance = Comparator.comparingDouble(Candidate::distance);
-		var byTime = Comparator.comparing(Candidate::timeOutside);
+		var byTime = Comparator.comparing(Candidate::requiredTimeExpansion);
 		if (!areaOnly.isEmpty()) {
 			return similar(exact, areaOnly, byDistance, List.of(RelaxedCondition.AREA));
 		}
@@ -110,7 +114,7 @@ final class MatchSearchRules {
 			return expanded.isAfter(dayEnd) ? dayEnd : expanded;
 		}
 
-		Duration timeOutside(CourtSlot slot) {
+		Duration requiredTimeExpansion(CourtSlot slot) {
 			Duration early = slot.getStartsAt().isBefore(from) ? Duration.between(slot.getStartsAt(), from) : Duration.ZERO;
 			Duration late = slot.getEndsAt().isAfter(to) ? Duration.between(to, slot.getEndsAt()) : Duration.ZERO;
 			return early.plus(late);
@@ -120,6 +124,6 @@ final class MatchSearchRules {
 	record SearchResults(List<Match> exact, List<Match> similar, List<RelaxedCondition> relaxedConditions) {
 	}
 
-	private record Candidate(Match match, double distance, Duration timeOutside) {
+	private record Candidate(Match match, double distance, Duration requiredTimeExpansion) {
 	}
 }
