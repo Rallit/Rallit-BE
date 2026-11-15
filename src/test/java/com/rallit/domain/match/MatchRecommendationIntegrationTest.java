@@ -2,6 +2,7 @@ package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -188,6 +190,41 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.code").value("MATCH_PAGE_OUT_OF_RANGE"));
 		assertThat(jdbc.queryForObject("select count(*) from areas where center_latitude is not null and center_longitude is not null",
 				Long.class)).isEqualTo(25L);
+	}
+
+	@Test
+	void excludesOppositeGenderFromSameGenderMatchEvenWithAnOppositeGenderQuota() throws Exception {
+		var date = saturday();
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		long matchId = match(host, original, date, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		jdbc.update("update match set same_gender_only = true where id = ?", matchId);
+		String femaleAuth = bearer(viewer());
+		String maleAuth = bearer(member(Gender.MALE, "3.0"));
+
+		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", femaleAuth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(0));
+		mvc.perform(search(femaleAuth, date))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.hasResults").value(false));
+		mvc.perform(get("/api/v1/matches").header("Authorization", femaleAuth).param("applicableOnly", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(0));
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", femaleAuth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.canApply").value(false))
+				.andExpect(jsonPath("$.result.applicationBlockReason").value("GENDER_NOT_RECRUITED"));
+		mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId).header("Authorization", femaleAuth)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"refundPolicyAgreed\":true}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("GENDER_NOT_RECRUITED"));
+		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", maleAuth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items[0].match.matchId").value(matchId));
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", maleAuth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.canApply").value(true));
 	}
 
 	@Test

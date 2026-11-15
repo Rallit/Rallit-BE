@@ -40,6 +40,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 	// Keep the eligibility predicates aligned with MatchApplicationEligibility.
 	String APPLICANT_FILTER = """
 			and m.host.id <> :applicantId
+			and (m.sameGenderOnly = false or m.host.gender = :gender)
 			and (select count(a) from MatchApplication a
 				where a.match.id = m.id and a.applicantGender = :gender
 				and a.status = com.rallit.domain.match.enums.MatchApplicationStatus.CONFIRMED)
@@ -51,12 +52,12 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			)
 			""";
 
-	String SAME_GENDER_FILTER = """
-			and (:sameGenderOnly = false or (m.sameGenderOnly = true and m.host.gender = :gender))
+	String SAME_GENDER_PREFERENCE_FILTER = """
+			and (:sameGenderOnly = false or m.sameGenderOnly = true)
 			""";
 
 	String HOME_RECOMMENDATION_FILTER = RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER
-			+ SAME_GENDER_FILTER + """
+			+ SAME_GENDER_PREFERENCE_FILTER + """
 			and area.code in :areaCodes
 			and (case
 				when extract(day of week from s.startsAt) in (1, 7) then
@@ -106,7 +107,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch m.courtSlot s
 			join fetch s.court c
 			join fetch c.area
-			""" + RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER + SAME_GENDER_FILTER + """
+			""" + RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER + SAME_GENDER_PREFERENCE_FILTER + """
 			and s.startsAt >= :from and s.startsAt < :before and s.endsAt <= :endsBy
 			and (:filterNtrp = false or (m.minNtrp <= :minimumNtrp and m.maxNtrp >= :maximumNtrp))
 			order by s.startsAt, m.id

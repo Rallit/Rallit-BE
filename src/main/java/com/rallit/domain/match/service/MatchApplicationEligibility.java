@@ -33,7 +33,7 @@ class MatchApplicationEligibility {
 		}
 		int recruitCount = applicant.getGender() == Gender.MALE
 				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
-		if (recruitCount <= 0) {
+		if (recruitCount <= 0 || (match.isSameGenderOnly() && match.getHost().getGender() != applicant.getGender())) {
 			return Optional.of(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
 		}
 		if (applications.countByMatchIdAndApplicantGenderAndStatus(match.getId(),
