@@ -1,6 +1,5 @@
 package com.rallit.domain.match.dto.request;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -15,7 +14,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 public record MatchSearchRequest(
 		@Schema(description = "경기 시작일(서울 기준). YYYY-MM-DD, 연도 0001~9999.",
 				type = "string", format = "date", example = "2026-11-21")
-		@NotNull @DateTimeFormat(pattern = "uuuu-MM-dd") LocalDate date,
+		@NotNull @Pattern(regexp = "[0-9]{4}-[0-9]{2}-[0-9]{2}") String date,
 		@NotEmpty @Size(max = 25) List<@NotNull @Pattern(regexp = "[0-9]{5}") String> areaCodes,
 		@Schema(description = "가장 이른 경기 시작 시각. 생략하면 자정부터 조회합니다.", example = "14:00")
 		@DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,

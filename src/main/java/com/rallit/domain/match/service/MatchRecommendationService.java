@@ -2,7 +2,9 @@ package com.rallit.domain.match.service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -72,10 +74,16 @@ public class MatchRecommendationService {
 	public MatchSearchResponse search(Long userId, MatchSearchRequest request, int exactPage, int similarPage,
 			int size) {
 		User user = onboardedUser(userId);
-		if (request.date().getYear() < 1 || request.date().getYear() > 9999) {
+		LocalDate date;
+		try {
+			date = LocalDate.parse(request.date());
+		} catch (DateTimeParseException e) {
+			throw new GeneralException(ErrorStatus._BAD_REQUEST, e);
+		}
+		if (date.getYear() < 1 || date.getYear() > 9999) {
 			throw new GeneralException(ErrorStatus._BAD_REQUEST);
 		}
-		var window = MatchSearchRules.TimeWindow.of(request.date(), request.startTimeFrom(), request.startTimeTo());
+		var window = MatchSearchRules.TimeWindow.of(date, request.startTimeFrom(), request.startTimeTo());
 		if (!window.from().isBefore(window.to())) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_TIME_RANGE);
 		}

@@ -230,7 +230,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void rejectsOffsetAndImpossibleDatesWithCommonRequestError() throws Exception {
 		String auth = bearer(viewer());
-		for (String invalidDate : Set.of(saturday() + "+09:00", "2026-11-31", "0000-01-01")) {
+		for (String invalidDate : Set.of(saturday() + "+09:00", "+02026-11-21", "2026-11-31", "0000-01-01")) {
 			mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
 							.param("date", invalidDate).param("areaCodes", MAPO))
 					.andExpect(status().isBadRequest())
