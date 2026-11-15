@@ -6,9 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 
 import com.rallit.domain.match.exception.InvalidMatchNtrpException;
+import com.rallit.global.apiPayload.exception.GeneralException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
 
 class MatchNtrpTest {
 
@@ -20,6 +22,16 @@ class MatchNtrpTest {
 				.isInstanceOf(InvalidMatchNtrpException.class);
 		assertThatThrownBy(() -> Match.builder().maxNtrp(ntrp).build())
 				.isInstanceOf(InvalidMatchNtrpException.class);
+	}
+
+	@Test
+	void classifiesUnsupportedRecruitmentNtrpAsABadRequest() {
+		assertThatThrownBy(() -> Match.builder().maxNtrp(new BigDecimal("3.6")).build())
+				.isInstanceOfSatisfying(GeneralException.class, failure -> {
+					var reason = failure.getErrorReasonHttpStatus();
+					assertThat(reason.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(reason.getCode()).isEqualTo("MATCH_INVALID_RECRUITMENT_NTRP");
+				});
 	}
 
 	@Test

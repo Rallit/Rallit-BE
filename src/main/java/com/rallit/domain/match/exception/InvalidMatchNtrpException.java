@@ -1,8 +1,10 @@
 package com.rallit.domain.match.exception;
 
-public class InvalidMatchNtrpException extends IllegalArgumentException {
+import com.rallit.global.apiPayload.exception.GeneralException;
+
+public class InvalidMatchNtrpException extends GeneralException {
 
 	public InvalidMatchNtrpException() {
-		super("모집 NTRP는 1.0부터 4.0+까지 0.5 단위로 선택해야 합니다.");
+		super(MatchErrorStatus.MATCH_INVALID_RECRUITMENT_NTRP);
 	}
 }
