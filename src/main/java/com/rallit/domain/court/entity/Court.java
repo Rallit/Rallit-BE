@@ -2,12 +2,16 @@ package com.rallit.domain.court.entity;
 
 import java.math.BigDecimal;
 
+import com.rallit.domain.region.entity.Area;
 import com.rallit.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -36,6 +40,10 @@ public class Court extends BaseEntity {
 	@Column(nullable = false, precision = 9, scale = 6)
 	private BigDecimal longitude;
 
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "area_id")
+	private Area area;
+
 	@Column(nullable = false)
 	private boolean hasParking;
 
@@ -46,12 +54,13 @@ public class Court extends BaseEntity {
 	private String facilityNotes;
 
 	@Builder
-	private Court(String name, String address, BigDecimal latitude, BigDecimal longitude, boolean hasParking,
+	private Court(String name, String address, BigDecimal latitude, BigDecimal longitude, Area area, boolean hasParking,
 			boolean hasShower, String facilityNotes) {
 		this.name = name;
 		this.address = address;
 		this.latitude = latitude;
 		this.longitude = longitude;
+		this.area = area;
 		this.hasParking = hasParking;
 		this.hasShower = hasShower;
 		this.facilityNotes = facilityNotes;
