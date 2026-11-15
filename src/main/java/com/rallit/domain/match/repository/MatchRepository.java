@@ -56,6 +56,10 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			and (:sameGenderOnly = false or m.sameGenderOnly = true)
 			""";
 
+	String HAS_NTRP_BOUND = """
+			(m.minNtrp is not null or m.maxNtrp is not null)
+			""";
+
 	String HOME_RECOMMENDATION_FILTER = RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER
 			+ SAME_GENDER_PREFERENCE_FILTER + """
 			and area.code in :areaCodes
@@ -92,8 +96,10 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch m.courtSlot s
 			join fetch s.court c
 			join fetch c.area area
-			""" + HOME_RECOMMENDATION_FILTER + """
-			order by case when :ntrp between m.minNtrp and m.maxNtrp then 0 else 1 end, s.startsAt, m.id
+			""" + HOME_RECOMMENDATION_FILTER + "order by case when " + HAS_NTRP_BOUND + """
+				and (m.minNtrp is null or m.minNtrp <= :ntrp)
+				and (m.maxNtrp is null or m.maxNtrp >= :ntrp)
+				then 0 else 1 end, s.startsAt, m.id
 			""", countQuery = """
 			select count(m) from Match m join m.courtSlot s join s.court c join c.area area
 			""" + HOME_RECOMMENDATION_FILTER)
@@ -109,7 +115,11 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch c.area
 			""" + RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER + SAME_GENDER_PREFERENCE_FILTER + """
 			and s.startsAt >= :from and s.startsAt < :before and s.endsAt <= :endsBy
-			and (:filterNtrp = false or (m.minNtrp <= :minimumNtrp and m.maxNtrp >= :maximumNtrp))
+			and (:filterNtrp = false or (
+			""" + HAS_NTRP_BOUND + """
+				and (m.minNtrp is null or m.minNtrp <= :minimumNtrp)
+				and (m.maxNtrp is null or m.maxNtrp >= :maximumNtrp)
+			))
 			order by s.startsAt, m.id
 			""")
 	List<Match> findSearchCandidates(CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now,

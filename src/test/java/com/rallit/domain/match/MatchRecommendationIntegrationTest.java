@@ -193,6 +193,53 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void comparesOnlyConfiguredNtrpBoundsWhenSearchSpecifiesLevels() throws Exception {
+		var date = saturday();
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		var nearby = court(SEODAEMUN, "37.5824", "126.92985");
+		long lowerBoundOnly = match(host, original, date, "14:00", "2.5", null, MatchType.SINGLES, false);
+		long upperBoundOnly = match(host, nearby, date, "14:00", null, "3.5", MatchType.SINGLES, false);
+		long unspecifiedExact = match(host, original, date, "14:00", null, null, MatchType.SINGLES, false);
+		long unspecifiedSimilar = match(host, nearby, date, "14:00", null, null, MatchType.SINGLES, false);
+		match(host, original, date, "15:00", "3.5", null, MatchType.SINGLES, false);
+		match(host, nearby, date, "15:00", null, "3.0", MatchType.SINGLES, false);
+		String auth = bearer(viewer());
+
+		mvc.perform(search(auth, date).param("ntrp", "3.0", "3.5"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(lowerBoundOnly))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(upperBoundOnly));
+		mvc.perform(search(auth, date))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
+				.andExpect(jsonPath("$.result.exactMatches.items[1].match.matchId").value(unspecifiedExact))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(3))
+				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(unspecifiedSimilar));
+	}
+
+	@Test
+	void ranksMatchingOneSidedNtrpRangesBeforeUnspecifiedAndNonMatchingRanges() throws Exception {
+		var date = saturday();
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		long unspecified = match(host, original, date, "12:00", null, null, MatchType.SINGLES, false);
+		long belowViewer = match(host, original, date, "13:00", null, "3.5", MatchType.SINGLES, false);
+		long lowerBoundOnly = match(host, original, date, "14:00", "3.5", null, MatchType.SINGLES, false);
+		long upperBoundOnly = match(host, original, date, "15:00", null, "4.0", MatchType.SINGLES, false);
+
+		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", bearer(viewer())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(4))
+				.andExpect(jsonPath("$.result.items[0].match.matchId").value(lowerBoundOnly))
+				.andExpect(jsonPath("$.result.items[1].match.matchId").value(upperBoundOnly))
+				.andExpect(jsonPath("$.result.items[2].match.matchId").value(unspecified))
+				.andExpect(jsonPath("$.result.items[3].match.matchId").value(belowViewer));
+	}
+
+	@Test
 	void excludesOppositeGenderFromSameGenderMatchEvenWithAnOppositeGenderQuota() throws Exception {
 		var date = saturday();
 		var host = member(Gender.MALE, "3.0");
@@ -309,7 +356,8 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		var match = Match.builder().courtSlot(slot).host(host).matchTypes(Set.of(type))
 				.maleRecruitCount(sameGenderOnly ? 0 : 2).femaleRecruitCount(2)
 				.sameGenderOnly(sameGenderOnly)
-				.minNtrp(new BigDecimal(min)).maxNtrp(new BigDecimal(max))
+				.minNtrp(min == null ? null : new BigDecimal(min))
+				.maxNtrp(max == null ? null : new BigDecimal(max))
 				.participationFee(10000).recruitmentDeadline(startsAt.minusHours(1)).build();
 		entityManager.persist(match);
 		entityManager.flush();

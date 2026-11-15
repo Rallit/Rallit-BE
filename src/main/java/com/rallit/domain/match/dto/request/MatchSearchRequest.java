@@ -22,7 +22,8 @@ public record MatchSearchRequest(
 		@DateTimeFormat(pattern = "HH:mm") LocalTime startTimeTo,
 		@Schema(description = "선택한 경기 방식 중 하나 이상과 일치해야 합니다. DOUBLES는 남복·여복을 포함합니다.")
 		List<@NotNull PreferredMatchType> matchTypes,
-		@Schema(description = "선택값 모두가 모집 범위에 포함되어야 합니다. 4.0+는 URL에서 4.0%2B로 전송합니다.")
+		@Schema(description = "선택값 모두가 설정된 모집 NTRP 경계를 충족해야 합니다. 양쪽 경계가 모두 미설정인 매치는 "
+				+ "제외합니다. 4.0+는 URL에서 4.0%2B로 전송합니다.")
 		List<@NotNull @Pattern(regexp = "(?:[1-3]\\.[05]|4\\.0\\+)") String> ntrp,
 		@Schema(description = "같은 성별의 호스트가 동성만으로 개설한 매치만 조회합니다.")
 		Boolean sameGenderOnly) {

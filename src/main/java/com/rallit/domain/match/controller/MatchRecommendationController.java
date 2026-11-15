@@ -43,7 +43,8 @@ public class MatchRecommendationController {
 	@GetMapping("/recommendations")
 	@Operation(summary = "온보딩 기반 홈 매치 추천",
 			description = "활동 지역, 선호 경기 방식과 시간대가 맞는 신청 가능 매치를 추천합니다. 모집 NTRP 범위에 "
-					+ "회원의 등급이 들어오는 매치를 먼저 표시합니다.")
+					+ "회원의 등급이 들어오는 매치를 먼저 표시합니다. 설정된 NTRP 경계만 비교하고, 양쪽 경계가 모두 "
+					+ "미설정인 매치는 우선 정렬에서 제외합니다.")
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
 			description = "홈 추천 조회 성공. 첫 페이지에 결과가 없으면 빈 목록을 반환합니다.",
 			useReturnTypeSchema = true)
