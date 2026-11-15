@@ -1,10 +1,12 @@
 package com.rallit.domain.match.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.rallit.support.IntegrationTestSupport;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -12,7 +14,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class MatchNtrpMigrationTest extends IntegrationTestSupport {
 
 	@Test
-	void normalizesLegacyRangesAndPreservesUnsetBounds() {
+	void upgradesLegacyRangesAndRejectsNewValuesAboveTheUpperBand() {
 		try (var postgres = new PostgreSQLContainer(PG.getDockerImageName())) {
 			postgres.start();
 			var dataSource = new DriverManagerDataSource(
@@ -52,6 +54,10 @@ class MatchNtrpMigrationTest extends IntegrationTestSupport {
 					FROM match m JOIN court_slot s ON s.id = m.court_slot_id
 					ORDER BY s.court_number
 					""", String.class)).containsExactly("4.0:4.0", "3.0:4.0", "null:4.0", "4.0:null", "2.5:3.5");
+			assertThatThrownBy(() -> jdbc.update("UPDATE match SET min_ntrp = 4.5 WHERE max_ntrp IS NULL"))
+					.isInstanceOf(DataIntegrityViolationException.class);
+			assertThatThrownBy(() -> jdbc.update("UPDATE match SET max_ntrp = 4.5 WHERE min_ntrp IS NULL"))
+					.isInstanceOf(DataIntegrityViolationException.class);
 		}
 	}
 }
