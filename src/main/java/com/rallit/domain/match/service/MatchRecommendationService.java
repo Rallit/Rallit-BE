@@ -74,6 +74,25 @@ public class MatchRecommendationService {
 	public MatchSearchResponse search(Long userId, MatchSearchRequest request, int exactPage, int similarPage,
 			int size) {
 		User user = onboardedUser(userId);
+		var window = validateTimeWindow(request);
+		var areaCodes = new HashSet<>(request.areaCodes());
+		var selectedAreas = areas.findAllByCodeIn(areaCodes);
+		if (selectedAreas.size() != areaCodes.size()) {
+			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_AREA);
+		}
+		var candidates = findSearchCandidates(user, request, window);
+		var results = MatchSearchRules.group(candidates, areaCodes, selectedAreas, window);
+		var exact = page(results.exact(), exactPage, size);
+		var similar = page(results.similar(), similarPage, size);
+		MatchPageRange.requireInRange(exact);
+		MatchPageRange.requireInRange(similar);
+		var counts = occupiedSeats(Stream.concat(exact.stream(), similar.stream()).toList());
+		return new MatchSearchResponse(!results.exact().isEmpty() || !results.similar().isEmpty(),
+				PageResponse.from(exact.map(match -> view(match, counts))),
+				PageResponse.from(similar.map(match -> view(match, counts))), results.relaxedConditions());
+	}
+
+	private static MatchSearchRules.TimeWindow validateTimeWindow(MatchSearchRequest request) {
 		LocalDate date;
 		try {
 			date = LocalDate.parse(request.date());
@@ -87,31 +106,20 @@ public class MatchRecommendationService {
 		if (!window.from().isBefore(window.to())) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_TIME_RANGE);
 		}
-		var areaCodes = new HashSet<>(request.areaCodes());
-		var selectedAreas = areas.findAllByCodeIn(areaCodes);
-		if (selectedAreas.size() != areaCodes.size()) {
-			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_AREA);
-		}
+		return window;
+	}
+
+	private List<Match> findSearchCandidates(User user, MatchSearchRequest request, MatchSearchRules.TimeWindow window) {
 		var levels = request.ntrp() == null ? List.<BigDecimal>of() : request.ntrp().stream()
 				.map(value -> new BigDecimal(value.replace("+", ""))).sorted(Comparator.naturalOrder()).toList();
 		var types = matchTypes(request.matchTypes());
 		boolean allTypes = types.isEmpty();
-		var candidates = matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
+		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
 				window.expandedFrom(), window.dayEnd(), window.expandedTo(), allTypes,
-				allTypes ? EnumSet.allOf(MatchType.class) : types, userId, user.getGender(), MatchApplicationStatus.ACTIVE,
+				allTypes ? EnumSet.allOf(MatchType.class) : types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
 				Boolean.TRUE.equals(request.sameGenderOnly()), !levels.isEmpty(),
 				levels.isEmpty() ? BigDecimal.ZERO : levels.getFirst(),
 				levels.isEmpty() ? BigDecimal.ZERO : levels.getLast());
-
-		var results = MatchSearchRules.group(candidates, areaCodes, selectedAreas, window);
-		var exact = page(results.exact(), exactPage, size);
-		var similar = page(results.similar(), similarPage, size);
-		MatchPageRange.requireInRange(exact);
-		MatchPageRange.requireInRange(similar);
-		var counts = occupiedSeats(Stream.concat(exact.stream(), similar.stream()).toList());
-		return new MatchSearchResponse(!results.exact().isEmpty() || !results.similar().isEmpty(),
-				PageResponse.from(exact.map(match -> view(match, counts))),
-				PageResponse.from(similar.map(match -> view(match, counts))), results.relaxedConditions());
 	}
 
 	private static EnumSet<MatchType> matchTypes(Iterable<PreferredMatchType> preferences) {
