@@ -28,7 +28,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.tags[*].name", containsInAnyOrder("인증", "회원", "매치 조회", "매치 참가 신청", "운영자")))
+        .andExpect(jsonPath("$.tags[*].name",
+            containsInAnyOrder("인증", "회원", "매치 조회", "매치 추천", "매치 참가 신청", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.parameters[*].name",
@@ -137,6 +138,17 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
       assertThat(applications.at("/items/items/$ref").asText())
           .isEqualTo("#/components/schemas/MyMatchApplicationListItemResponse");
     }
+  }
+
+  @Test
+  void swaggerDocumentsHomeRecommendation() throws Exception {
+    String home = "$.paths['/api/v1/matches/recommendations'].get";
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(home + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(home + ".responses['200'].content['application/json'].schema['$ref']").isString())
+        .andExpect(jsonPath(home + ".responses['400'].content['application/json']"
+            + ".examples['페이지 범위 초과'].value.code").value("MATCH_PAGE_OUT_OF_RANGE"));
   }
 
   private JsonNode paginationSchema(JsonNode openApi, String path) {

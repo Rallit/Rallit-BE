@@ -1,5 +1,6 @@
 package com.rallit.domain.match.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Optional;
@@ -49,6 +50,20 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			)
 			""";
 
+	String SAME_GENDER_FILTER = """
+			and (:sameGenderOnly = false or (m.sameGenderOnly = true and m.host.gender = :gender))
+			""";
+
+	String HOME_RECOMMENDATION_FILTER = RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER
+			+ SAME_GENDER_FILTER + """
+			and area.code in :areaCodes
+			and (case
+				when extract(day of week from s.startsAt) in (1, 7) then
+					case when extract(hour from s.startsAt) < 12 then 'WEEKEND_MORNING' else 'WEEKEND_AFTERNOON' end
+				else case when extract(hour from s.startsAt) < 12 then 'WEEKDAY_MORNING' else 'WEEKDAY_AFTERNOON' end
+			end) in :timeSlots
+			""";
+
 	@Query(value = """
 			select m from Match m
 			join fetch m.courtSlot s
@@ -69,6 +84,21 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			LocalDateTime from, LocalDateTime before, LocalDateTime endsBy, boolean allTypes,
 			Collection<MatchType> types, Long applicantId, Gender gender,
 			Collection<MatchApplicationStatus> activeStatuses, Pageable pageable);
+
+	@Query(value = """
+			select m from Match m
+			join fetch m.courtSlot s
+			join fetch s.court c
+			join fetch c.area area
+			""" + HOME_RECOMMENDATION_FILTER + """
+			order by case when :ntrp between m.minNtrp and m.maxNtrp then 0 else 1 end, s.startsAt, m.id
+			""", countQuery = """
+			select count(m) from Match m join m.courtSlot s join s.court c join c.area area
+			""" + HOME_RECOMMENDATION_FILTER)
+	Page<Match> findHomeRecommendations(CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now,
+			boolean allTypes, Collection<MatchType> types, Long applicantId, Gender gender,
+			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly, Collection<String> areaCodes,
+			Collection<String> timeSlots, BigDecimal ntrp, Pageable pageable);
 
 	@Query("""
 			select m from Match m
