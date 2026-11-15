@@ -52,6 +52,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     String onboarding = "$.paths['/api/v1/users/me/onboarding'].post";
     String jsonBody = onboarding + ".requestBody.content['application/json']";
     String example = jsonBody + ".examples['가입 완료 예시'].value";
+    String conflictExamples = onboarding + ".responses['409'].content['application/json'].examples";
     String profile = "$.components.schemas.UserResponse.properties.profile";
     String cityCode = "$.paths['/api/v1/cities/{cityCode}/areas'].get.parameters[0].example";
     mvc.perform(get("/v3/api-docs"))
@@ -60,7 +61,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath(deletion + "['204'].content").doesNotExist())
         .andExpect(jsonPath(deletion + "['200']").doesNotExist())
         .andExpect(jsonPath(onboarding + ".responses['400']").exists())
-        .andExpect(jsonPath(onboarding + ".responses['409']").exists())
+        .andExpect(jsonPath(conflictExamples + "['닉네임 중복'].value.code").value("NICKNAME_CONFLICT"))
+        .andExpect(jsonPath(conflictExamples + "['완료 후 다른 내용 제출'].value.code").value("COMMON409"))
         .andExpect(jsonPath(jsonBody + ".schema['$ref']").value("#/components/schemas/OnboardingRequest"))
         .andExpect(jsonPath(example + ".ntrp").value("4.0+"))
         .andExpect(jsonPath(example + ".activityAreaCodes[0]").value("11440"))

@@ -72,7 +72,23 @@ public class UserController {
           @io.swagger.v3.oas.annotations.responses.ApiResponse(
               responseCode = "409", description = "닉네임 중복 또는 완료 후 다른 내용 제출",
               content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-                  schema = @Schema(implementation = ApiResponse.class)))
+                  schema = @Schema(implementation = ApiResponse.class),
+                  examples = {
+                      @ExampleObject(name = "닉네임 중복", value = """
+                          {
+                            "isSuccess": false,
+                            "code": "NICKNAME_CONFLICT",
+                            "message": "이미 사용 중인 닉네임입니다."
+                          }
+                          """),
+                      @ExampleObject(name = "완료 후 다른 내용 제출", value = """
+                          {
+                            "isSuccess": false,
+                            "code": "COMMON409",
+                            "message": "이미 온보딩을 완료했습니다."
+                          }
+                          """)
+                  }))
       })
   @PostMapping("/me/onboarding")
   public ResponseEntity<ApiResponse<UserResponse>> completeOnboarding(
