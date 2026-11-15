@@ -17,17 +17,23 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface MatchRepository extends JpaRepository<Match, Long> {
 
-	String DISCOVERY_FILTER = """
+	String RECRUITING_FILTER = """
 			where s.status = :slotStatus and m.status = :matchStatus
 			and s.startsAt > :now and m.recruitmentDeadline > :now
-			and (cast(:from as LocalDateTime) is null or s.startsAt >= :from)
-			and (cast(:before as LocalDateTime) is null or s.startsAt < :before)
-			and (cast(:endsBy as LocalDateTime) is null or s.endsAt <= :endsBy)
+			""";
+
+	String MATCH_TYPE_FILTER = """
 			and (:allTypes = true or exists (
 				select t from Match candidate join candidate.matchTypes t
 				where candidate.id = m.id and t in :types
 			))
 			""";
+
+	String DISCOVERY_FILTER = RECRUITING_FILTER + """
+			and (cast(:from as LocalDateTime) is null or s.startsAt >= :from)
+			and (cast(:before as LocalDateTime) is null or s.startsAt < :before)
+			and (cast(:endsBy as LocalDateTime) is null or s.endsAt <= :endsBy)
+			""" + MATCH_TYPE_FILTER;
 
 	// Keep the eligibility predicates aligned with MatchApplicationEligibility.
 	String APPLICANT_FILTER = """
