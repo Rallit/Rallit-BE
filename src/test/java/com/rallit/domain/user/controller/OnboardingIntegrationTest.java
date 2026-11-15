@@ -31,6 +31,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.JsonPathExpectationsHelper;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -76,7 +77,8 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("\"11440\", \"11410\"", "\"11410\", \"11440\", \"11440\""))
         .andExpect(status().isOk());
     submit(member, body.replace("WEEKEND_MORNING", "WEEKEND_AFTERNOON"))
-        .andExpect(status().isConflict());
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("COMMON409"));
 
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(status().isOk())
@@ -125,7 +127,9 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
             .header("Authorization", member.bearer()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.available").value(false));
-    submit(member, PAYLOAD.formatted(candidate)).andExpect(status().isConflict());
+    submit(member, PAYLOAD.formatted(candidate))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("NICKNAME_CONFLICT"));
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(jsonPath("$.result.onboardingCompleted").value(false));
   }
@@ -152,9 +156,14 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     try (var executor = Executors.newFixedThreadPool(2)) {
       var firstRequest = executor.submit(() -> submit(first, body).andReturn().getResponse());
       var secondRequest = executor.submit(() -> submit(second, body).andReturn().getResponse());
-      int firstStatus = firstRequest.get(20, TimeUnit.SECONDS).getStatus();
-      int secondStatus = secondRequest.get(20, TimeUnit.SECONDS).getStatus();
+      var firstResponse = firstRequest.get(20, TimeUnit.SECONDS);
+      var secondResponse = secondRequest.get(20, TimeUnit.SECONDS);
+      int firstStatus = firstResponse.getStatus();
+      int secondStatus = secondResponse.getStatus();
       assertThat(List.of(firstStatus, secondStatus)).containsExactlyInAnyOrder(200, 409);
+      var conflictResponse = firstStatus == 409 ? firstResponse : secondResponse;
+      new JsonPathExpectationsHelper("$.code")
+          .assertValue(conflictResponse.getContentAsString(), "NICKNAME_CONFLICT");
       verify(userRepository, times(2)).isNicknameTakenByAnotherUser(eq(nickname), anyLong());
 
       var winner = firstStatus == 200 ? first : second;
