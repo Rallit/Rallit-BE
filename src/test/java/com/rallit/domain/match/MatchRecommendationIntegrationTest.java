@@ -1,6 +1,7 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,10 +14,13 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.IntStream;
 
+import com.jayway.jsonpath.JsonPath;
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.court.entity.Court;
@@ -42,22 +46,26 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
 @Transactional
 class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 
+	private static final String MATCH_REQUESTS = "/api/v1/match-requests";
 	private static final String MAPO = "11440";
 	private static final String JUNG = "11140";
 	private static final String SEODAEMUN = "11410";
 	private static final String YONGSAN = "11170";
 
 	@Autowired private MockMvc mvc;
+	@Autowired private ObjectMapper json;
 	@Autowired private JdbcTemplate jdbc;
 	@Autowired private EntityManager entityManager;
 	@Autowired private AreaRepository areas;
@@ -66,7 +74,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void emptySearchIsAValidResponseForAnOnboardedMember() throws Exception {
-		mvc.perform(search(bearer(viewer()), saturday()))
+		search(bearer(viewer()), saturday())
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(0))
@@ -86,7 +94,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		match(host, tooFar, date, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
 		String auth = bearer(viewer());
 
-		mvc.perform(search(auth, date))
+		search(auth, date)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.hasResults").value(true))
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
@@ -96,7 +104,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.similarMatches.items[0].areaName").value("서대문구"))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
 		for (String pageParam : Set.of("exactPage", "similarPage")) {
-			mvc.perform(search(auth, date).param(pageParam, "1").param("size", "1"))
+			search(auth, searchConditions(date), Map.of(pageParam, "1", "size", "1"))
 					.andExpect(status().isBadRequest())
 					.andExpect(jsonPath("$.code").value("MATCH_PAGE_OUT_OF_RANGE"));
 		}
@@ -119,14 +127,14 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		match(host, original, firstDate, "13:00", "2.5", "4.0", MatchType.SINGLES, false);
 		String auth = bearer(viewer());
 
-		mvc.perform(search(auth, lastDate, firstDate, firstDate).param("size", "1").param("exactPage", "1"))
+		search(auth, searchConditions(lastDate, firstDate, firstDate), Map.of("size", "1", "exactPage", "1"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(2))
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(last))
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(similar))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
-		mvc.perform(search(auth, lastDate, firstDate))
+		search(auth, lastDate, firstDate)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(first));
 	}
@@ -152,7 +160,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		conditions.set("minNtrp", "3.0");
 		conditions.set("sameGenderOnly", "true");
 
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
@@ -161,7 +169,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
 		jdbc.update("update match set status = 'CANCELED' where id = ?", timeOnly);
 		entityManager.clear();
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
@@ -184,7 +192,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		var conditions = searchConditions(date);
 		conditions.add("areaCodes", JUNG);
 
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(similar))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
@@ -192,13 +200,13 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		conditions.set("matchTypes", "RALLY");
 		conditions.set("startTimeFrom", "23:00");
 		conditions.set("startTimeTo", "24:00");
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(endsAtMidnight))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
 		conditions.set("startTimeFrom", "22:00");
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(endsAtMidnight))
@@ -272,7 +280,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		var conditions = searchConditions(date);
 		conditions.set("maxNtrp", "2.0");
 
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(lowerBoundOnly))
@@ -282,12 +290,12 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(upperBoundOnly))
 				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(unspecifiedSimilar));
 		conditions.set("minNtrp", "1.5");
-		mvc.perform(search(auth, conditions))
+		search(auth, conditions)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(unspecifiedSimilar));
-		mvc.perform(search(auth, date))
+		search(auth, date)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(4))
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(3));
@@ -301,7 +309,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		conditions.set("minNtrp", minNtrp);
 		conditions.set("maxNtrp", maxNtrp);
 
-		mvc.perform(search(auth, conditions))
+		mvc.perform(createRequest(auth, conditions))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
 	}
 
@@ -312,7 +320,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		var conditions = searchConditions(saturday());
 		conditions.remove(field);
 
-		mvc.perform(search(bearer(viewer()), conditions))
+		mvc.perform(createRequest(bearer(viewer()), conditions))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON400"));
 	}
@@ -349,7 +357,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", femaleAuth))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(0));
-		mvc.perform(search(femaleAuth, date))
+		search(femaleAuth, date)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.hasResults").value(false));
 		mvc.perform(get("/api/v1/matches").header("Authorization", femaleAuth).param("applicableOnly", "true"))
@@ -382,7 +390,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				date.atTime(13, 30), entirelyOutside);
 		jdbc.update("update court_slot set ends_at = ? where id = (select court_slot_id from match where id = ?)",
 				date.atTime(14, 15), partlyOutside);
-		mvc.perform(search(bearer(viewer()), date))
+		search(bearer(viewer()), date)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(partlyOutside))
@@ -395,36 +403,31 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		for (String invalidDate : Set.of(saturday() + "+09:00", "+02026-11-21", "2026-11-31", "0000-01-01")) {
 			var conditions = searchConditions(saturday());
 			conditions.add("dates", invalidDate);
-			mvc.perform(search(auth, conditions))
+			mvc.perform(createRequest(auth, conditions))
 					.andExpect(status().isBadRequest())
 					.andExpect(jsonPath("$.code").value("COMMON400"));
 		}
 	}
 
 	@Test
-	void requiresBetweenOneAndFourteenDates() throws Exception {
-		var auth = bearer(viewer());
-		var first = saturday();
-		var dates = IntStream.range(0, 15).mapToObj(first::plusDays).toArray(LocalDate[]::new);
-
-		mvc.perform(search(auth)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
-		mvc.perform(search(auth, Arrays.copyOf(dates, 14))).andExpect(status().isOk());
-		mvc.perform(search(auth, dates)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
-	}
-
-	@Test
 	void validatesSearchFiltersAndRequiresOnboarding() throws Exception {
 		var date = saturday();
 		var auth = bearer(viewer());
-		mvc.perform(search(auth, date).param("areaCodes", "99999")).andExpect(status().isBadRequest());
-		mvc.perform(search(auth, date).param("areaCodes", JUNG, SEODAEMUN)).andExpect(status().isOk());
-		mvc.perform(search(auth, date).param("areaCodes", JUNG, SEODAEMUN, YONGSAN))
+		var conditions = searchConditions(date);
+		conditions.set("areaCodes", "99999");
+		mvc.perform(createRequest(auth, conditions))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_AREA"));
+		conditions.put("areaCodes", List.of(MAPO, JUNG, SEODAEMUN));
+		mvc.perform(createRequest(auth, conditions)).andExpect(status().isCreated());
+		conditions.put("areaCodes", List.of(MAPO, JUNG, SEODAEMUN, YONGSAN));
+		mvc.perform(createRequest(auth, conditions))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON400"));
 		var waiting = User.signUp();
 		entityManager.persist(waiting);
 		entityManager.flush();
-		mvc.perform(search(bearer(waiting), date))
+		mvc.perform(createRequest(bearer(waiting), searchConditions(date)))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("MATCH_ONBOARDING_REQUIRED"));
 		mvc.perform(get("/api/v1/matches/recommendations")).andExpect(status().isUnauthorized());
@@ -436,23 +439,50 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		for (String parameter : Set.of("startTimeFrom", "startTimeTo")) {
 			var conditions = searchConditions(saturday());
 			conditions.set(parameter, "24:01");
-			mvc.perform(search(auth, conditions))
+			mvc.perform(createRequest(auth, conditions))
 					.andExpect(status().isBadRequest())
 					.andExpect(jsonPath("$.code").value("COMMON400"));
 		}
 		var conditions = searchConditions(saturday());
 		conditions.set("startTimeFrom", "24:00");
-		mvc.perform(search(auth, conditions))
+		mvc.perform(createRequest(auth, conditions))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON400"));
 	}
 
-	private MockHttpServletRequestBuilder search(String auth, LocalDate... dates) {
+	private ResultActions search(String auth, LocalDate... dates) throws Exception {
 		return search(auth, searchConditions(dates));
 	}
 
-	private MockHttpServletRequestBuilder search(String auth, MultiValueMap<String, String> conditions) {
-		return get("/api/v1/matches/search").header("Authorization", auth).params(conditions);
+	private ResultActions search(String auth, MultiValueMap<String, String> conditions) throws Exception {
+		return search(auth, conditions, Map.of());
+	}
+
+	private ResultActions search(String auth, MultiValueMap<String, String> conditions,
+			Map<String, String> pageParameters) throws Exception {
+		String created = mvc.perform(createRequest(auth, conditions)).andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long id = ((Number) JsonPath.read(created, "$.result.request.requestId")).longValue();
+		try {
+			var results = get(MATCH_REQUESTS + "/{id}/results", id).header("Authorization", auth);
+			pageParameters.forEach((name, value) -> results.param(name, value));
+			return mvc.perform(results);
+		} finally {
+			mvc.perform(delete(MATCH_REQUESTS + "/{id}", id).header("Authorization", auth))
+					.andExpect(status().isNoContent());
+		}
+	}
+
+	private MockHttpServletRequestBuilder createRequest(String auth, MultiValueMap<String, String> conditions) {
+		var body = new LinkedHashMap<String, Object>();
+		conditions.forEach((field, values) -> body.put(field, switch (field) {
+			case "dates", "areaCodes", "matchTypes" -> values;
+			case "minNtrp", "maxNtrp" -> new BigDecimal(values.getFirst());
+			case "sameGenderOnly" -> Boolean.valueOf(values.getFirst());
+			default -> values.getFirst();
+		}));
+		return post(MATCH_REQUESTS).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(body));
 	}
 
 	private MultiValueMap<String, String> searchConditions(LocalDate... dates) {

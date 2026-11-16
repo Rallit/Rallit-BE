@@ -98,7 +98,10 @@ public class MatchRequestController {
 	}
 
 	@GetMapping("/{requestId}/results")
-	@Operation(summary = "저장한 매칭 요청의 결과 조회", description = "저장한 조건으로 현재의 정확 일치·비슷한 매치를 조회합니다.")
+	@Operation(summary = "저장한 매칭 요청의 결과 조회",
+			description = "저장한 조건으로 현재의 정확 일치·비슷한 매치를 조회합니다. 비슷한 매치는 지역만, 시간만, "
+					+ "둘 다 순으로 완화해 첫 결과가 있는 단계만 반환합니다. 지역은 구 대표점에서 직선거리 5km 이내, "
+					+ "시간은 각 선택일 안에서 앞뒤 1시간을 적용합니다.")
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", useReturnTypeSchema = true)
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 형식 또는 페이지가 유효하지 않습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,

@@ -25,6 +25,7 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import com.jayway.jsonpath.JsonPath;
 import com.rallit.domain.auth.model.LoginTarget;
@@ -285,6 +286,17 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_INVALID_DATE"));
 		}
 		mvc.perform(create(auth, today.plusDays(13))).andExpect(status().isCreated());
+	}
+
+	@Test
+	void requiresBetweenOneAndFourteenDates() throws Exception {
+		var auth = bearer(member());
+		var today = LocalDate.now(clock);
+		var dates = IntStream.range(0, 15).mapToObj(today::plusDays).toArray(LocalDate[]::new);
+
+		mvc.perform(create(auth)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
+		mvc.perform(create(auth, Arrays.copyOf(dates, 14))).andExpect(status().isCreated());
+		mvc.perform(create(auth, dates)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
 	}
 
 	@Test
