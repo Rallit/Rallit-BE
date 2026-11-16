@@ -13,6 +13,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -37,6 +38,7 @@ import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.match.exception.MatchApplicationErrorStatus;
+import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.match.service.MatchApplicationService;
 import com.rallit.domain.user.entity.User;
@@ -219,7 +221,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void paymentDueAtDoesNotPassMatchStart() throws Exception {
+	void paymentDueAtDoesNotPassFinalDeadlineOneHourBeforeMatchStart() throws Exception {
 		User host = activeUser(Gender.MALE);
 		LocalDateTime startsAt = LocalDateTime.now(clock).plusHours(10).truncatedTo(ChronoUnit.SECONDS);
 		Match match = match(host, 1, 2, LocalDateTime.now(clock).plusHours(5), startsAt);
@@ -229,7 +231,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 		accept(host, match, applicationId).andExpect(status().isOk());
 
 		assertThat(((Timestamp) applicationRow(applicationId).get("payment_due_at")).toLocalDateTime())
-				.isEqualTo(startsAt);
+				.isEqualTo(startsAt.minusHours(1));
 	}
 
 	@Test
@@ -404,6 +406,50 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void acceptIsBlockedAfterFinalDeadlineOneHourBeforeMatchStart() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 2);
+		long applicationId = apply(activeUser(Gender.FEMALE), match);
+		LocalDateTime startsAt = LocalDateTime.now(clock).plusMinutes(59);
+		jdbcTemplate.update("""
+				UPDATE court_slot SET starts_at = ?, ends_at = ?
+				WHERE id = (SELECT court_slot_id FROM match WHERE id = ?)
+				""", startsAt, startsAt.plusHours(2), match.getId());
+
+		accept(host, match, applicationId)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("MATCH_RECRUITMENT_CLOSED"));
+
+		assertThat(applicationStatus(applicationId)).isEqualTo("PENDING");
+	}
+
+	@Test
+	void applicantCancelWhilePaymentPendingReturnsSeat() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 1);
+		User accepted = activeUser(Gender.FEMALE);
+		long acceptedId = apply(accepted, match);
+		long waitingId = apply(activeUser(Gender.FEMALE), match);
+		accept(host, match, acceptedId).andExpect(status().isOk());
+
+		accept(host, match, waitingId)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("SEAT_UNAVAILABLE"));
+		assertThat(catchThrowable(() -> apply(activeUser(Gender.FEMALE), match)))
+				.isInstanceOfSatisfying(GeneralException.class, exception -> assertThat(exception.getCode())
+						.isEqualTo(MatchApplicationErrorStatus.RECRUITMENT_FULL));
+
+		mvc.perform(post("/api/v1/applications/{id}/cancel", acceptedId).header("Authorization", bearer(accepted)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.status").value("CANCELED"));
+
+		assertThat(occupiedSeats(match)).isZero();
+		apply(activeUser(Gender.FEMALE), match);
+		accept(host, match, waitingId).andExpect(status().isOk());
+		assertThat(occupiedSeats(match)).isEqualTo(1);
+	}
+
+	@Test
 	void secondAcceptWaitsForMatchLockAndFailsWhenLastSeatIsTaken() throws Exception {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host, 1, 1);
@@ -522,6 +568,66 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 						.isEqualTo(MatchApplicationErrorStatus.APPLICATION_NOT_PENDING));
 		assertThat(applicationStatus(applicationId)).isEqualTo("CANCELED");
 		assertThat(occupiedSeats(match)).isZero();
+	}
+
+	@Test
+	void nonHostAcceptIsRejectedWithoutWaitingForMatchLock() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 2);
+		long applicationId = apply(activeUser(Gender.FEMALE), match);
+		User stranger = activeUser(Gender.MALE);
+		CountDownLatch accepted = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+
+		Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+				status -> {
+					matchApplicationService.accept(host.getId(), match.getId(), applicationId);
+					accepted.countDown();
+					await(release);
+				}));
+		assertThat(accepted.await(30, TimeUnit.SECONDS)).isTrue();
+		Future<Throwable> strangerAccept = executor.submit(
+				() -> catchThrowable(() -> matchApplicationService.accept(stranger.getId(), match.getId(),
+						applicationId)));
+
+		try {
+			assertThat(strangerAccept.get(5, TimeUnit.SECONDS)).isInstanceOfSatisfying(GeneralException.class,
+					exception -> assertThat(exception.getCode()).isEqualTo(MatchApplicationErrorStatus.NOT_MATCH_HOST));
+		} finally {
+			release.countDown();
+			holder.get(30, TimeUnit.SECONDS);
+		}
+	}
+
+	@Test
+	void acceptChecksDeadlineAfterWaitingForApplicationLock() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 2);
+		User applicant = activeUser(Gender.FEMALE);
+		long applicationId = apply(applicant, match);
+		LocalDateTime deadline = LocalDateTime.now(clock).plusSeconds(2);
+		jdbcTemplate.update("UPDATE match SET recruitment_deadline = ? WHERE id = ?", deadline, match.getId());
+		CountDownLatch canceled = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+
+		Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+				status -> {
+					matchApplicationService.cancel(applicant.getId(), applicationId, null);
+					canceled.countDown();
+					await(release);
+					status.setRollbackOnly();
+				}));
+		assertThat(canceled.await(30, TimeUnit.SECONDS)).isTrue();
+		Future<Throwable> accepting = executor.submit(
+				() -> catchThrowable(() -> matchApplicationService.accept(host.getId(), match.getId(), applicationId)));
+		awaitBlockedOnLock();
+		Thread.sleep(Math.max(0, Duration.between(LocalDateTime.now(clock), deadline).toMillis()) + 50);
+		release.countDown();
+		holder.get(30, TimeUnit.SECONDS);
+
+		assertThat(accepting.get(30, TimeUnit.SECONDS)).isInstanceOfSatisfying(GeneralException.class,
+				exception -> assertThat(exception.getCode()).isEqualTo(MatchErrorStatus.MATCH_RECRUITMENT_CLOSED));
+		assertThat(applicationStatus(applicationId)).isEqualTo("PENDING");
 	}
 
 	private ResultActions hostApplications(User user, Match match) throws Exception {

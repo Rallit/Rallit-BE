@@ -42,7 +42,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "매치 참가 신청",
-			description = "모집 중인 매치에 참가를 신청합니다. 신청은 호스트 수락 전 PENDING 상태이며 좌석을 점유하지 않습니다.",
+			description = "모집 중인 매치에 참가를 신청합니다. 신청은 호스트 수락 전 PENDING 상태이며 좌석을 점유하지 않습니다. "
+					+ "모집 마감이나 최종 마감(경기 시작 1시간 전)이 지나면 신청할 수 없습니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@PostMapping("/api/v1/matches/{matchId}/applications")
 	public ResponseEntity<ApiResponse<MatchApplicationCreateResponse>> apply(
@@ -97,7 +98,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "결제 전 참가 신청 취소",
-			description = "PENDING 상태의 본인 신청을 취소합니다. 이미 취소된 신청은 기존 취소 정보를 그대로 반환합니다.",
+			description = "결제 전(PENDING, PAYMENT_PENDING) 본인 신청을 취소합니다. 결제 대기 중인 신청을 취소하면 자리가 반환됩니다. "
+					+ "이미 취소된 신청은 기존 취소 정보를 그대로 반환합니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@PostMapping("/api/v1/applications/{applicationId}/cancel")
 	public ResponseEntity<ApiResponse<MatchApplicationCancelResponse>> cancel(

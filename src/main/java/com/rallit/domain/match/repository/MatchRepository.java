@@ -24,9 +24,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchRepository extends JpaRepository<Match, Long> {
 
+	// Keep the final deadline aligned with MatchApplicationEligibility.finalDeadline.
 	String RECRUITING_FILTER = """
 			where s.status = :slotStatus and m.status = :matchStatus
-			and s.startsAt > :now and m.recruitmentDeadline > :now
+			and s.startsAt > timestampadd(hour, 1, :now) and m.recruitmentDeadline > :now
 			""";
 
 	String MATCH_TYPE_EXISTS = """
@@ -50,7 +51,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			and (m.sameGenderOnly = false or m.host.gender = :gender)
 			and (select count(a) from MatchApplication a
 				where a.match.id = m.id and a.applicantGender = :gender
-				and a.status = com.rallit.domain.match.enums.MatchApplicationStatus.CONFIRMED)
+				and a.status in (com.rallit.domain.match.enums.MatchApplicationStatus.PAYMENT_PENDING,
+					com.rallit.domain.match.enums.MatchApplicationStatus.CONFIRMED))
 				< (case when :gender = com.rallit.domain.user.enums.Gender.MALE
 					then m.maleRecruitCount else m.femaleRecruitCount end)
 			and not exists (
@@ -143,6 +145,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			where m.id = :id and s.status = :slotStatus and m.status = :matchStatus and s.startsAt > :now
 			""")
 	Optional<Match> findDiscoveryDetail(Long id, CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now);
+
+	@Query("select m.host.id from Match m where m.id = :id")
+	Optional<Long> findHostIdById(@Param("id") Long id);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select m from Match m where m.id = :id")

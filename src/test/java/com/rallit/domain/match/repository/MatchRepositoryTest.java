@@ -4,6 +4,9 @@ import static com.rallit.support.EntityFixtures.MATCH_STARTS_AT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 
 import com.rallit.domain.court.entity.Court;
@@ -28,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,6 +123,26 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void recruitingMatchesExcludeMatchesPastFinalDeadlineOneHourBeforeStart() {
+		CourtSlot courtSlot = courtSlotRepository.save(EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
+		Match match = matchRepository.saveAndFlush(Match.builder()
+				.courtSlot(courtSlot)
+				.host(host)
+				.matchTypes(Set.of(MatchType.SINGLES))
+				.maleRecruitCount(1)
+				.femaleRecruitCount(0)
+				.participationFee(7000)
+				.recruitmentDeadline(MATCH_STARTS_AT)
+				.build());
+		jdbcTemplate.update("UPDATE court_slot SET status = 'APPROVED' WHERE id = ?", courtSlot.getId());
+		jdbcTemplate.update("UPDATE match SET status = 'RECRUITING' WHERE id = ?", match.getId());
+		entityManager.clear();
+
+		assertThat(recruitingMatchIds(MATCH_STARTS_AT.minusMinutes(61))).contains(match.getId());
+		assertThat(recruitingMatchIds(MATCH_STARTS_AT.minusMinutes(59))).doesNotContain(match.getId());
+	}
+
+	@Test
 	void rejectsTotalCapacityOverSixIncludingHost() {
 		CourtSlot courtSlot = courtSlotRepository.save(EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
 		Match match = Match.builder()
@@ -207,5 +231,10 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	private Match savedMatch() {
 		CourtSlot courtSlot = courtSlotRepository.save(EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
 		return matchRepository.save(EntityFixtures.match(courtSlot, host));
+	}
+
+	private List<Long> recruitingMatchIds(LocalDateTime now) {
+		return matchRepository.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, null,
+				null, null, true, EnumSet.allOf(MatchType.class), PageRequest.of(0, 100)).map(Match::getId).getContent();
 	}
 }

@@ -122,7 +122,7 @@ public class MatchApplicationService {
 	public HostMatchApplicationListResponse getHostApplications(Long userId, Long matchId) {
 		Match match = matchRepository.findDetailById(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		validateHost(match, userId);
+		validateHost(match.getHost().getId(), userId);
 		return HostMatchApplicationListResponse.of(match,
 				matchApplicationRepository.findAllWithApplicantByMatchIdAndStatusIn(matchId,
 						MatchApplicationStatus.ACTIVE), clock.getZone(), YearMonth.now(clock));
@@ -130,35 +130,38 @@ public class MatchApplicationService {
 
 	@Transactional
 	public MatchApplicationAcceptResponse accept(Long userId, Long matchId, Long applicationId) {
+		validateHost(findHostId(matchId), userId);
 		Match match = matchRepository.findByIdForUpdate(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		validateHost(match, userId);
+		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		LocalDateTime now = now();
 		validateRecruiting(match, now);
-		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		int recruitCount = application.getApplicantGender() == Gender.MALE
 				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
 		if (matchApplicationRepository.countByMatchIdAndApplicantGenderAndStatusIn(matchId,
 				application.getApplicantGender(), MatchApplicationStatus.SEAT_OCCUPYING) >= recruitCount) {
 			throw new GeneralException(MatchApplicationErrorStatus.SEAT_UNAVAILABLE);
 		}
-		application.accept(now, paymentDueAt(now, match.getCourtSlot().getStartsAt()));
+		application.accept(now, paymentDueAt(now, MatchApplicationEligibility.finalDeadline(match)));
 		return MatchApplicationAcceptResponse.from(application);
 	}
 
 	@Transactional
 	public MatchApplicationRejectResponse reject(Long userId, Long matchId, Long applicationId,
 			MatchApplicationRejectReason reason) {
-		Match match = matchRepository.findById(matchId)
-				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		validateHost(match, userId);
+		validateHost(findHostId(matchId), userId);
 		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		application.reject(reason);
 		return MatchApplicationRejectResponse.from(application);
 	}
 
-	private void validateHost(Match match, Long userId) {
-		if (!match.getHost().getId().equals(userId)) {
+	private Long findHostId(Long matchId) {
+		return matchRepository.findHostIdById(matchId)
+				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
+	}
+
+	private void validateHost(Long hostId, Long userId) {
+		if (!hostId.equals(userId)) {
 			throw new GeneralException(MatchApplicationErrorStatus.NOT_MATCH_HOST);
 		}
 	}
@@ -166,15 +169,13 @@ public class MatchApplicationService {
 	private MatchApplication findPendingApplicationForUpdate(Long matchId, Long applicationId) {
 		MatchApplication application = matchApplicationRepository.findByIdAndMatchIdForUpdate(applicationId, matchId)
 				.orElseThrow(() -> new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_FOUND));
-		if (application.getStatus() != MatchApplicationStatus.PENDING) {
-			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_PENDING);
-		}
+		application.validatePending();
 		return application;
 	}
 
-	private LocalDateTime paymentDueAt(LocalDateTime acceptedAt, LocalDateTime startsAt) {
+	private LocalDateTime paymentDueAt(LocalDateTime acceptedAt, LocalDateTime finalDeadline) {
 		LocalDateTime dueAt = acceptedAt.plus(PAYMENT_DUE_DURATION);
-		return dueAt.isBefore(startsAt) ? dueAt : startsAt;
+		return dueAt.isBefore(finalDeadline) ? dueAt : finalDeadline;
 	}
 
 	private void validateRecruiting(Match match, LocalDateTime now) {
