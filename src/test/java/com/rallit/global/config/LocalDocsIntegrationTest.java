@@ -6,6 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Map;
+
+import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -169,6 +172,32 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     docs.andExpect(jsonPath(search + ".responses['400'].content['application/json'].examples[*].value.code",
         containsInAnyOrder("COMMON400", "MATCH_INVALID_SEARCH_AREA", "MATCH_INVALID_TIME_RANGE",
             "MATCH_INVALID_SEARCH_NTRP", "MATCH_PAGE_OUT_OF_RANGE")));
+  }
+
+  @Test
+  void swaggerReusesMatchRequestErrorResponsesFromDomainStatuses() throws Exception {
+    String collection = "$.paths['/api/v1/match-requests'].post.responses";
+    String request = "$.paths['/api/v1/match-requests/{requestId}";
+    var docs = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+    docs.andExpect(jsonPath(collection + "['400'].content['application/json']"
+            + ".examples['날짜 범위']['$ref']").value("#/components/examples/matchRequestInvalidDate"))
+        .andExpect(jsonPath(collection + "['409'].content['application/json']"
+            + ".examples['요청 상한']['$ref']").value("#/components/examples/matchRequestLimitReached"))
+        .andExpect(jsonPath(request + "/results'].get.responses['404'].content['application/json']"
+            + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"))
+        .andExpect(jsonPath(request + "'].delete.responses['404'].content['application/json']"
+            + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"));
+    for (var example : Map.of(
+        "matchRequestInvalidDate", MatchErrorStatus.MATCH_REQUEST_INVALID_DATE,
+        "matchRequestLimitReached", MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED,
+        "matchRequestNotFound", MatchErrorStatus.MATCH_REQUEST_NOT_FOUND).entrySet()) {
+      var reason = example.getValue().getReason();
+      String value = "$.components.examples." + example.getKey() + ".value";
+      docs.andExpect(jsonPath(value + ".isSuccess").value(false))
+          .andExpect(jsonPath(value + ".code").value(reason.getCode()))
+          .andExpect(jsonPath(value + ".message").value(reason.getMessage()))
+          .andExpect(jsonPath(value + ".result").doesNotExist());
+    }
   }
 
   private JsonNode paginationSchema(JsonNode openApi, String path) {

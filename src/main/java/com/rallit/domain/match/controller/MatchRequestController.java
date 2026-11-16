@@ -43,13 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
 @MatchReadErrorResponses
 public class MatchRequestController {
 
-	private static final String INVALID_DATE =
-			"{\"isSuccess\":false,\"code\":\"MATCH_REQUEST_INVALID_DATE\",\"message\":\"매칭 요청 날짜는 오늘부터 14일 이내로 선택해 주세요.\"}";
-	private static final String NOT_FOUND =
-			"{\"isSuccess\":false,\"code\":\"MATCH_REQUEST_NOT_FOUND\",\"message\":\"매칭 요청을 찾을 수 없습니다.\"}";
-	private static final String LIMIT_REACHED =
-			"{\"isSuccess\":false,\"code\":\"MATCH_REQUEST_LIMIT_REACHED\",\"message\":\"활성 매칭 요청을 최대 3개까지 저장할 수 있습니다.\"}";
-
 	private final MatchRequestService requests;
 
 	@PostMapping
@@ -58,7 +51,7 @@ public class MatchRequestController {
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "검색 조건이 유효하지 않습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 					schema = @Schema(implementation = ApiResponse.class), examples = {
-					@ExampleObject(name = "날짜 범위", value = INVALID_DATE),
+					@ExampleObject(name = "날짜 범위", ref = MatchRequestErrorExamples.INVALID_DATE_REF),
 					@ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST),
 					@ExampleObject(name = "지원하지 않는 자치구", value = MatchDiscoveryExamples.INVALID_SEARCH_AREA),
 					@ExampleObject(name = "잘못된 시간 범위", value = MatchDiscoveryExamples.INVALID_TIME_RANGE),
@@ -66,7 +59,8 @@ public class MatchRequestController {
 			}))
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "활성 요청 상한에 도달했습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-					schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(value = LIMIT_REACHED)))
+					schema = @Schema(implementation = ApiResponse.class),
+					examples = @ExampleObject(name = "요청 상한", ref = MatchRequestErrorExamples.LIMIT_REACHED_REF)))
 	public ResponseEntity<ApiResponse<MatchRequestCreatedResponse>> create(
 			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
 			@Valid @RequestBody MatchSearchRequest conditions) {
@@ -94,7 +88,8 @@ public class MatchRequestController {
 			}))
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "활성 매칭 요청을 찾을 수 없습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-					schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(value = NOT_FOUND)))
+					schema = @Schema(implementation = ApiResponse.class),
+					examples = @ExampleObject(name = "요청 없음", ref = MatchRequestErrorExamples.NOT_FOUND_REF)))
 	public ResponseEntity<ApiResponse<MatchSearchResponse>> results(
 			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
 			@PathVariable @Positive Long requestId,
@@ -110,7 +105,8 @@ public class MatchRequestController {
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "삭제 완료")
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "활성 매칭 요청을 찾을 수 없습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
-					schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(value = NOT_FOUND)))
+					schema = @Schema(implementation = ApiResponse.class),
+					examples = @ExampleObject(name = "요청 없음", ref = MatchRequestErrorExamples.NOT_FOUND_REF)))
 	public ResponseEntity<Void> delete(@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
 			@PathVariable @Positive Long requestId) {
 		requests.delete(principal.userId(), requestId);
