@@ -148,7 +148,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath(home + ".security[0].bearerAuth").exists())
         .andExpect(jsonPath(search + ".parameters[*].name", containsInAnyOrder("dates", "areaCodes",
-            "startTimeFrom", "startTimeTo", "matchTypes", "ntrp", "sameGenderOnly", "exactPage", "similarPage", "size")))
+            "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly", "exactPage",
+            "similarPage", "size")))
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.exactMatches['$ref']").isString())
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.similarMatches['$ref']").isString());
     for (String operation : new String[]{home, search}) {
@@ -165,7 +166,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     }
     docs.andExpect(jsonPath(search + ".responses['400'].content['application/json'].examples[*].value.code",
         containsInAnyOrder("COMMON400", "MATCH_INVALID_SEARCH_AREA", "MATCH_INVALID_TIME_RANGE",
-            "MATCH_PAGE_OUT_OF_RANGE")));
+            "MATCH_INVALID_SEARCH_NTRP", "MATCH_PAGE_OUT_OF_RANGE")));
   }
 
   private JsonNode paginationSchema(JsonNode openApi, String path) {

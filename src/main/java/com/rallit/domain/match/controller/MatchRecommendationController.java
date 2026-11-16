@@ -73,12 +73,13 @@ public class MatchRecommendationController {
 			description = "정확 일치와 비슷한 매치 조회 성공. 각 목록의 첫 페이지에 결과가 없으면 빈 목록을 반환합니다.",
 			useReturnTypeSchema = true)
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
-			description = "요청 형식, 자치구, 시간 범위 또는 페이지가 유효하지 않습니다.",
+			description = "요청 형식, 자치구, 시간 범위, NTRP 범위 또는 페이지가 유효하지 않습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 					schema = @Schema(implementation = ApiResponse.class), examples = {
 							@ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST),
 							@ExampleObject(name = "지원하지 않는 자치구", value = MatchDiscoveryExamples.INVALID_SEARCH_AREA),
 							@ExampleObject(name = "잘못된 시간 범위", value = MatchDiscoveryExamples.INVALID_TIME_RANGE),
+							@ExampleObject(name = "잘못된 NTRP 범위", value = MatchDiscoveryExamples.INVALID_SEARCH_NTRP),
 							@ExampleObject(name = "페이지 범위 초과", value = MatchDiscoveryExamples.PAGE_OUT_OF_RANGE)
 					}))
 	public ResponseEntity<ApiResponse<MatchSearchResponse>> search(

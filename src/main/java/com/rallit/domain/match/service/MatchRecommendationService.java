@@ -1,13 +1,11 @@
 package com.rallit.domain.match.service;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +30,7 @@ import com.rallit.domain.match.repository.MatchApplicationRepository.MatchApplic
 import com.rallit.domain.match.repository.MatchRepository;
 import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.region.repository.AreaRepository;
+import com.rallit.domain.user.entity.Ntrp;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.repository.UserRepository;
@@ -114,8 +113,11 @@ public class MatchRecommendationService {
 
 	private List<Match> findSearchCandidates(User user, MatchSearchRequest request,
 			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows) {
-		var levels = request.ntrp() == null ? List.<BigDecimal>of() : request.ntrp().stream()
-				.map(value -> new BigDecimal(value.replace("+", ""))).sorted(Comparator.naturalOrder()).toList();
+		boolean filterNtrp = request.minNtrp() != null || request.maxNtrp() != null;
+		if (filterNtrp && (!Ntrp.isSupported(request.minNtrp()) || !Ntrp.isSupported(request.maxNtrp())
+				|| request.minNtrp().compareTo(request.maxNtrp()) > 0)) {
+			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_NTRP);
+		}
 		var types = matchTypes(request.matchTypes());
 		boolean allTypes = types.isEmpty();
 		var firstWindow = windows.firstEntry().getValue();
@@ -125,9 +127,7 @@ public class MatchRecommendationService {
 				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
 				firstWindow.expandedFrom().toLocalTime(), endMinute, allTypes,
 				allTypes ? EnumSet.allOf(MatchType.class) : types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
-				Boolean.TRUE.equals(request.sameGenderOnly()), !levels.isEmpty(),
-				levels.isEmpty() ? BigDecimal.ZERO : levels.getFirst(),
-				levels.isEmpty() ? BigDecimal.ZERO : levels.getLast());
+				Boolean.TRUE.equals(request.sameGenderOnly()), filterNtrp, request.minNtrp(), request.maxNtrp());
 	}
 
 	private static EnumSet<MatchType> matchTypes(Iterable<PreferredMatchType> preferences) {

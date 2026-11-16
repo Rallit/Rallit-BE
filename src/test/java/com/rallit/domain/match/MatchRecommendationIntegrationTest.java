@@ -146,7 +146,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		match(viewer, nearby, date, "14:00", "2.5", "4.0", MatchType.SINGLES, true);
 		String auth = bearer(viewer);
 
-		mvc.perform(search(auth, date).param("ntrp", "3.0", "4.0+").param("sameGenderOnly", "true"))
+		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "4.0").param("sameGenderOnly", "true"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
@@ -155,7 +155,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
 		jdbc.update("update match set status = 'CANCELED' where id = ?", timeOnly);
 		entityManager.clear();
-		mvc.perform(search(auth, date).param("ntrp", "3.0", "4.0+").param("sameGenderOnly", "true"))
+		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "4.0").param("sameGenderOnly", "true"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
@@ -242,7 +242,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		match(host, nearby, date, "15:00", null, "3.0", MatchType.SINGLES, false);
 		String auth = bearer(viewer());
 
-		mvc.perform(search(auth, date).param("ntrp", "3.0", "3.5"))
+		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "3.5"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(lowerBoundOnly))
@@ -254,6 +254,23 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.exactMatches.items[1].match.matchId").value(unspecifiedExact))
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(3))
 				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(unspecifiedSimilar));
+	}
+
+	@Test
+	void rejectsIncompleteReversedOrUnsupportedNtrpRanges() throws Exception {
+		var auth = bearer(viewer());
+		var date = saturday();
+
+		mvc.perform(search(auth, date).param("minNtrp", "3.0"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
+		mvc.perform(search(auth, date).param("maxNtrp", "4.0"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
+		mvc.perform(search(auth, date).param("minNtrp", "3.5").param("maxNtrp", "3.0"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
+		mvc.perform(search(auth, date).param("minNtrp", "3.1").param("maxNtrp", "4.0"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
+		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "4.5"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
 	}
 
 	@Test
@@ -354,7 +371,6 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	void validatesSearchFiltersAndRequiresOnboarding() throws Exception {
 		var date = saturday();
 		var auth = bearer(viewer());
-		mvc.perform(search(auth, date).param("ntrp", "4.5")).andExpect(status().isBadRequest());
 		mvc.perform(search(auth, date).param("areaCodes", "99999")).andExpect(status().isBadRequest());
 		mvc.perform(search(auth, date).param("areaCodes", JUNG, SEODAEMUN)).andExpect(status().isOk());
 		mvc.perform(search(auth, date).param("areaCodes", JUNG, SEODAEMUN, YONGSAN))

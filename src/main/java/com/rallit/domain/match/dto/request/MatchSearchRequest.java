@@ -1,5 +1,6 @@
 package com.rallit.domain.match.dto.request;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.rallit.domain.user.enums.PreferredMatchType;
@@ -27,9 +28,13 @@ public record MatchSearchRequest(
 		@Pattern(regexp = CLOCK_TIME + "|24:00") String startTimeTo,
 		@Schema(description = "선택한 경기 방식 중 하나 이상과 일치해야 합니다. DOUBLES는 남복·여복을 포함합니다.")
 		List<@NotNull PreferredMatchType> matchTypes,
-		@Schema(description = "선택값 모두가 설정된 모집 NTRP 경계를 충족해야 합니다. 양쪽 경계가 모두 미설정인 매치는 "
-				+ "제외합니다. 4.0+는 URL에서 4.0%2B로 전송합니다.")
-		List<@NotNull @Pattern(regexp = "(?:[1-3]\\.[05]|4\\.0\\+)") String> ntrp,
+		@Schema(description = "희망 NTRP 최솟값. maxNtrp와 함께 전달합니다. 선택 범위 전체가 매치의 설정된 모집 경계에 "
+				+ "들어와야 하며, 모집 경계가 모두 미설정인 매치는 제외합니다.", example = "2.5",
+				minimum = "1.0", maximum = "4.0", multipleOf = 0.5)
+		BigDecimal minNtrp,
+		@Schema(description = "희망 NTRP 최댓값. minNtrp와 함께 전달합니다. 4.0+는 숫자 4.0으로 전달합니다.",
+				example = "4.0", minimum = "1.0", maximum = "4.0", multipleOf = 0.5)
+		BigDecimal maxNtrp,
 		@Schema(description = "같은 성별의 호스트가 동성만으로 개설한 매치만 조회합니다.")
 		Boolean sameGenderOnly) {
 

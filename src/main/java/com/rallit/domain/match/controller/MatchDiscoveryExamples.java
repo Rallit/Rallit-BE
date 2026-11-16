@@ -92,6 +92,10 @@ final class MatchDiscoveryExamples {
 			"{\"isSuccess\":false,\"code\":\"MATCH_INVALID_TIME_RANGE\",\"message\":\"조회 시작 시간은 종료 시간보다 빨라야 합니다.\"}";
 	static final String INVALID_SEARCH_AREA =
 			"{\"isSuccess\":false,\"code\":\"MATCH_INVALID_SEARCH_AREA\",\"message\":\"지원하지 않는 자치구가 포함되어 있습니다.\"}";
+	static final String INVALID_SEARCH_NTRP = """
+			{"isSuccess":false,"code":"MATCH_INVALID_SEARCH_NTRP",
+			"message":"검색 NTRP는 1.0부터 4.0+까지 0.5 단위로 최솟값과 최댓값을 순서대로 입력해 주세요."}
+			""";
 	static final String PAGE_OUT_OF_RANGE =
 			"{\"isSuccess\":false,\"code\":\"MATCH_PAGE_OUT_OF_RANGE\",\"message\":\"요청한 페이지가 매치 목록의 범위를 벗어났습니다.\"}";
 	static final String UNAUTHORIZED =
