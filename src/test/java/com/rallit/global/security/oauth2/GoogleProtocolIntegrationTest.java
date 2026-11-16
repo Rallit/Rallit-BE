@@ -30,7 +30,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.*;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
+@SpringBootTest(
+    properties = {
+      "RALLIT_ENV_FILE=.env.test-disabled",
+      "SERVICE_ORIGINS=https://rallit.co.kr,https://dev.rallit.co.kr,http://localhost:5173"
+    })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
@@ -41,6 +45,7 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
   static final Map<String, Exchange> accessTokens = new ConcurrentHashMap<>();
   static final String CALLBACK = "https://rallit.co.kr/auth/callback";
   static final String DEV_CALLBACK = "https://dev.rallit.co.kr/auth/callback";
+  static final String LOCAL_CALLBACK = "http://localhost:5173/auth/callback";
 
   record Exchange(String subject, String email, boolean verified, String nonce, String invalid) {}
 
@@ -213,6 +218,14 @@ class GoogleProtocolIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.socialDisplayName").value("Google Name"));
+    var local = callback(start("service", LOCAL_CALLBACK), subject, email, true, "");
+    assertThat(local.getHeader("Location")).isEqualTo(LOCAL_CALLBACK);
+    assertThat(local.getHeaders("Set-Cookie"))
+        .anySatisfy(
+            c ->
+                assertThat(c)
+                    .startsWith("__Host-rallit_refresh=")
+                    .contains("Secure", "SameSite=None"));
     assertThat(callback(start("service"), subject, email, true, "").getHeader("Location"))
         .isEqualTo(CALLBACK);
     assertThat(

@@ -17,6 +17,15 @@ class GoogleAuthorizationIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
 
   @Test
+  void localhostOriginIsRejectedByDefault() throws Exception {
+    mvc.perform(
+            options("/api/v1/auth/refresh")
+                .header("Origin", "http://localhost:5173")
+                .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void googleStartsBackendOidcFlowWithEmailAndNonce() throws Exception {
     var result =
         mvc.perform(get("/api/v1/auth/google").param("target", "service"))

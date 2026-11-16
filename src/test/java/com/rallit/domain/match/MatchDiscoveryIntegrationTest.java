@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.UUID;
 
@@ -77,7 +80,9 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.recruitmentDeadline").value(date + "T09:00:00+09:00"))
 				.andExpect(jsonPath("$.result.canApply").value(true))
 				.andExpect(jsonPath("$.result.court.address").isString())
-				.andExpect(jsonPath("$.result.court.evidenceFileKey").doesNotExist());
+				.andExpect(jsonPath("$.result.court.evidenceFileKey").doesNotExist())
+				.andExpect(jsonPath("$.result.host.experienceYears")
+						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON, YearMonth.now(clock))));
 		var application = mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId)
 						.header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"refundPolicyAgreed\":true}"))
@@ -179,7 +184,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		jdbc.update("""
 				insert into match_application (match_id, applicant_user_id, applicant_gender, status,
 					refund_policy_agreed_at, created_at, updated_at)
-				values (?, ?, 'FEMALE', 'PAYMENT_PENDING', localtimestamp, localtimestamp, localtimestamp)
+				values (?, ?, 'FEMALE', 'PENDING', localtimestamp, localtimestamp, localtimestamp)
 				""", doublesId, activeUser().getId());
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
@@ -198,12 +203,14 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("MATCH_PAGE_OUT_OF_RANGE"));
 
-		jdbc.update("update match_application set status = 'CONFIRMED' where match_id = ?", doublesId);
-		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
-						.param("applicableOnly", "true"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.totalElements").value(0))
-				.andExpect(jsonPath("$.result.items", hasSize(0)));
+		for (String occupyingStatus : List.of("PAYMENT_PENDING", "CONFIRMED")) {
+			jdbc.update("update match_application set status = ? where match_id = ?", occupyingStatus, doublesId);
+			mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+							.param("applicableOnly", "true"))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.result.totalElements").value(0))
+					.andExpect(jsonPath("$.result.items", hasSize(0)));
+		}
 	}
 
 	@Test
@@ -285,12 +292,12 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		String bearer = bearer(viewer);
 		LocalDate date = LocalDate.now(clock).plusDays(7);
 		long matchId = createRecruitingMatches(date).singlesId();
-		User confirmed = activeUser();
+		User accepted = activeUser();
 		jdbc.update("""
 				insert into match_application (match_id, applicant_user_id, applicant_gender, status,
 					refund_policy_agreed_at, created_at, updated_at)
-				values (?, ?, 'FEMALE', 'CONFIRMED', localtimestamp, localtimestamp, localtimestamp)
-				""", matchId, confirmed.getId());
+				values (?, ?, 'FEMALE', 'PAYMENT_PENDING', localtimestamp, localtimestamp, localtimestamp)
+				""", matchId, accepted.getId());
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.currentParticipantCount").value(2))

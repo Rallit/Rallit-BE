@@ -15,6 +15,8 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.BaseErrorCode;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import java.time.Clock;
+import java.time.YearMonth;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,6 +29,7 @@ public class UserService {
   private final UserRepository users;
   private final AreaRepository areas;
   private final SocialAccountRepository accounts;
+  private final Clock clock;
 
   @Transactional(readOnly = true)
   public UserResponse getMe(Long userId) {
@@ -62,12 +65,15 @@ public class UserService {
       throw new GeneralException(UserErrorStatus.INVALID_ACTIVITY_AREA);
     }
     try {
-      return request.toProfile(Set.copyOf(selectedAreas));
+      OnboardingProfile profile = request.toProfile(Set.copyOf(selectedAreas));
+      profile.requireTennisStartedBy(YearMonth.now(clock));
+      return profile;
     } catch (OnboardingProfileValidationException failure) {
       BaseErrorCode error = switch (failure.reason()) {
         case INVALID_REQUIRED_VALUES -> ErrorStatus._BAD_REQUEST;
         case INVALID_ACTIVITY_AREA -> UserErrorStatus.INVALID_ACTIVITY_AREA;
         case INVALID_MATCH_PREFERENCES -> UserErrorStatus.INVALID_MATCH_PREFERENCES;
+        case INVALID_TENNIS_START -> UserErrorStatus.INVALID_TENNIS_START;
       };
       throw new GeneralException(error, failure);
     }
@@ -85,6 +91,6 @@ public class UserService {
   private UserResponse response(User user) {
     String displayName = accounts.findFirstByUserIdOrderByIdAsc(user.getId())
         .map(SocialAccount::getDisplayName).orElse(null);
-    return UserResponse.from(user, displayName);
+    return UserResponse.from(user, displayName, YearMonth.now(clock));
   }
 }

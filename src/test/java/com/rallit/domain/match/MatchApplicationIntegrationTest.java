@@ -42,7 +42,6 @@ import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
@@ -267,6 +266,18 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void acceptsApplicationsOnlyUntilOneHourBeforeMatchStart() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match beforeFinalDeadline = recruitingMatch(host, LocalDateTime.now(clock).plusMinutes(61));
+		Match afterFinalDeadline = recruitingMatch(host, LocalDateTime.now(clock).plusMinutes(59));
+
+		apply(activeUser(Gender.FEMALE), beforeFinalDeadline.getId(), AGREED).andExpect(status().isCreated());
+		apply(activeUser(Gender.FEMALE), afterFinalDeadline.getId(), AGREED)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("MATCH_RECRUITMENT_CLOSED"));
+	}
+
+	@Test
 	void rejectsHostApplyingToOwnMatch() throws Exception {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host);
@@ -278,16 +289,18 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void rejectsGenderWhoseSeatsAreAllConfirmedButNotOnlyPending() throws Exception {
-		Match match = recruitingMatch(activeUser(Gender.MALE));
-		long firstMaleId = id(apply(activeUser(Gender.MALE), match.getId(), AGREED));
-		apply(activeUser(Gender.MALE), match.getId(), AGREED).andExpect(status().isCreated());
-		jdbcTemplate.update("UPDATE match_application SET status = 'CONFIRMED' WHERE id = ?", firstMaleId);
+	void rejectsGenderWhoseSeatsAreAllOccupiedButNotOnlyPending() throws Exception {
+		for (String occupyingStatus : List.of("PAYMENT_PENDING", "CONFIRMED")) {
+			Match match = recruitingMatch(activeUser(Gender.MALE));
+			long firstMaleId = id(apply(activeUser(Gender.MALE), match.getId(), AGREED));
+			apply(activeUser(Gender.MALE), match.getId(), AGREED).andExpect(status().isCreated());
+			jdbcTemplate.update("UPDATE match_application SET status = ? WHERE id = ?", occupyingStatus, firstMaleId);
 
-		apply(activeUser(Gender.MALE), match.getId(), AGREED)
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("RECRUITMENT_FULL"));
-		apply(activeUser(Gender.FEMALE), match.getId(), AGREED).andExpect(status().isCreated());
+			apply(activeUser(Gender.MALE), match.getId(), AGREED)
+					.andExpect(status().isConflict())
+					.andExpect(jsonPath("$.code").value("RECRUITMENT_FULL"));
+			apply(activeUser(Gender.FEMALE), match.getId(), AGREED).andExpect(status().isCreated());
+		}
 	}
 
 	@Test
@@ -595,7 +608,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void blocksCancellationByOtherUserAndFromNonPendingStatus() throws Exception {
+	void blocksCancellationByOtherUserAndAfterPaymentOrClosing() throws Exception {
 		Match match = recruitingMatch(activeUser(Gender.MALE));
 		User applicant = activeUser(Gender.FEMALE);
 		User stranger = activeUser(Gender.FEMALE);
@@ -606,7 +619,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.code").value("APPLICATION_NOT_FOUND"));
 		assertThat(applicationStatus(applicationId)).isEqualTo("PENDING");
 
-		for (String status : List.of("PAYMENT_PENDING", "CONFIRMED", "REJECTED", "EXPIRED")) {
+		for (String status : List.of("CONFIRMED", "REJECTED", "EXPIRED")) {
 			jdbcTemplate.update("UPDATE match_application SET status = ? WHERE id = ?", status, applicationId);
 			cancel(applicant, applicationId, null)
 					.andExpect(status().isConflict())
@@ -666,7 +679,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.getSingleResult();
 		User user = User.signUp();
 		user.completeOnboarding(new OnboardingProfile(nickname(), gender, ageGroup,
-				ExperiencePeriod.ONE_TO_THREE_YEARS, ntrp, false, Set.of(PreferredMatchType.SINGLES), Set.of(area),
+				EntityFixtures.TENNIS_STARTED_ON, ntrp, false, Set.of(PreferredMatchType.SINGLES), Set.of(area),
 				Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		return user;
 	}

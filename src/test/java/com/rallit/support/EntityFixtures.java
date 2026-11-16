@@ -2,6 +2,7 @@ package com.rallit.support;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Set;
 
 import com.rallit.domain.court.entity.Court;
@@ -13,7 +14,6 @@ import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
@@ -23,6 +23,8 @@ public final class EntityFixtures {
 
 	public static final LocalDateTime MATCH_STARTS_AT = LocalDateTime.of(2026, 11, 14, 14, 0);
 
+	public static final YearMonth TENNIS_STARTED_ON = YearMonth.of(2023, 3);
+
 	private EntityFixtures() {
 	}
 
@@ -31,7 +33,7 @@ public final class EntityFixtures {
 				.getSingleResult();
 		User user = User.signUp();
 		user.completeOnboarding(new OnboardingProfile(nickname, gender, AgeGroup.TWENTIES,
-				ExperiencePeriod.ONE_TO_THREE_YEARS, new BigDecimal("3.0"), false,
+				TENNIS_STARTED_ON, new BigDecimal("3.0"), false,
 				Set.of(PreferredMatchType.SINGLES), Set.of(area), Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		return user;
 	}

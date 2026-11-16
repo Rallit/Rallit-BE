@@ -6,6 +6,7 @@ import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
+import com.rallit.domain.match.exception.MatchApplicationNotPendingException;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.global.entity.BaseEntity;
@@ -79,15 +80,34 @@ public class MatchApplication extends BaseEntity {
 		return new MatchApplication(match, applicant, refundPolicyAgreedAt);
 	}
 
+	public void accept(LocalDateTime acceptedAt, LocalDateTime paymentDueAt) {
+		validatePending();
+		this.status = MatchApplicationStatus.PAYMENT_PENDING;
+		this.acceptedAt = acceptedAt;
+		this.paymentDueAt = paymentDueAt;
+	}
+
+	public void reject(MatchApplicationRejectReason rejectReason) {
+		validatePending();
+		this.status = MatchApplicationStatus.REJECTED;
+		this.rejectReason = rejectReason;
+	}
+
 	public void cancel(MatchApplicationCancelReason cancelReason, LocalDateTime canceledAt) {
 		if (status == MatchApplicationStatus.CANCELED) {
 			return;
 		}
-		if (status != MatchApplicationStatus.PENDING) {
+		if (status != MatchApplicationStatus.PENDING && status != MatchApplicationStatus.PAYMENT_PENDING) {
 			throw new MatchApplicationNotCancelableException(status);
 		}
 		this.status = MatchApplicationStatus.CANCELED;
 		this.cancelReason = cancelReason;
 		this.canceledAt = canceledAt;
+	}
+
+	public void validatePending() {
+		if (status != MatchApplicationStatus.PENDING) {
+			throw new MatchApplicationNotPendingException();
+		}
 	}
 }

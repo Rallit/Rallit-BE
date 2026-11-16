@@ -190,7 +190,7 @@ public class SecurityConfig {
             o.authorizationEndpoint(
                     a ->
                         a.authorizationRequestResolver(
-                                new PurposeAuthorizationRequestResolver(clients))
+                                new PurposeAuthorizationRequestResolver(clients, p))
                             .authorizationRequestRepository(requests))
                 .redirectionEndpoint(r -> r.baseUri("/api/v1/auth/*/callback"))
                 .authorizedClientRepository(new NoStoreAuthorizedClientRepository())
@@ -246,7 +246,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}",
                     "/api/v1/matches/recommendations", "/api/v1/matches/search")
                 .authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/matches/*/applications",
+                    "/api/v1/host/matches/*/applications/*/accept",
+                    "/api/v1/host/matches/*/applications/*/reject")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/match-requests", "/api/v1/match-requests/{id}",
                     "/api/v1/match-requests/{id}/results")
@@ -257,6 +261,7 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(
                     HttpMethod.GET,
+                    "/api/v1/host/matches/*/applications",
                     "/api/v1/users/me/applications",
                     "/api/v1/users/me/applications/closed",
                     "/api/v1/applications/*")

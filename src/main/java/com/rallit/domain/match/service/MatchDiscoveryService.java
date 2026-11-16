@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.List;
@@ -81,7 +82,8 @@ public class MatchDiscoveryService {
 		var reason = eligibility.blockReason(match, applicant, now);
 		long count = occupiedSeats(List.of(matchId)).getOrDefault(matchId, 0L);
 		return MatchDetailResponse.from(match, count, clock.getZone(),
-				MatchApplicationEligibility.isWithinRecruitmentWindow(match, now), reason.orElse(null));
+				MatchApplicationEligibility.isWithinRecruitmentWindow(match, now), reason.orElse(null),
+				YearMonth.from(now));
 	}
 
 	private Map<Long, Long> occupiedSeats(List<Long> ids) {

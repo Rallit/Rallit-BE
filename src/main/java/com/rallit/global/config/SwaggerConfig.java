@@ -84,7 +84,9 @@ public class SwaggerConfig {
 						.schema(target))
 				.addParametersItem(new QueryParameter().name("callback")
 						.description("일반 서비스 로그인 후 돌아갈 전체 URL. 허용 목록과 정확히 일치할 때 사용하며, "
-								+ "그 외에는 기본 콜백으로 이동합니다.")
+								+ "그 외에는 기본 콜백으로 이동합니다. "
+								+ "http://localhost:5173/auth/callback은 서비스 허용 Origin에 "
+								+ "http://localhost:5173이 등록된 환경에서 사용할 수 있습니다.")
 						.schema(new StringSchema().example("https://dev.rallit.co.kr/auth/callback")))
 				.responses(new ApiResponses()
 						.addApiResponse("302", new ApiResponse().description("소셜 인증 화면으로 이동"))

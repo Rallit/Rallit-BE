@@ -1,5 +1,6 @@
 package com.rallit.domain.match.service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -19,6 +20,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class MatchApplicationEligibility {
 
+	private static final Duration FINAL_DEADLINE_BEFORE_START = Duration.ofHours(1);
+
 	private final MatchApplicationRepository applications;
 
 	Optional<BaseErrorCode> blockReason(Match match, User applicant, LocalDateTime now) {
@@ -36,8 +39,8 @@ class MatchApplicationEligibility {
 		if (recruitCount <= 0 || (match.isSameGenderOnly() && match.getHost().getGender() != applicant.getGender())) {
 			return Optional.of(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
 		}
-		if (applications.countByMatchIdAndApplicantGenderAndStatus(match.getId(),
-				applicant.getGender(), MatchApplicationStatus.CONFIRMED) >= recruitCount) {
+		if (applications.countByMatchIdAndApplicantGenderAndStatusIn(match.getId(),
+				applicant.getGender(), MatchApplicationStatus.SEAT_OCCUPYING) >= recruitCount) {
 			return Optional.of(MatchApplicationErrorStatus.RECRUITMENT_FULL);
 		}
 		if (applications.existsActiveApplication(match.getId(), applicant.getId())) {
@@ -46,7 +49,11 @@ class MatchApplicationEligibility {
 		return Optional.empty();
 	}
 
+	static LocalDateTime finalDeadline(Match match) {
+		return match.getCourtSlot().getStartsAt().minus(FINAL_DEADLINE_BEFORE_START);
+	}
+
 	static boolean isWithinRecruitmentWindow(Match match, LocalDateTime now) {
-		return now.isBefore(match.getRecruitmentDeadline()) && now.isBefore(match.getCourtSlot().getStartsAt());
+		return now.isBefore(match.getRecruitmentDeadline()) && now.isBefore(finalDeadline(match));
 	}
 }

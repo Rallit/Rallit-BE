@@ -32,7 +32,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.tags[*].name",
-            containsInAnyOrder("인증", "회원", "매치 조회", "매치 추천", "매치 참가 신청", "운영자")))
+            containsInAnyOrder("인증", "회원", "매치 조회", "매치 추천", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.parameters[*].name",
@@ -117,6 +117,27 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
             + ".examples['조회 불가'].value.code").value("MATCH_NOT_FOUND"))
         .andExpect(jsonPath(detail + ".responses['503'].content['application/json']"
             + ".examples['세션 저장소 장애'].value.code").value("COMMON503"));
+  }
+
+  @Test
+  void swaggerGroupsHostApplicationManagementUnderHostPaths() throws Exception {
+    String list = "$.paths['/api/v1/host/matches/{matchId}/applications'].get";
+    String accept = "$.paths['/api/v1/host/matches/{matchId}/applications/{applicationId}/accept'].post";
+    String reject = "$.paths['/api/v1/host/matches/{matchId}/applications/{applicationId}/reject'].post";
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(list + ".tags[0]").value("호스트 - 참가 신청자 관리"))
+        .andExpect(jsonPath(accept + ".tags[0]").value("호스트 - 참가 신청자 관리"))
+        .andExpect(jsonPath(reject + ".tags[0]").value("호스트 - 참가 신청자 관리"))
+        .andExpect(jsonPath(list + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(list + ".responses['200'].content['application/json']"
+            + ".examples['신청 관리 화면'].value.result.match.courtNumber").value("3"))
+        .andExpect(jsonPath(list + ".responses['403'].content['application/json']"
+            + ".examples['호스트 아님'].value.code").value("NOT_MATCH_HOST"))
+        .andExpect(jsonPath(accept + ".responses['409'].content['application/json']"
+            + ".examples['성별 잔여석 없음'].value.code").value("SEAT_UNAVAILABLE"))
+        .andExpect(jsonPath(reject + ".requestBody.required").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/matches/{matchId}/applications'].get").doesNotExist());
   }
 
   @Test
