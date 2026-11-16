@@ -190,7 +190,7 @@ public class SecurityConfig {
             o.authorizationEndpoint(
                     a ->
                         a.authorizationRequestResolver(
-                                new PurposeAuthorizationRequestResolver(clients))
+                                new PurposeAuthorizationRequestResolver(clients, p))
                             .authorizationRequestRepository(requests))
                 .redirectionEndpoint(r -> r.baseUri("/api/v1/auth/*/callback"))
                 .authorizedClientRepository(new NoStoreAuthorizedClientRepository())

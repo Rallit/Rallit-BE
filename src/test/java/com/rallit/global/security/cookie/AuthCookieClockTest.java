@@ -7,12 +7,15 @@ import com.rallit.domain.auth.model.*;
 import com.rallit.global.config.AuthProperties;
 import java.time.*;
 import java.util.*;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 class AuthCookieClockTest {
-  @Test
-  void cookieLifetimeUsesTheSameFixedClockAsTokens() {
+  @ParameterizedTest
+  @CsvSource({"true, false, Lax", "true, true, None", "false, true, Lax"})
+  void refreshCookieUsesSessionLifetimeAndConfiguredSameSite(
+      boolean secure, boolean allowLocalFrontend, String sameSite) {
     var now = Instant.parse("2026-01-01T00:00:00Z");
     var properties =
         new AuthProperties(
@@ -26,8 +29,8 @@ class AuthCookieClockTest {
             null,
             null,
             null,
-            true,
-            null,
+            secure,
+            allowLocalFrontend ? List.of("http://localhost:5173") : null,
             null);
     var cookies = new AuthCookieManager(properties, Clock.fixed(now, ZoneOffset.UTC));
     var response = new MockHttpServletResponse();
@@ -40,8 +43,16 @@ class AuthCookieClockTest {
             now.plusSeconds(1209600)),
         LoginTarget.SERVICE);
     assertThat(response.getHeaders("Set-Cookie"))
-        .anySatisfy(v -> assertThat(v).contains("__Host-rallit_access=", "Max-Age=0"));
+        .anySatisfy(
+            v ->
+                assertThat(v)
+                    .startsWith(properties.cookieName(LoginTarget.SERVICE, "access") + "=")
+                    .contains("Max-Age=0", "SameSite=Lax"));
     assertThat(response.getHeaders("Set-Cookie"))
-        .anySatisfy(v -> assertThat(v).contains("__Host-rallit_refresh=", "Max-Age=1209600"));
+        .anySatisfy(
+            v ->
+                assertThat(v)
+                    .startsWith(properties.cookieName(LoginTarget.SERVICE, "refresh") + "=")
+                    .contains("Max-Age=1209600", "SameSite=" + sameSite));
   }
 }
