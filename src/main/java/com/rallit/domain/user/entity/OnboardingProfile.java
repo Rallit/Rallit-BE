@@ -21,7 +21,7 @@ public record OnboardingProfile(
     Set<PreferredTimeSlot> preferredTimeSlots) {
 
   public static final String NICKNAME_PATTERN = "[가-힣a-zA-Z0-9]{2,12}";
-  public static final YearMonth EARLIEST_TENNIS_START = YearMonth.of(1950, 1);
+  public static final YearMonth EARLIEST_TENNIS_START = YearMonth.of(1900, 1);
 
   public OnboardingProfile {
     if (nickname == null || !nickname.matches(NICKNAME_PATTERN)

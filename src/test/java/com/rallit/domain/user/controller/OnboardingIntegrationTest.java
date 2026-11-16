@@ -104,7 +104,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("4.0+", "4.0")).andExpect(status().isBadRequest());
     submit(member, body.replace("2024-11", "2024-13")).andExpect(status().isBadRequest());
     submit(member, body.replace("2024-11", "2024-1")).andExpect(status().isBadRequest());
-    submit(member, body.replace("2024-11", "1949-12"))
+    submit(member, body.replace("2024-11", "1899-12"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("테니스 시작 시기를 확인해 주세요."));
     submit(member, body.replace("2024-11", YearMonth.now(clock).plusMonths(1).toString()))

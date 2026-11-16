@@ -30,7 +30,7 @@
 ```
 
 - 성별은 `MALE`, `FEMALE`을 사용한다. 연령대는 `TEENS`, `TWENTIES`, `THIRTIES`, `FORTIES`, `FIFTIES`, `SIXTIES_OR_OLDER`를 사용한다.
-- 테니스 시작 시기 `tennisStartedOn`은 `yyyy-MM` 연월 문자열로 보낸다. 1950-01부터 서울 기준 현재 연월까지 허용하며, 범위를 벗어나면 `400`과 "테니스 시작 시기를 확인해 주세요." 메시지를 반환한다.
+- 테니스 시작 시기 `tennisStartedOn`은 `yyyy-MM` 연월 문자열로 보낸다. 1900-01부터 서울 기준 현재 연월까지 허용하며, 범위를 벗어나면 `400`과 "테니스 시작 시기를 확인해 주세요." 메시지를 반환한다.
 - 응답의 `profile.tennisStartedOn`은 저장된 시작 연월이고, `profile.experienceYears`는 조회 시점의 서울 기준 연월로 계산한 만 구력(년)이다. 시작 2024-11, 현재 2026-10이면 `1`이며 1년 미만은 `0`이다. 시작 연월이 없는 기존 회원은 두 값 모두 `null`이다.
 - 경기 방식은 `SINGLES`, `RALLY`, `DOUBLES`, `MIXED_DOUBLES`를 사용한다. 시간대는 `WEEKDAY_MORNING`, `WEEKDAY_AFTERNOON`, `WEEKEND_MORNING`, `WEEKEND_AFTERNOON`을 사용한다.
 - 같은 내용으로 재제출하면 `200`을 반환한다. 다른 회원이 사용 중인 닉네임으로 제출하거나 완료한 온보딩을 변경하려 하면 `409`를 반환한다.
