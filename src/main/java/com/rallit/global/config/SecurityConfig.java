@@ -246,10 +246,15 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}",
                     "/api/v1/matches/recommendations", "/api/v1/matches/search")
                 .authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/matches/*/applications",
+                    "/api/v1/host/matches/*/applications/*/accept",
+                    "/api/v1/host/matches/*/applications/*/reject")
                 .authenticated()
                 .requestMatchers(
                     HttpMethod.GET,
+                    "/api/v1/host/matches/*/applications",
                     "/api/v1/users/me/applications",
                     "/api/v1/users/me/applications/closed",
                     "/api/v1/applications/*")

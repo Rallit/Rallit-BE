@@ -50,7 +50,7 @@ public class MatchDiscoveryController {
 	@GetMapping
 	@Operation(summary = "모집 중 매치 목록",
 			description = """
-					승인된 코트 슬롯의 매치 중 모집 마감과 경기 시작 전인 매치를 조회합니다.
+					승인된 코트 슬롯의 매치 중 모집 마감과 최종 마감(경기 시작 1시간 전)이 모두 지나지 않은 매치를 조회합니다.
 
 					- 경기 시작 시각이 빠른 순으로 정렬합니다. 시작 시각이 같으면 매치 ID가 작은 순으로 정렬합니다.
 					- 응답 시각에는 서울 시간대 오프셋 `+09:00`이 포함됩니다.
@@ -115,7 +115,7 @@ public class MatchDiscoveryController {
 
 					**신청 상태**
 
-					- 모집 마감과 경기 시작 전이면 `recruitmentOpen` 값이 `true`입니다. 경기 시작 전에는 모집이 마감돼도 상세를 조회할 수 있습니다.
+					- 모집 마감과 최종 마감(경기 시작 1시간 전)이 모두 지나지 않았으면 `recruitmentOpen` 값이 `true`입니다. 경기 시작 전에는 모집이 마감돼도 상세를 조회할 수 있습니다.
 					- 조회 시점에 현재 회원이 신청할 수 있으면 `canApply` 값이 `true`입니다. 신청할 수 없는 이유는 `applicationBlockReason` 필드에 표시됩니다.
 
 					참가 신청은 같은 매치 ID로 `POST /api/v1/matches/{matchId}/applications`를 호출합니다.
