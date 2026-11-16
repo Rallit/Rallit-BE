@@ -1,6 +1,7 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -111,6 +112,40 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches/{matchId}", similar).header("Authorization", auth))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.matchId").value(similar));
+	}
+
+	@Test
+	void exposesTheSameCourtThumbnailInMatchCardsDetailAndSavedRequestResults() throws Exception {
+		var date = saturday();
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		var nearby = court(SEODAEMUN, "37.5824", "126.92985");
+		long exact = match(host, original, date, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		long similar = match(host, nearby, date, "15:00", "2.5", "4.0", MatchType.SINGLES, false);
+		jdbc.update("update court set thumbnail_image_key = ? where id = ?", UUID.randomUUID() + ".png",
+				original.getId());
+		entityManager.clear();
+		String url = "/api/v1/courts/" + original.getId() + "/thumbnail";
+		String auth = bearer(viewer());
+
+		mvc.perform(get("/api/v1/matches").param("date", date.toString()).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items[0].courtThumbnailUrl").value(url))
+				.andExpect(jsonPath("$.result.items[1].courtThumbnailUrl").value(nullValue()));
+		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items[0].match.courtThumbnailUrl").value(url));
+		search(auth, date)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.courtThumbnailUrl").value(url))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.courtThumbnailUrl").value(nullValue()));
+		mvc.perform(get("/api/v1/matches/{matchId}", exact).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.court.thumbnailUrl").value(url))
+				.andExpect(jsonPath("$.result.court.thumbnailImageKey").doesNotExist());
+		mvc.perform(get("/api/v1/matches/{matchId}", similar).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.court.thumbnailUrl").value(nullValue()));
 	}
 
 	@Test

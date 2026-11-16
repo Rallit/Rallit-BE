@@ -11,7 +11,10 @@ import com.rallit.domain.match.enums.MatchType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes,
-		OffsetDateTime startsAt, OffsetDateTime endsAt, String courtName, Integer participationFee,
+		OffsetDateTime startsAt, OffsetDateTime endsAt, String courtName,
+		@Schema(description = "Bearer 인증이 필요한 코트 대표 사진 상대 경로. 사진이 없으면 null",
+				types = {"string", "null"}) String courtThumbnailUrl,
+		Integer participationFee,
 		@Schema(description = "모집 NTRP 하한. 미설정이면 null", types = {"number", "null"}) BigDecimal minNtrp,
 		@Schema(description = "모집 NTRP 상한. 미설정이면 null", types = {"number", "null"}) BigDecimal maxNtrp,
 		@Schema(description = "호스트와 결제 대기·참가 확정 인원을 합한 수") long currentParticipantCount,
@@ -19,9 +22,11 @@ public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<
 
 	public static MatchListItemResponse from(Match match, long occupiedSeats, ZoneId zone) {
 		var slot = match.getCourtSlot();
+		var court = slot.getCourt();
+		String thumbnailUrl = court.getThumbnailImageKey() == null ? null : "/api/v1/courts/" + court.getId() + "/thumbnail";
 		return new MatchListItemResponse(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
 				slot.getStartsAt().atZone(zone).toOffsetDateTime(), slot.getEndsAt().atZone(zone).toOffsetDateTime(),
-				slot.getCourt().getName(), match.getParticipationFee(), match.getMinNtrp(), match.getMaxNtrp(),
+				court.getName(), thumbnailUrl, match.getParticipationFee(), match.getMinNtrp(), match.getMaxNtrp(),
 				1 + occupiedSeats, 1 + match.getMaleRecruitCount() + match.getFemaleRecruitCount());
 	}
 }

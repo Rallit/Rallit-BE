@@ -17,6 +17,7 @@ final class MatchDiscoveryExamples {
 			      "startsAt": "2026-11-15T14:00:00+09:00",
 			      "endsAt": "2026-11-15T16:00:00+09:00",
 			      "courtName": "랠릿 데모 마포 코트",
+			      "courtThumbnailUrl": "/api/v1/courts/1/thumbnail",
 			      "participationFee": 8000,
 			      "minNtrp": 2.5,
 			      "maxNtrp": 3.5,
@@ -72,7 +73,8 @@ final class MatchDiscoveryExamples {
 			      "longitude": 126.910000,
 			      "hasParking": true,
 			      "hasShower": false,
-			      "facilityNotes": "랠릿 로컬 매치 조회 데모"
+			      "facilityNotes": "랠릿 로컬 매치 조회 데모",
+			      "thumbnailUrl": "/api/v1/courts/1/thumbnail"
 			    },
 			    "host": {
 			      "userId": 7,

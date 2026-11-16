@@ -41,14 +41,16 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 				match.getPreferredAgeGroups().stream().sorted().toList(),
 				new CourtInfo(court.getId(), court.getName(), court.getAddress(), slot.getCourtNumber(),
 						court.getLatitude(), court.getLongitude(), court.isHasParking(), court.isHasShower(),
-						court.getFacilityNotes()),
+						court.getFacilityNotes(), card.courtThumbnailUrl()),
 				new HostInfo(host.getId(), host.getNickname(), host.experienceYears(currentMonth),
 						host.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(host.getId())));
 	}
 
 	public record CourtInfo(Long courtId, String name, String address, String courtNumber, BigDecimal latitude,
 			BigDecimal longitude, boolean hasParking, boolean hasShower,
-			@Schema(types = {"string", "null"}) String facilityNotes) {
+			@Schema(types = {"string", "null"}) String facilityNotes,
+			@Schema(description = "Bearer 인증이 필요한 코트 대표 사진 상대 경로. 사진이 없으면 null",
+					types = {"string", "null"}) String thumbnailUrl) {
 	}
 
 	public record HostInfo(Long userId, String nickname,
