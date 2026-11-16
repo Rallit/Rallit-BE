@@ -125,6 +125,39 @@ Redis는 `local-db` 프로필과 독립적으로 항상 실행됩니다. RDS로 
 
 비밀번호는 컨테이너 시작 시 해시 ACL 설정으로 변환되고 Redis는 전용 사용자로 실행됩니다. 인증 없는 명령은 거절하며 헬스체크도 인증 후 수행합니다. 데이터는 `redis-data` 볼륨에 AOF로 기록하므로 Redis 컨테이너를 재생성해도 유지됩니다. `noeviction`을 사용하므로 메모리가 가득 차면 임의 세션 삭제 대신 쓰기가 실패합니다. 재시작·장애·파일 동기화 시점에 따른 데이터 손실 가능성까지 없애는 고가용성 구성은 아닙니다.
 
+### 이미지 저장소
+
+기본값인 `IMAGE_STORAGE_BACKEND=filesystem`은 프로필 이미지를 `profile-images` 볼륨에서 읽고 씁니다. 코트 대표 사진은 별도 `court-thumbnails` 볼륨에서 읽습니다. JVM을 직접 실행하는 로컬 환경의 기본 경로는 각각 `build/profile-images`와 `build/court-thumbnails`입니다.
+
+#### 로컬 코트 대표 사진 연결
+
+Flyway 마이그레이션이 적용된 로컬 테스트 DB에서 코트 ID 하나를 선택하고 JPEG 샘플을 준비합니다. 아래의 `LOCAL_DB_URL`은 `psql`용 로컬 연결 주소이며, `court_id`와 `sample_image`는 테스트 데이터에 맞게 지정합니다.
+
+```bash
+court_id=1
+sample_image=/path/to/sample.jpg
+image_key="$(uuidgen | tr '[:upper:]' '[:lower:]').jpg"
+mkdir -p build/court-thumbnails
+cp "$sample_image" "build/court-thumbnails/$image_key"
+psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -v court_id="$court_id" -v image_key="$image_key" <<'SQL'
+UPDATE court
+SET thumbnail_image_key = :'image_key', updated_at = CURRENT_TIMESTAMP
+WHERE id = :'court_id'::bigint
+RETURNING id, thumbnail_image_key;
+SQL
+```
+
+온보딩 완료 회원으로 Swagger를 인증한 뒤 `GET /api/v1/courts/{courtId}/thumbnail`을 실행합니다. 연결한 코트의 이미지를 얻을 수 있습니다. 매치 목록·홈 추천·저장한 요청 결과의 카드에는 `courtThumbnailUrl`, 매치 상세에는 `court.thumbnailUrl`이 나타납니다. 프론트에서는 해당 상대 경로에 Bearer 토큰을 붙여 이미지를 요청하고, URL이 `null`이거나 이미지가 없으면 공통 이미지를 표시합니다.
+
+#### 기존 사진을 유지하며 S3로 전환
+
+1. 비공개 버킷에 암호화와 공개 액세스 차단을 적용합니다. EC2 앱에는 IAM 역할로 HTTPS를 통한 이미지 읽기·쓰기에 필요한 권한을 부여합니다. 프로필은 `profile-images/`, 코트 사진은 `court-thumbnails/` 아래에서 관리합니다. 앱의 코트 사진 작업은 조회이므로 코트 등록은 별도 운영 권한으로 수행합니다. [S3 보안 가이드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html)
+2. DB의 `users.profile_image_key`가 가리키는 기존 볼륨 파일을 `profile-images/{기존 키}`에 복사합니다. 코트 사진도 `court.thumbnail_image_key`에 기록한 이름으로 `court-thumbnails/`에 준비합니다. 기존 키와 복사한 객체를 대조하고, 전환 직전 이미지 변경을 잠시 멈춰 마지막 변경분을 동기화합니다.
+3. 서버 `.env`에 `IMAGE_STORAGE_BACKEND=s3`, `IMAGE_S3_BUCKET`, `IMAGE_S3_REGION`을 설정하고 배포합니다. 시험 회원의 기존 사진 조회와 새 사진 등록·교체·삭제, 코트 사진 조회를 확인한 뒤 이미지 변경을 재개합니다.
+4. 같은 IAM 역할에서 누락 객체와 접근 거절을 각각 검증합니다. 앱은 `NoSuchKey`를 `404`, 권한·통신 실패를 `503`으로 매핑합니다. S3는 `s3:ListBucket` 권한이 없으면 누락 객체에도 `403`을 반환할 수 있으므로 역할 설정과 실제 응답을 함께 확인합니다. [S3 GetObject 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
+
+전환 확인이 끝날 때까지 기존 볼륨을 보존합니다. 새 사진 쓰기를 재개한 뒤 파일시스템으로 복구한다면, 현재 DB 키에 해당하는 S3 객체를 볼륨에 동기화한 후 `IMAGE_STORAGE_BACKEND=filesystem`으로 돌립니다.
+
 ### Nginx와 HTTPS
 
 `sudo nginx -T`에 `api.rallit.co.kr` 블록이 이미 있으면 덮어쓰지 말고 `location`만 `deploy/nginx/api.rallit.co.kr.conf`에 맞춥니다. 없으면 이 파일을 추가합니다. 위치는 Ubuntu의 경우 `sites-available`에 넣고 `sites-enabled`에 링크하고, Amazon Linux의 경우 `/etc/nginx/conf.d/`입니다.
