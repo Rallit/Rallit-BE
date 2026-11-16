@@ -29,7 +29,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.tags[*].name",
-            containsInAnyOrder("인증", "회원", "매치 조회", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
+            containsInAnyOrder("인증", "회원", "매치 조회", "매치 추천", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.parameters[*].name",
@@ -159,6 +159,37 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
       assertThat(applications.at("/items/items/$ref").asText())
           .isEqualTo("#/components/schemas/MyMatchApplicationListItemResponse");
     }
+  }
+
+  @Test
+  void swaggerDocumentsRecommendationRoutesAndSeparateSearchSections() throws Exception {
+    String home = "$.paths['/api/v1/matches/recommendations'].get";
+    String search = "$.paths['/api/v1/matches/search'].get";
+    var docs = mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(home + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(search + ".parameters[*].name", containsInAnyOrder("dates", "areaCodes",
+            "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly", "exactPage",
+            "similarPage", "size")))
+        .andExpect(jsonPath(search + ".parameters[?(@.required == true)].name", containsInAnyOrder("dates", "areaCodes",
+            "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly")))
+        .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.exactMatches['$ref']").isString())
+        .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.similarMatches['$ref']").isString());
+    for (String operation : new String[]{home, search}) {
+      String responses = operation + ".responses";
+      docs.andExpect(jsonPath(responses + "['200'].content['application/json'].schema['$ref']").isString())
+          .andExpect(jsonPath(responses + "['400'].content['application/json']"
+              + ".examples['페이지 범위 초과'].value.code").value("MATCH_PAGE_OUT_OF_RANGE"))
+          .andExpect(jsonPath(responses + "['401'].content['application/json']"
+              + ".examples['인증 필요'].value.code").value("AUTH401"))
+          .andExpect(jsonPath(responses + "['403'].content['application/json']"
+              + ".examples['온보딩 미완료'].value.code").value("MATCH_ONBOARDING_REQUIRED"))
+          .andExpect(jsonPath(responses + "['503'].content['application/json']"
+              + ".examples['세션 저장소 장애'].value.code").value("COMMON503"));
+    }
+    docs.andExpect(jsonPath(search + ".responses['400'].content['application/json'].examples[*].value.code",
+        containsInAnyOrder("COMMON400", "MATCH_INVALID_SEARCH_AREA", "MATCH_INVALID_TIME_RANGE",
+            "MATCH_INVALID_SEARCH_NTRP", "MATCH_PAGE_OUT_OF_RANGE")));
   }
 
   private JsonNode paginationSchema(JsonNode openApi, String path) {

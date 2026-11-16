@@ -24,7 +24,7 @@ public record OnboardingProfile(
   public OnboardingProfile {
     if (nickname == null || !nickname.matches(NICKNAME_PATTERN)
         || gender == null || ageGroup == null || experiencePeriod == null
-        || ntrp == null || isInvalidNtrp(ntrp)
+        || !Ntrp.isSupported(ntrp)
         || invalidSelection(preferredMatchTypes) || invalidSelection(preferredTimeSlots)) {
       throw new OnboardingProfileValidationException(Reason.INVALID_REQUIRED_VALUES);
     }
@@ -41,11 +41,5 @@ public record OnboardingProfile(
 
   private static boolean invalidSelection(Set<?> values) {
     return values == null || values.isEmpty() || values.stream().anyMatch(Objects::isNull);
-  }
-
-  private static boolean isInvalidNtrp(BigDecimal ntrp) {
-    return ntrp.compareTo(BigDecimal.ONE) < 0
-        || ntrp.compareTo(BigDecimal.valueOf(4)) > 0
-        || ntrp.remainder(new BigDecimal("0.5")).signum() != 0;
   }
 }

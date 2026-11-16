@@ -1,6 +1,7 @@
 package com.rallit.domain.region.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,4 +24,10 @@ public class Area {
 
   @Column(nullable = false, length = 40)
   private String name;
+
+  @Column(precision = 9, scale = 6)
+  private BigDecimal centerLatitude;
+
+  @Column(precision = 9, scale = 6)
+  private BigDecimal centerLongitude;
 }
