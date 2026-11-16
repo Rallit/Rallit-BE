@@ -52,6 +52,7 @@ public class MatchRequestController {
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 					schema = @Schema(implementation = ApiResponse.class), examples = {
 					@ExampleObject(name = "날짜 범위", ref = MatchRequestErrorExamples.INVALID_DATE_REF),
+					@ExampleObject(name = "동성만과 혼합복식", ref = MatchRequestErrorExamples.INVALID_PREFERENCES_REF),
 					@ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST),
 					@ExampleObject(name = "지원하지 않는 자치구", value = MatchDiscoveryExamples.INVALID_SEARCH_AREA),
 					@ExampleObject(name = "잘못된 시간 범위", value = MatchDiscoveryExamples.INVALID_TIME_RANGE),

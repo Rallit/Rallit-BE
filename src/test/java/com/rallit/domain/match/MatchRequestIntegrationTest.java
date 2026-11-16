@@ -92,6 +92,21 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void rejectsSavingMixedDoublesTogetherWithSameGenderOnly() throws Exception {
+		var date = LocalDate.now(clock).plusDays(1);
+		String auth = bearer(member());
+
+		mvc.perform(post(PATH).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content("""
+				{"dates":["%s"],"areaCodes":["11440"],"startTimeFrom":"14:00","startTimeTo":"17:00",
+				 "matchTypes":["SINGLES","MIXED_DOUBLES"],"minNtrp":1.0,"maxNtrp":4.0,"sameGenderOnly":true}
+				""".formatted(date)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("MATCH_REQUEST_INVALID_PREFERENCES"));
+		mvc.perform(get(PATH).header("Authorization", auth))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(0));
+	}
+
+	@Test
 	void hidesAnotherMembersRequestAndRemovesDeletedRequestsFromHome() throws Exception {
 		var date = LocalDate.now(clock).plusDays(2);
 		String owner = bearer(member());

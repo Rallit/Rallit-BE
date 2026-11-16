@@ -181,6 +181,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     var docs = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     docs.andExpect(jsonPath(collection + "['400'].content['application/json']"
             + ".examples['날짜 범위']['$ref']").value("#/components/examples/matchRequestInvalidDate"))
+        .andExpect(jsonPath(collection + "['400'].content['application/json']"
+            + ".examples['동성만과 혼합복식']['$ref']").value("#/components/examples/matchRequestInvalidPreferences"))
         .andExpect(jsonPath(collection + "['409'].content['application/json']"
             + ".examples['요청 상한']['$ref']").value("#/components/examples/matchRequestLimitReached"))
         .andExpect(jsonPath(request + "/results'].get.responses['404'].content['application/json']"
@@ -189,6 +191,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
             + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"));
     for (var example : Map.of(
         "matchRequestInvalidDate", MatchErrorStatus.MATCH_REQUEST_INVALID_DATE,
+        "matchRequestInvalidPreferences", MatchErrorStatus.MATCH_REQUEST_INVALID_PREFERENCES,
         "matchRequestLimitReached", MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED,
         "matchRequestNotFound", MatchErrorStatus.MATCH_REQUEST_NOT_FOUND).entrySet()) {
       var reason = example.getValue().getReason();

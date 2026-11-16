@@ -16,6 +16,7 @@ import com.rallit.domain.match.entity.MatchRequestConditions;
 import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.repository.MatchRequestRepository;
 import com.rallit.domain.user.entity.User;
+import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
@@ -44,6 +45,9 @@ public class MatchRequestService {
 		var dates = request.dates().stream().map(MatchDate::parse).distinct().sorted().toList();
 		if (dates.getFirst().isBefore(today) || !dates.getLast().isBefore(today.plusDays(SELECTABLE_DAYS))) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE);
+		}
+		if (request.sameGenderOnly() && request.matchTypes().contains(PreferredMatchType.MIXED_DOUBLES)) {
+			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_PREFERENCES);
 		}
 		if (requests.countByOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(userId, now) >= MAX_ACTIVE_REQUESTS) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED);
