@@ -403,6 +403,24 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void acceptIsBlockedAfterFinalDeadlineOneHourBeforeMatchStart() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 2);
+		long applicationId = apply(activeUser(Gender.FEMALE), match);
+		LocalDateTime startsAt = LocalDateTime.now(clock).plusMinutes(59);
+		jdbcTemplate.update("""
+				UPDATE court_slot SET starts_at = ?, ends_at = ?
+				WHERE id = (SELECT court_slot_id FROM match WHERE id = ?)
+				""", startsAt, startsAt.plusHours(2), match.getId());
+
+		accept(host, match, applicationId)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("MATCH_RECRUITMENT_CLOSED"));
+
+		assertThat(applicationStatus(applicationId)).isEqualTo("PENDING");
+	}
+
+	@Test
 	void secondAcceptWaitsForMatchLockAndFailsWhenLastSeatIsTaken() throws Exception {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host, 1, 1);

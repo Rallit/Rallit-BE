@@ -19,7 +19,7 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 		@Schema(description = "모집 NTRP 하한. 미설정이면 null", types = {"number", "null"}) BigDecimal minNtrp,
 		@Schema(description = "모집 NTRP 상한. 미설정이면 null", types = {"number", "null"}) BigDecimal maxNtrp,
 		long currentParticipantCount, int capacity, OffsetDateTime recruitmentDeadline,
-		@Schema(description = "모집 마감과 경기 시작이 모두 지나지 않았는지 여부") boolean recruitmentOpen,
+		@Schema(description = "모집 마감과 최종 마감(경기 시작 1시간 전)이 모두 지나지 않았는지 여부") boolean recruitmentOpen,
 		@Schema(description = "조회 시점에 현재 로그인 회원이 신청 가능한지 여부") boolean canApply,
 		@Schema(description = "신청 가능하면 null. 신청 불가 사유는 MATCH_RECRUITMENT_CLOSED, HOST_NOT_ALLOWED, "
 				+ "GENDER_NOT_RECRUITED, RECRUITMENT_FULL, APPLICATION_DUPLICATED 중 하나입니다.",

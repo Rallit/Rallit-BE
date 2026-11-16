@@ -78,6 +78,7 @@ public class HostMatchApplicationController {
 	@Operation(summary = "새 신청 수락",
 			description = """
 					새 신청을 수락합니다. 수락된 신청자는 참가자 목록에 입금 대기 중으로 표시됩니다.
+					모집 마감이나 최종 마감(경기 시작 1시간 전)이 지나면 수락할 수 없습니다.
 
 					성공하면 조회 API를 다시 호출해 화면을 갱신하세요.
 					""")

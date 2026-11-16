@@ -267,6 +267,18 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void acceptsApplicationsOnlyUntilOneHourBeforeMatchStart() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match beforeFinalDeadline = recruitingMatch(host, LocalDateTime.now(clock).plusMinutes(61));
+		Match afterFinalDeadline = recruitingMatch(host, LocalDateTime.now(clock).plusMinutes(59));
+
+		apply(activeUser(Gender.FEMALE), beforeFinalDeadline.getId(), AGREED).andExpect(status().isCreated());
+		apply(activeUser(Gender.FEMALE), afterFinalDeadline.getId(), AGREED)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("MATCH_RECRUITMENT_CLOSED"));
+	}
+
+	@Test
 	void rejectsHostApplyingToOwnMatch() throws Exception {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host);

@@ -42,7 +42,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "매치 참가 신청",
-			description = "모집 중인 매치에 참가를 신청합니다. 신청은 호스트 수락 전 PENDING 상태이며 좌석을 점유하지 않습니다.",
+			description = "모집 중인 매치에 참가를 신청합니다. 신청은 호스트 수락 전 PENDING 상태이며 좌석을 점유하지 않습니다. "
+					+ "모집 마감이나 최종 마감(경기 시작 1시간 전)이 지나면 신청할 수 없습니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@PostMapping("/api/v1/matches/{matchId}/applications")
 	public ResponseEntity<ApiResponse<MatchApplicationCreateResponse>> apply(

@@ -1,5 +1,6 @@
 package com.rallit.domain.match.service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 class MatchApplicationEligibility {
+
+	private static final Duration FINAL_DEADLINE_BEFORE_START = Duration.ofHours(1);
 
 	private final MatchApplicationRepository applications;
 
@@ -46,7 +49,11 @@ class MatchApplicationEligibility {
 		return Optional.empty();
 	}
 
+	static LocalDateTime finalDeadline(Match match) {
+		return match.getCourtSlot().getStartsAt().minus(FINAL_DEADLINE_BEFORE_START);
+	}
+
 	static boolean isWithinRecruitmentWindow(Match match, LocalDateTime now) {
-		return now.isBefore(match.getRecruitmentDeadline()) && now.isBefore(match.getCourtSlot().getStartsAt());
+		return now.isBefore(match.getRecruitmentDeadline()) && now.isBefore(finalDeadline(match));
 	}
 }
