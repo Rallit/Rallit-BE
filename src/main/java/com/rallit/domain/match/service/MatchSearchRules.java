@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.rallit.domain.court.entity.Court;
@@ -26,7 +27,8 @@ final class MatchSearchRules {
 	private MatchSearchRules() {
 	}
 
-	static SearchResults group(List<Match> candidates, Set<String> areaCodes, List<Area> origins, TimeWindow window) {
+	static SearchResults group(List<Match> candidates, Set<String> areaCodes, List<Area> origins,
+			Map<LocalDate, TimeWindow> windows) {
 		var exact = new ArrayList<Match>();
 		var areaOnly = new ArrayList<Candidate>();
 		var timeOnly = new ArrayList<Candidate>();
@@ -36,7 +38,7 @@ final class MatchSearchRules {
 		for (Match match : candidates) {
 			var slot = match.getCourtSlot();
 			var court = slot.getCourt();
-			var timeExpansion = window.requiredTimeExpansion(slot);
+			var timeExpansion = windows.get(slot.getStartsAt().toLocalDate()).requiredTimeExpansion(slot);
 			boolean exactTime = timeExpansion.isZero();
 			if (areaCodes.contains(court.getArea().getCode())) {
 				if (exactTime) {

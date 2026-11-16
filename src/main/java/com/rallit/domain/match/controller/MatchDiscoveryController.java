@@ -1,10 +1,9 @@
 package com.rallit.domain.match.controller;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
+import com.rallit.domain.match.dto.request.MatchDate;
 import com.rallit.domain.match.dto.response.MatchDetailResponse;
 import com.rallit.domain.match.dto.response.MatchListItemResponse;
 import com.rallit.domain.match.enums.MatchType;
@@ -12,7 +11,6 @@ import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.domain.match.service.MatchDiscoveryService;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.apiPayload.PageResponse;
-import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -84,7 +82,7 @@ public class MatchDiscoveryController {
 			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
 			@Parameter(description = "경기 시작일(서울 기준). 연도 0001~9999. 생략하면 현재 모집 중인 향후 경기를 조회합니다.",
 					schema = @Schema(type = "string", format = "date", example = "2026-11-15"))
-			@RequestParam(required = false) @Pattern(regexp = "[0-9]{4}-[0-9]{2}-[0-9]{2}") String date,
+			@RequestParam(required = false) @Pattern(regexp = MatchDate.PATTERN) String date,
 			@Parameter(description = "가장 이른 경기 시작 시각(HH:mm, 경계 포함). 입력 시 date가 필요합니다.",
 					schema = @Schema(type = "string", example = "14:00"))
 			@RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTimeFrom,
@@ -104,8 +102,8 @@ public class MatchDiscoveryController {
 			@RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
 		requireOnboarding(principal);
 		return ResponseEntity.ok(ApiResponse.onSuccess(
-				discovery.list(principal.userId(), parseDate(date), startTimeFrom, startTimeTo, matchTypes, applicableOnly,
-						page, size)));
+				discovery.list(principal.userId(), date == null ? null : MatchDate.parse(date), startTimeFrom,
+						startTimeTo, matchTypes, applicableOnly, page, size)));
 	}
 
 	@GetMapping("/{matchId}")
@@ -150,20 +148,5 @@ public class MatchDiscoveryController {
 		if (!principal.onboardingCompleted()) {
 			throw new GeneralException(MatchErrorStatus.MATCH_ONBOARDING_REQUIRED);
 		}
-	}
-
-	private LocalDate parseDate(String value) {
-		if (value == null) {
-			return null;
-		}
-		try {
-			LocalDate date = LocalDate.parse(value);
-			if (date.getYear() > 0) {
-				return date;
-			}
-		} catch (DateTimeParseException e) {
-			throw new GeneralException(ErrorStatus._BAD_REQUEST, e);
-		}
-		throw new GeneralException(ErrorStatus._BAD_REQUEST);
 	}
 }

@@ -1,7 +1,9 @@
 package com.rallit.domain.match.repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -114,7 +116,10 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch s.court c
 			join fetch c.area
 			""" + RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER + SAME_GENDER_PREFERENCE_FILTER + """
-			and s.startsAt >= :from and s.startsAt < :before and s.endsAt <= :endsBy
+			and s.startsAt >= :from and s.startsAt < :before
+			and cast(s.startsAt as LocalDate) in :dates
+			and cast(s.startsAt as LocalTime) >= :startTime
+			and s.endsAt <= timestampadd(minute, :endMinute, cast(cast(s.startsAt as LocalDate) as LocalDateTime))
 			and (:filterNtrp = false or (
 			""" + HAS_NTRP_BOUND + """
 				and (m.minNtrp is null or m.minNtrp <= :minimumNtrp)
@@ -123,8 +128,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			order by s.startsAt, m.id
 			""")
 	List<Match> findSearchCandidates(CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now,
-			LocalDateTime from, LocalDateTime before, LocalDateTime endsBy, boolean allTypes,
-			Collection<MatchType> types, Long applicantId, Gender gender, Collection<MatchApplicationStatus> activeStatuses,
+			LocalDateTime from, LocalDateTime before, Collection<LocalDate> dates, LocalTime startTime, long endMinute,
+			boolean allTypes, Collection<MatchType> types, Long applicantId, Gender gender,
+			Collection<MatchApplicationStatus> activeStatuses,
 			boolean sameGenderOnly, boolean filterNtrp, BigDecimal minimumNtrp, BigDecimal maximumNtrp);
 
 	@Query("""

@@ -67,7 +67,8 @@ public class MatchRecommendationController {
 	@Operation(summary = "조건에 맞는 매치와 비슷한 매치 검색",
 			description = "정확히 일치하는 결과와 비슷한 매치를 각각 반환합니다. 비슷한 매치는 지역만, 시간만, "
 					+ "지역과 시간 모두를 완화하는 순으로 찾아 최초로 결과가 나온 단계만 반환합니다. 지역은 "
-					+ "선택한 자치구 대표점에서 직선거리 5km 이하, 시간은 선택한 날짜 내 앞뒤 1시간을 적용합니다.")
+					+ "선택한 자치구 대표점에서 직선거리 5km 이하, 시간은 각 선택일 안에서 앞뒤 1시간을 적용합니다. "
+					+ "여러 날짜를 선택해도 시간대는 공통으로 적용합니다.")
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
 			description = "정확 일치와 비슷한 매치 조회 성공. 각 목록의 첫 페이지에 결과가 없으면 빈 목록을 반환합니다.",
 			useReturnTypeSchema = true)

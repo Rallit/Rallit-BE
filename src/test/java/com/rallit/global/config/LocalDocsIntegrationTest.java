@@ -147,7 +147,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     var docs = mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath(home + ".security[0].bearerAuth").exists())
-        .andExpect(jsonPath(search + ".parameters[*].name", containsInAnyOrder("date", "areaCodes",
+        .andExpect(jsonPath(search + ".parameters[*].name", containsInAnyOrder("dates", "areaCodes",
             "startTimeFrom", "startTimeTo", "matchTypes", "ntrp", "sameGenderOnly", "exactPage", "similarPage", "size")))
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.exactMatches['$ref']").isString())
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.similarMatches['$ref']").isString());

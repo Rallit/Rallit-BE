@@ -12,8 +12,10 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
@@ -100,6 +102,32 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void appliesOneWindowAndRelaxationTierAcrossOnlyTheSelectedDates() throws Exception {
+		var firstDate = saturday();
+		var lastDate = firstDate.plusDays(2);
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		var nearby = court(SEODAEMUN, "37.5824", "126.92985");
+		long first = match(host, original, firstDate, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		long last = match(host, original, lastDate, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		long similar = match(host, nearby, lastDate, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		match(host, original, firstDate.plusDays(1), "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		match(host, original, firstDate, "13:00", "2.5", "4.0", MatchType.SINGLES, false);
+		String auth = bearer(viewer());
+
+		mvc.perform(search(auth, lastDate, firstDate, firstDate).param("size", "1").param("exactPage", "1"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(2))
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(last))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(similar))
+				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
+		mvc.perform(search(auth, lastDate, firstDate))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(first));
+	}
+
+	@Test
 	void findsTimeOnlyThenBothWhilePreservingExplicitFilters() throws Exception {
 		var date = saturday();
 		var host = member(Gender.FEMALE, "3.0");
@@ -149,17 +177,25 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		String auth = bearer(viewer());
 
 		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-						.param("date", date.toString()).param("areaCodes", MAPO, JUNG).param("matchTypes", "SINGLES")
+						.param("dates", date.toString()).param("areaCodes", MAPO, JUNG).param("matchTypes", "SINGLES")
 						.param("startTimeFrom", "14:00").param("startTimeTo", "17:00"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(similar))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
 		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-						.param("date", date.toString()).param("areaCodes", MAPO).param("startTimeFrom", "23:00"))
+						.param("dates", date.toString()).param("areaCodes", MAPO).param("startTimeFrom", "23:00")
+						.param("startTimeTo", "24:00"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(endsAtMidnight))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
+		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
+						.param("dates", date.toString()).param("areaCodes", MAPO).param("startTimeFrom", "22:00")
+						.param("startTimeTo", "24:00").param("matchTypes", "RALLY"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(endsAtMidnight))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(0));
 	}
 
 	@Test
@@ -297,10 +333,21 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		String auth = bearer(viewer());
 		for (String invalidDate : Set.of(saturday() + "+09:00", "+02026-11-21", "2026-11-31", "0000-01-01")) {
 			mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-							.param("date", invalidDate).param("areaCodes", MAPO))
+							.param("dates", saturday().toString(), invalidDate).param("areaCodes", MAPO))
 					.andExpect(status().isBadRequest())
 					.andExpect(jsonPath("$.code").value("COMMON400"));
 		}
+	}
+
+	@Test
+	void requiresBetweenOneAndFourteenDates() throws Exception {
+		var auth = bearer(viewer());
+		var first = saturday();
+		var dates = IntStream.range(0, 15).mapToObj(first::plusDays).toArray(LocalDate[]::new);
+
+		mvc.perform(search(auth)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
+		mvc.perform(search(auth, Arrays.copyOf(dates, 14))).andExpect(status().isOk());
+		mvc.perform(search(auth, dates)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
 	}
 
 	@Test
@@ -309,6 +356,10 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		var auth = bearer(viewer());
 		mvc.perform(search(auth, date).param("ntrp", "4.5")).andExpect(status().isBadRequest());
 		mvc.perform(search(auth, date).param("areaCodes", "99999")).andExpect(status().isBadRequest());
+		mvc.perform(search(auth, date).param("areaCodes", JUNG, SEODAEMUN)).andExpect(status().isOk());
+		mvc.perform(search(auth, date).param("areaCodes", JUNG, SEODAEMUN, YONGSAN))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
 		var waiting = User.signUp();
 		entityManager.persist(waiting);
 		entityManager.flush();
@@ -318,9 +369,26 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches/recommendations")).andExpect(status().isUnauthorized());
 	}
 
-	private MockHttpServletRequestBuilder search(String auth, LocalDate date) {
+	@Test
+	void rejectsInvalidClockTimesIncludingMidnightAsAStartTime() throws Exception {
+		String auth = bearer(viewer());
+		var date = saturday().toString();
+		for (String parameter : Set.of("startTimeFrom", "startTimeTo")) {
+			mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
+							.param("dates", date).param("areaCodes", MAPO).param(parameter, "24:01"))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.code").value("COMMON400"));
+		}
+		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
+						.param("dates", date).param("areaCodes", MAPO).param("startTimeFrom", "24:00"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
+	}
+
+	private MockHttpServletRequestBuilder search(String auth, LocalDate... dates) {
 		return get("/api/v1/matches/search").header("Authorization", auth)
-				.param("date", date.toString()).param("areaCodes", MAPO).param("matchTypes", "SINGLES")
+				.param("dates", Arrays.stream(dates).map(LocalDate::toString).toArray(String[]::new))
+				.param("areaCodes", MAPO).param("matchTypes", "SINGLES")
 				.param("startTimeFrom", "14:00").param("startTimeTo", "17:00");
 	}
 

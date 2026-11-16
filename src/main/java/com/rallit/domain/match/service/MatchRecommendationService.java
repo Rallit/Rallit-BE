@@ -2,19 +2,23 @@ package com.rallit.domain.match.service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.rallit.domain.court.enums.CourtSlotStatus;
+import com.rallit.domain.match.dto.request.MatchDate;
 import com.rallit.domain.match.dto.request.MatchSearchRequest;
 import com.rallit.domain.match.dto.response.MatchRecommendationResponse;
 import com.rallit.domain.match.dto.response.MatchSearchResponse;
@@ -74,14 +78,14 @@ public class MatchRecommendationService {
 	public MatchSearchResponse search(Long userId, MatchSearchRequest request, int exactPage, int similarPage,
 			int size) {
 		User user = onboardedUser(userId);
-		var window = validateTimeWindow(request);
+		var windows = validateTimeWindows(request);
 		var areaCodes = new HashSet<>(request.areaCodes());
 		var selectedAreas = areas.findAllByCodeIn(areaCodes);
 		if (selectedAreas.size() != areaCodes.size()) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_AREA);
 		}
-		var candidates = findSearchCandidates(user, request, window);
-		var results = MatchSearchRules.group(candidates, areaCodes, selectedAreas, window);
+		var candidates = findSearchCandidates(user, request, windows);
+		var results = MatchSearchRules.group(candidates, areaCodes, selectedAreas, windows);
 		var exact = page(results.exact(), exactPage, size);
 		var similar = page(results.similar(), similarPage, size);
 		MatchPageRange.requireInRange(exact);
@@ -92,30 +96,34 @@ public class MatchRecommendationService {
 				PageResponse.from(similar.map(match -> view(match, counts))), results.relaxedConditions());
 	}
 
-	private static MatchSearchRules.TimeWindow validateTimeWindow(MatchSearchRequest request) {
-		LocalDate date;
-		try {
-			date = LocalDate.parse(request.date());
-		} catch (DateTimeParseException e) {
-			throw new GeneralException(ErrorStatus._BAD_REQUEST, e);
+	private static NavigableMap<LocalDate, MatchSearchRules.TimeWindow> validateTimeWindows(MatchSearchRequest request) {
+		var start = request.startTimeFrom() == null ? null : LocalTime.parse(request.startTimeFrom());
+		var end = request.startTimeTo() == null || request.startTimeTo().equals("24:00")
+				? null : LocalTime.parse(request.startTimeTo());
+		var windows = new TreeMap<LocalDate, MatchSearchRules.TimeWindow>();
+		for (String value : request.dates()) {
+			var date = MatchDate.parse(value);
+			windows.put(date, MatchSearchRules.TimeWindow.of(date, start, end));
 		}
-		if (date.getYear() < 1 || date.getYear() > 9999) {
-			throw new GeneralException(ErrorStatus._BAD_REQUEST);
-		}
-		var window = MatchSearchRules.TimeWindow.of(date, request.startTimeFrom(), request.startTimeTo());
+		var window = windows.firstEntry().getValue();
 		if (!window.from().isBefore(window.to())) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_TIME_RANGE);
 		}
-		return window;
+		return windows;
 	}
 
-	private List<Match> findSearchCandidates(User user, MatchSearchRequest request, MatchSearchRules.TimeWindow window) {
+	private List<Match> findSearchCandidates(User user, MatchSearchRequest request,
+			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows) {
 		var levels = request.ntrp() == null ? List.<BigDecimal>of() : request.ntrp().stream()
 				.map(value -> new BigDecimal(value.replace("+", ""))).sorted(Comparator.naturalOrder()).toList();
 		var types = matchTypes(request.matchTypes());
 		boolean allTypes = types.isEmpty();
+		var firstWindow = windows.firstEntry().getValue();
+		var lastWindow = windows.lastEntry().getValue();
+		var endMinute = Duration.between(firstWindow.dayStart(), firstWindow.expandedTo()).toMinutes();
 		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
-				window.expandedFrom(), window.dayEnd(), window.expandedTo(), allTypes,
+				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
+				firstWindow.expandedFrom().toLocalTime(), endMinute, allTypes,
 				allTypes ? EnumSet.allOf(MatchType.class) : types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
 				Boolean.TRUE.equals(request.sameGenderOnly()), !levels.isEmpty(),
 				levels.isEmpty() ? BigDecimal.ZERO : levels.getFirst(),
