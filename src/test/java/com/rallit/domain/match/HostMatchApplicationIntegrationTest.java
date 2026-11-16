@@ -218,7 +218,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void paymentDueAtDoesNotPassMatchStart() throws Exception {
+	void paymentDueAtDoesNotPassFinalDeadlineOneHourBeforeMatchStart() throws Exception {
 		User host = activeUser(Gender.MALE);
 		LocalDateTime startsAt = LocalDateTime.now(clock).plusHours(10).truncatedTo(ChronoUnit.SECONDS);
 		Match match = match(host, 1, 2, LocalDateTime.now(clock).plusHours(5), startsAt);
@@ -228,7 +228,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 		accept(host, match, applicationId).andExpect(status().isOk());
 
 		assertThat(((Timestamp) applicationRow(applicationId).get("payment_due_at")).toLocalDateTime())
-				.isEqualTo(startsAt);
+				.isEqualTo(startsAt.minusHours(1));
 	}
 
 	@Test

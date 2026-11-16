@@ -141,7 +141,7 @@ public class MatchApplicationService {
 				application.getApplicantGender(), MatchApplicationStatus.SEAT_OCCUPYING) >= recruitCount) {
 			throw new GeneralException(MatchApplicationErrorStatus.SEAT_UNAVAILABLE);
 		}
-		application.accept(now, paymentDueAt(now, match.getCourtSlot().getStartsAt()));
+		application.accept(now, paymentDueAt(now, MatchApplicationEligibility.finalDeadline(match)));
 		return MatchApplicationAcceptResponse.from(application);
 	}
 
@@ -171,9 +171,9 @@ public class MatchApplicationService {
 		return application;
 	}
 
-	private LocalDateTime paymentDueAt(LocalDateTime acceptedAt, LocalDateTime startsAt) {
+	private LocalDateTime paymentDueAt(LocalDateTime acceptedAt, LocalDateTime finalDeadline) {
 		LocalDateTime dueAt = acceptedAt.plus(PAYMENT_DUE_DURATION);
-		return dueAt.isBefore(startsAt) ? dueAt : startsAt;
+		return dueAt.isBefore(finalDeadline) ? dueAt : finalDeadline;
 	}
 
 	private void validateRecruiting(Match match, LocalDateTime now) {
