@@ -36,6 +36,7 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -44,6 +45,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
@@ -146,8 +149,11 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		match(host, tooFar, date, "14:00", "2.5", "4.0", MatchType.SINGLES, true);
 		match(viewer, nearby, date, "14:00", "2.5", "4.0", MatchType.SINGLES, true);
 		String auth = bearer(viewer);
+		var conditions = searchConditions(date);
+		conditions.set("minNtrp", "3.0");
+		conditions.set("sameGenderOnly", "true");
 
-		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "4.0").param("sameGenderOnly", "true"))
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
@@ -156,7 +162,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
 		jdbc.update("update match set status = 'CANCELED' where id = ?", timeOnly);
 		entityManager.clear();
-		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "4.0").param("sameGenderOnly", "true"))
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
@@ -176,23 +182,24 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		long endsAtMidnight = match(host, original, date, "22:00", "2.5", "4.0", MatchType.RALLY, false);
 		match(host, original, date, "22:01", "2.5", "4.0", MatchType.RALLY, false);
 		String auth = bearer(viewer());
+		var conditions = searchConditions(date);
+		conditions.add("areaCodes", JUNG);
 
-		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-						.param("dates", date.toString()).param("areaCodes", MAPO, JUNG).param("matchTypes", "SINGLES")
-						.param("startTimeFrom", "14:00").param("startTimeTo", "17:00"))
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(similar))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
-		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-						.param("dates", date.toString()).param("areaCodes", MAPO).param("startTimeFrom", "23:00")
-						.param("startTimeTo", "24:00"))
+		conditions.set("areaCodes", MAPO);
+		conditions.set("matchTypes", "RALLY");
+		conditions.set("startTimeFrom", "23:00");
+		conditions.set("startTimeTo", "24:00");
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(endsAtMidnight))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
-		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-						.param("dates", date.toString()).param("areaCodes", MAPO).param("startTimeFrom", "22:00")
-						.param("startTimeTo", "24:00").param("matchTypes", "RALLY"))
+		conditions.set("startTimeFrom", "22:00");
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(endsAtMidnight))
@@ -263,8 +270,10 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		match(host, original, date, "15:00", "2.5", null, MatchType.SINGLES, false);
 		match(host, nearby, date, "15:00", "2.5", "3.0", MatchType.SINGLES, false);
 		String auth = bearer(viewer());
+		var conditions = searchConditions(date);
+		conditions.set("maxNtrp", "2.0");
 
-		mvc.perform(search(auth, date).param("minNtrp", "1.0").param("maxNtrp", "2.0"))
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
 				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(lowerBoundOnly))
@@ -273,7 +282,8 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(2))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(upperBoundOnly))
 				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(unspecifiedSimilar));
-		mvc.perform(search(auth, date).param("minNtrp", "1.5").param("maxNtrp", "2.0"))
+		conditions.set("minNtrp", "1.5");
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
@@ -284,21 +294,28 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(3));
 	}
 
-	@Test
-	void rejectsIncompleteReversedOrUnsupportedNtrpRanges() throws Exception {
+	@ParameterizedTest
+	@CsvSource({"3.5, 3.0", "3.1, 4.0", "3.0, 4.5"})
+	void rejectsReversedOrUnsupportedNtrpRanges(String minNtrp, String maxNtrp) throws Exception {
 		var auth = bearer(viewer());
-		var date = saturday();
+		var conditions = searchConditions(saturday());
+		conditions.set("minNtrp", minNtrp);
+		conditions.set("maxNtrp", maxNtrp);
 
-		mvc.perform(search(auth, date).param("minNtrp", "3.0"))
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
-		mvc.perform(search(auth, date).param("maxNtrp", "4.0"))
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
-		mvc.perform(search(auth, date).param("minNtrp", "3.5").param("maxNtrp", "3.0"))
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
-		mvc.perform(search(auth, date).param("minNtrp", "3.1").param("maxNtrp", "4.0"))
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
-		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "4.5"))
-				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_INVALID_SEARCH_NTRP"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"dates", "areaCodes", "startTimeFrom", "startTimeTo", "matchTypes",
+			"minNtrp", "maxNtrp", "sameGenderOnly"})
+	void rejectsOmittingAnySearchCondition(String field) throws Exception {
+		var conditions = searchConditions(saturday());
+		conditions.remove(field);
+
+		mvc.perform(search(bearer(viewer()), conditions))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON400"));
 	}
 
 	@Test
@@ -377,8 +394,9 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	void rejectsOffsetAndImpossibleDatesWithCommonRequestError() throws Exception {
 		String auth = bearer(viewer());
 		for (String invalidDate : Set.of(saturday() + "+09:00", "+02026-11-21", "2026-11-31", "0000-01-01")) {
-			mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-							.param("dates", saturday().toString(), invalidDate).param("areaCodes", MAPO))
+			var conditions = searchConditions(saturday());
+			conditions.add("dates", invalidDate);
+			mvc.perform(search(auth, conditions))
 					.andExpect(status().isBadRequest())
 					.andExpect(jsonPath("$.code").value("COMMON400"));
 		}
@@ -416,24 +434,39 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void rejectsInvalidClockTimesIncludingMidnightAsAStartTime() throws Exception {
 		String auth = bearer(viewer());
-		var date = saturday().toString();
 		for (String parameter : Set.of("startTimeFrom", "startTimeTo")) {
-			mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-							.param("dates", date).param("areaCodes", MAPO).param(parameter, "24:01"))
+			var conditions = searchConditions(saturday());
+			conditions.set(parameter, "24:01");
+			mvc.perform(search(auth, conditions))
 					.andExpect(status().isBadRequest())
 					.andExpect(jsonPath("$.code").value("COMMON400"));
 		}
-		mvc.perform(get("/api/v1/matches/search").header("Authorization", auth)
-						.param("dates", date).param("areaCodes", MAPO).param("startTimeFrom", "24:00"))
+		var conditions = searchConditions(saturday());
+		conditions.set("startTimeFrom", "24:00");
+		mvc.perform(search(auth, conditions))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON400"));
 	}
 
 	private MockHttpServletRequestBuilder search(String auth, LocalDate... dates) {
-		return get("/api/v1/matches/search").header("Authorization", auth)
-				.param("dates", Arrays.stream(dates).map(LocalDate::toString).toArray(String[]::new))
-				.param("areaCodes", MAPO).param("matchTypes", "SINGLES")
-				.param("startTimeFrom", "14:00").param("startTimeTo", "17:00");
+		return search(auth, searchConditions(dates));
+	}
+
+	private MockHttpServletRequestBuilder search(String auth, MultiValueMap<String, String> conditions) {
+		return get("/api/v1/matches/search").header("Authorization", auth).params(conditions);
+	}
+
+	private MultiValueMap<String, String> searchConditions(LocalDate... dates) {
+		var conditions = new LinkedMultiValueMap<String, String>();
+		Arrays.stream(dates).map(LocalDate::toString).forEach(date -> conditions.add("dates", date));
+		conditions.set("areaCodes", MAPO);
+		conditions.set("matchTypes", "SINGLES");
+		conditions.set("startTimeFrom", "14:00");
+		conditions.set("startTimeTo", "17:00");
+		conditions.set("minNtrp", "1.0");
+		conditions.set("maxNtrp", "4.0");
+		conditions.set("sameGenderOnly", "false");
+		return conditions;
 	}
 
 	private User viewer() {

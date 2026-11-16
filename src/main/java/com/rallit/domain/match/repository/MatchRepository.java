@@ -26,12 +26,14 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			and s.startsAt > :now and m.recruitmentDeadline > :now
 			""";
 
-	String MATCH_TYPE_FILTER = """
-			and (:allTypes = true or exists (
+	String MATCH_TYPE_EXISTS = """
+			exists (
 				select t from Match candidate join candidate.matchTypes t
 				where candidate.id = m.id and t in :types
-			))
+			)
 			""";
+
+	String MATCH_TYPE_FILTER = "and (:allTypes = true or " + MATCH_TYPE_EXISTS + ") ";
 
 	String DISCOVERY_FILTER = RECRUITING_FILTER + """
 			and (cast(:from as LocalDateTime) is null or s.startsAt >= :from)
@@ -115,22 +117,20 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch m.courtSlot s
 			join fetch s.court c
 			join fetch c.area
-			""" + RECRUITING_FILTER + MATCH_TYPE_FILTER + APPLICANT_FILTER + SAME_GENDER_PREFERENCE_FILTER + """
+			""" + RECRUITING_FILTER + "and " + MATCH_TYPE_EXISTS + APPLICANT_FILTER + SAME_GENDER_PREFERENCE_FILTER + """
 			and s.startsAt >= :from and s.startsAt < :before
 			and cast(s.startsAt as LocalDate) in :dates
 			and cast(s.startsAt as LocalTime) >= :startTime
 			and s.endsAt <= timestampadd(minute, :endMinute, cast(cast(s.startsAt as LocalDate) as LocalDateTime))
-			and (:filterNtrp = false or (
-				(m.minNtrp is null or m.minNtrp <= :maximumNtrp)
-				and (m.maxNtrp is null or m.maxNtrp >= :minimumNtrp)
-			))
+			and (m.minNtrp is null or m.minNtrp <= :maximumNtrp)
+			and (m.maxNtrp is null or m.maxNtrp >= :minimumNtrp)
 			order by s.startsAt, m.id
 			""")
 	List<Match> findSearchCandidates(CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now,
 			LocalDateTime from, LocalDateTime before, Collection<LocalDate> dates, LocalTime startTime, long endMinute,
-			boolean allTypes, Collection<MatchType> types, Long applicantId, Gender gender,
-			Collection<MatchApplicationStatus> activeStatuses,
-			boolean sameGenderOnly, boolean filterNtrp, BigDecimal minimumNtrp, BigDecimal maximumNtrp);
+			Collection<MatchType> types, Long applicantId, Gender gender,
+			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly,
+			BigDecimal minimumNtrp, BigDecimal maximumNtrp);
 
 	@Query("""
 			select m from Match m

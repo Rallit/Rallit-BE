@@ -150,6 +150,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath(search + ".parameters[*].name", containsInAnyOrder("dates", "areaCodes",
             "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly", "exactPage",
             "similarPage", "size")))
+        .andExpect(jsonPath(search + ".parameters[?(@.required == true)].name", containsInAnyOrder("dates", "areaCodes",
+            "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly")))
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.exactMatches['$ref']").isString())
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.similarMatches['$ref']").isString());
     for (String operation : new String[]{home, search}) {

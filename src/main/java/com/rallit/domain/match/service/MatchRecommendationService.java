@@ -96,9 +96,8 @@ public class MatchRecommendationService {
 	}
 
 	private static NavigableMap<LocalDate, MatchSearchRules.TimeWindow> validateTimeWindows(MatchSearchRequest request) {
-		var start = request.startTimeFrom() == null ? null : LocalTime.parse(request.startTimeFrom());
-		var end = request.startTimeTo() == null || request.startTimeTo().equals("24:00")
-				? null : LocalTime.parse(request.startTimeTo());
+		var start = LocalTime.parse(request.startTimeFrom());
+		var end = "24:00".equals(request.startTimeTo()) ? null : LocalTime.parse(request.startTimeTo());
 		var windows = new TreeMap<LocalDate, MatchSearchRules.TimeWindow>();
 		for (String value : request.dates()) {
 			var date = MatchDate.parse(value);
@@ -113,21 +112,18 @@ public class MatchRecommendationService {
 
 	private List<Match> findSearchCandidates(User user, MatchSearchRequest request,
 			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows) {
-		boolean filterNtrp = request.minNtrp() != null || request.maxNtrp() != null;
-		if (filterNtrp && (!Ntrp.isSupported(request.minNtrp()) || !Ntrp.isSupported(request.maxNtrp())
-				|| request.minNtrp().compareTo(request.maxNtrp()) > 0)) {
+		if (!Ntrp.isSupported(request.minNtrp()) || !Ntrp.isSupported(request.maxNtrp())
+				|| request.minNtrp().compareTo(request.maxNtrp()) > 0) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_NTRP);
 		}
 		var types = matchTypes(request.matchTypes());
-		boolean allTypes = types.isEmpty();
 		var firstWindow = windows.firstEntry().getValue();
 		var lastWindow = windows.lastEntry().getValue();
 		var endMinute = Duration.between(firstWindow.dayStart(), firstWindow.expandedTo()).toMinutes();
 		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
 				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
-				firstWindow.expandedFrom().toLocalTime(), endMinute, allTypes,
-				allTypes ? EnumSet.allOf(MatchType.class) : types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
-				Boolean.TRUE.equals(request.sameGenderOnly()), filterNtrp, request.minNtrp(), request.maxNtrp());
+				firstWindow.expandedFrom().toLocalTime(), endMinute, types, user.getId(), user.getGender(),
+				MatchApplicationStatus.ACTIVE, request.sameGenderOnly(), request.minNtrp(), request.maxNtrp());
 	}
 
 	private static EnumSet<MatchType> matchTypes(Iterable<PreferredMatchType> preferences) {

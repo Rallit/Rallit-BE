@@ -102,7 +102,7 @@ final class MatchSearchRules {
 		static TimeWindow of(LocalDate date, LocalTime start, LocalTime end) {
 			var dayStart = date.atStartOfDay();
 			var dayEnd = date.plusDays(1).atStartOfDay();
-			return new TimeWindow(start == null ? dayStart : date.atTime(start),
+			return new TimeWindow(date.atTime(start),
 					end == null ? dayEnd : date.atTime(end), dayStart, dayEnd);
 		}
 
