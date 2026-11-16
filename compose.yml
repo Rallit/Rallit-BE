@@ -46,8 +46,10 @@ services:
       IMAGE_S3_BUCKET: ${IMAGE_S3_BUCKET:-}
       IMAGE_S3_REGION: ${IMAGE_S3_REGION:-}
       PROFILE_IMAGE_STORAGE_PATH: /app/profile-images
+      COURT_THUMBNAIL_STORAGE_PATH: /app/court-thumbnails
     volumes:
       - profile-images:/app/profile-images
+      - court-thumbnails:/app/court-thumbnails:ro
     mem_limit: ${APP_MEM_LIMIT:-700m}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/actuator/health"]
@@ -110,3 +112,4 @@ volumes:
   postgres-data:
   redis-data:
   profile-images:
+  court-thumbnails:

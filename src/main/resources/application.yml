@@ -35,6 +35,8 @@ rallit:
       region: ${IMAGE_S3_REGION:}
   profile-image:
     storage-path: ${PROFILE_IMAGE_STORAGE_PATH:./build/profile-images}
+  court-thumbnail:
+    storage-path: ${COURT_THUMBNAIL_STORAGE_PATH:./build/court-thumbnails}
   auth:
     service-origins: ${SERVICE_ORIGINS:https://rallit.co.kr,https://dev.rallit.co.kr}
     admin-origins: ${ADMIN_ORIGINS:https://admin.rallit.co.kr}

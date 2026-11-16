@@ -32,7 +32,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.tags[*].name",
-            containsInAnyOrder("인증", "회원", "매치 조회", "매치 추천", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
+            containsInAnyOrder("인증", "회원", "매치 조회", "코트", "매치 추천", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.parameters[*].name",
@@ -48,6 +48,20 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.paths['/api/v1/admin/auth/logout'].post.tags[0]").value("운영자"))
         .andExpect(jsonPath("$.paths['/api/v1/admin/me'].get.tags[0]").value("운영자"))
         .andExpect(jsonPath("$.paths['/api/v1/admin/me'].get.security[0].bearerAuth").exists());
+  }
+
+  @Test
+  void swaggerDocumentsTheCourtThumbnailAsAnAuthenticatedBinaryResponse() throws Exception {
+    String thumbnail = "$.paths['/api/v1/courts/{courtId}/thumbnail'].get";
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(thumbnail + ".tags[0]").value("코트"))
+        .andExpect(jsonPath(thumbnail + ".operationId").value("getCourtThumbnail"))
+        .andExpect(jsonPath(thumbnail + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(thumbnail + ".responses['200'].content['image/jpeg'].schema.format").value("binary"))
+        .andExpect(jsonPath(thumbnail + ".responses['200'].content['image/png'].schema.format").value("binary"))
+        .andExpect(jsonPath(thumbnail + ".responses['404'].content['application/json']").exists())
+        .andExpect(jsonPath(thumbnail + ".responses['503'].content['application/json']").exists());
   }
 
   @Test
