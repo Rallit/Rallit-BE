@@ -6,6 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Map;
+
+import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.support.IntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -162,34 +165,72 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
-  void swaggerDocumentsRecommendationRoutesAndSeparateSearchSections() throws Exception {
+  void swaggerDocumentsHomeRecommendationsAndSearchThroughSavedRequests() throws Exception {
     String home = "$.paths['/api/v1/matches/recommendations'].get";
-    String search = "$.paths['/api/v1/matches/search'].get";
-    var docs = mvc.perform(get("/v3/api-docs"))
+    String savedResults = "$.paths['/api/v1/match-requests/{requestId}/results'].get";
+    mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath(home + ".security[0].bearerAuth").exists())
-        .andExpect(jsonPath(search + ".parameters[*].name", containsInAnyOrder("dates", "areaCodes",
-            "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly", "exactPage",
-            "similarPage", "size")))
-        .andExpect(jsonPath(search + ".parameters[?(@.required == true)].name", containsInAnyOrder("dates", "areaCodes",
+        .andExpect(jsonPath("$.paths['/api/v1/matches/search']").doesNotExist())
+        .andExpect(jsonPath("$.components.schemas.MatchSearchRequest.required", containsInAnyOrder("dates", "areaCodes",
             "startTimeFrom", "startTimeTo", "matchTypes", "minNtrp", "maxNtrp", "sameGenderOnly")))
+        .andExpect(jsonPath(savedResults + ".parameters[*].name",
+            containsInAnyOrder("requestId", "exactPage", "similarPage", "size")))
         .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.exactMatches['$ref']").isString())
-        .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.similarMatches['$ref']").isString());
-    for (String operation : new String[]{home, search}) {
-      String responses = operation + ".responses";
-      docs.andExpect(jsonPath(responses + "['200'].content['application/json'].schema['$ref']").isString())
-          .andExpect(jsonPath(responses + "['400'].content['application/json']"
-              + ".examples['페이지 범위 초과'].value.code").value("MATCH_PAGE_OUT_OF_RANGE"))
-          .andExpect(jsonPath(responses + "['401'].content['application/json']"
-              + ".examples['인증 필요'].value.code").value("AUTH401"))
-          .andExpect(jsonPath(responses + "['403'].content['application/json']"
-              + ".examples['온보딩 미완료'].value.code").value("MATCH_ONBOARDING_REQUIRED"))
-          .andExpect(jsonPath(responses + "['503'].content['application/json']"
-              + ".examples['세션 저장소 장애'].value.code").value("COMMON503"));
+        .andExpect(jsonPath("$.components.schemas.MatchSearchResponse.properties.similarMatches['$ref']").isString())
+        .andExpect(jsonPath(savedResults + ".responses['400'].content['application/json']"
+            + ".examples['페이지 범위 초과'].value.code").value("MATCH_PAGE_OUT_OF_RANGE"))
+        .andExpect(jsonPath(home + ".responses['200'].content['application/json'].schema['$ref']").isString())
+        .andExpect(jsonPath(home + ".responses['400'].content['application/json']"
+            + ".examples['페이지 범위 초과'].value.code").value("MATCH_PAGE_OUT_OF_RANGE"))
+        .andExpect(jsonPath(home + ".responses['401'].content['application/json']"
+            + ".examples['인증 필요'].value.code").value("AUTH401"))
+        .andExpect(jsonPath(home + ".responses['403'].content['application/json']"
+            + ".examples['온보딩 미완료'].value.code").value("MATCH_ONBOARDING_REQUIRED"))
+        .andExpect(jsonPath(home + ".responses['503'].content['application/json']"
+            + ".examples['세션 저장소 장애'].value.code").value("COMMON503"));
+  }
+
+  @Test
+  void swaggerReusesMatchRequestErrorResponsesFromDomainStatuses() throws Exception {
+    String collection = "$.paths['/api/v1/match-requests'].post.responses";
+    String request = "$.paths['/api/v1/match-requests/{requestId}";
+    var docs = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+    docs.andExpect(jsonPath(collection + "['400'].content['application/json']"
+            + ".examples['날짜 범위']['$ref']").value("#/components/examples/matchRequestInvalidDate"))
+        .andExpect(jsonPath(collection + "['400'].content['application/json']"
+            + ".examples['오늘의 지난 시작 시각']['$ref']").value("#/components/examples/matchRequestPastStartTime"))
+        .andExpect(jsonPath(collection + "['403'].content['application/json']"
+            + ".examples['온보딩 미완료']['$ref']").value("#/components/examples/matchRequestOnboardingRequired"))
+        .andExpect(jsonPath(request + "'].delete.responses['403'].content['application/json']"
+            + ".examples['온보딩 미완료']['$ref']").value("#/components/examples/matchRequestOnboardingRequired"))
+        .andExpect(jsonPath("$.components.examples.matchRequestOnboardingRequired.value.code")
+            .value("MATCH_ONBOARDING_REQUIRED"))
+        .andExpect(jsonPath("$.components.examples.matchRequestOnboardingRequired.value.message")
+            .value("온보딩을 완료해야 매치 요청 기능을 이용할 수 있습니다."))
+        .andExpect(jsonPath(collection + "['400'].content['application/json']"
+            + ".examples['동성만과 혼합복식']['$ref']").value("#/components/examples/matchRequestInvalidPreferences"))
+        .andExpect(jsonPath(collection + "['409'].content['application/json']"
+            + ".examples['요청 상한']['$ref']").value("#/components/examples/matchRequestLimitReached"))
+        .andExpect(jsonPath(request + "/results'].get.responses['404'].content['application/json']"
+            + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"))
+        .andExpect(jsonPath(request + "'].get.responses['404'].content['application/json']"
+            + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"))
+        .andExpect(jsonPath(request + "'].delete.responses['404'].content['application/json']"
+            + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"));
+    for (var example : Map.of(
+        "matchRequestInvalidDate", MatchErrorStatus.MATCH_REQUEST_INVALID_DATE,
+        "matchRequestPastStartTime", MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME,
+        "matchRequestInvalidPreferences", MatchErrorStatus.MATCH_REQUEST_INVALID_PREFERENCES,
+        "matchRequestLimitReached", MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED,
+        "matchRequestNotFound", MatchErrorStatus.MATCH_REQUEST_NOT_FOUND).entrySet()) {
+      var reason = example.getValue().getReason();
+      String value = "$.components.examples." + example.getKey() + ".value";
+      docs.andExpect(jsonPath(value + ".isSuccess").value(false))
+          .andExpect(jsonPath(value + ".code").value(reason.getCode()))
+          .andExpect(jsonPath(value + ".message").value(reason.getMessage()))
+          .andExpect(jsonPath(value + ".result").doesNotExist());
     }
-    docs.andExpect(jsonPath(search + ".responses['400'].content['application/json'].examples[*].value.code",
-        containsInAnyOrder("COMMON400", "MATCH_INVALID_SEARCH_AREA", "MATCH_INVALID_TIME_RANGE",
-            "MATCH_INVALID_SEARCH_NTRP", "MATCH_PAGE_OUT_OF_RANGE")));
   }
 
   private JsonNode paginationSchema(JsonNode openApi, String path) {
