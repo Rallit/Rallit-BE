@@ -24,9 +24,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchRepository extends JpaRepository<Match, Long> {
 
+	// Keep the final deadline aligned with MatchApplicationEligibility.finalDeadline.
 	String RECRUITING_FILTER = """
 			where s.status = :slotStatus and m.status = :matchStatus
-			and s.startsAt > :now and m.recruitmentDeadline > :now
+			and s.startsAt > timestampadd(hour, 1, :now) and m.recruitmentDeadline > :now
 			""";
 
 	String MATCH_TYPE_EXISTS = """
