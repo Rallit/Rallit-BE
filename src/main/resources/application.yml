@@ -28,6 +28,11 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 rallit:
+  image-storage:
+    backend: ${IMAGE_STORAGE_BACKEND:filesystem}
+    s3:
+      bucket: ${IMAGE_S3_BUCKET:}
+      region: ${IMAGE_S3_REGION:}
   profile-image:
     storage-path: ${PROFILE_IMAGE_STORAGE_PATH:./build/profile-images}
   auth:

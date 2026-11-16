@@ -3,6 +3,7 @@ package com.rallit.domain.user.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
@@ -40,6 +41,7 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -49,6 +51,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import software.amazon.awssdk.services.s3.S3Client;
 
 @SpringBootTest(properties = {
     "RALLIT_ENV_FILE=.env.test-disabled",
@@ -61,11 +64,13 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
   @Autowired MockMvc mvc;
   @Autowired UserRegistrationService users;
   @Autowired TokenSessionService sessions;
+  @Autowired ObjectProvider<S3Client> s3Clients;
   @MockitoSpyBean UserRepository userRepository;
   @MockitoSpyBean FileSystemProfileImageStorage storage;
 
   @Test
   void uploadsServesAndDeletesAnImageDuringOnboarding() throws Exception {
+    assertThat(s3Clients.getIfAvailable()).isNull();
     var owner = login();
     var viewer = login();
     var source = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
@@ -172,7 +177,7 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
       assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
       replacementKey.set(invocation.getArgument(0));
       return invocation.callRealMethod();
-    }).when(storage).write(anyString(), any());
+    }).when(storage).write(anyString(), any(), anyLong(), any());
     doReturn(Optional.empty()).when(userRepository).findByIdForUpdate(owner.id());
 
     upload(owner, "replacement.jpeg", "image/jpeg", image("jpeg")).andExpect(status().isUnauthorized());

@@ -5,6 +5,7 @@ import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.UserStatus;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.storage.ProfileImageStorage;
+import com.rallit.global.storage.ImageKey;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.io.ByteArrayInputStream;
@@ -37,8 +38,9 @@ public class ProfileImageService {
   public ProfileImageResponse upload(Long userId, MultipartFile file) {
     var image = normalizer.normalize(file);
     String key = UUID.randomUUID() + image.extension();
+    byte[] contents = image.contents();
     try {
-      storage.write(key, new ByteArrayInputStream(image.contents()));
+      storage.write(key, new ByteArrayInputStream(contents), contents.length, ImageKey.mediaType(key));
     } catch (IOException failure) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
     }
@@ -81,8 +83,7 @@ public class ProfileImageService {
   }
 
   private Optional<Image> readImage(String key) throws IOException {
-    MediaType type = key.endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
-    return storage.read(key).map(contents -> new Image(contents, type));
+    return storage.read(key).map(contents -> new Image(contents, ImageKey.mediaType(key)));
   }
 
   private void replaceImageKey(Long userId, String key) {

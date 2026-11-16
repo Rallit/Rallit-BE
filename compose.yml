@@ -42,6 +42,9 @@ services:
       SERVICE_ORIGINS: ${SERVICE_ORIGINS:?SERVICE_ORIGINS를 .env에 설정하세요}
       ADMIN_ORIGINS: ${ADMIN_ORIGINS:?ADMIN_ORIGINS를 .env에 설정하세요}
       AUTH_SECURE_COOKIES: "true"
+      IMAGE_STORAGE_BACKEND: ${IMAGE_STORAGE_BACKEND:-filesystem}
+      IMAGE_S3_BUCKET: ${IMAGE_S3_BUCKET:-}
+      IMAGE_S3_REGION: ${IMAGE_S3_REGION:-}
       PROFILE_IMAGE_STORAGE_PATH: /app/profile-images
     volumes:
       - profile-images:/app/profile-images
