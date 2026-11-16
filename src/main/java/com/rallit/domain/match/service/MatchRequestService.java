@@ -95,7 +95,7 @@ public class MatchRequestService {
 	private static User requireOnboarding(Optional<User> result) {
 		var user = result.orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
 		if (!user.isOnboardingCompleted()) {
-			throw new GeneralException(MatchErrorStatus.MATCH_ONBOARDING_REQUIRED);
+			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_ONBOARDING_REQUIRED);
 		}
 		return user;
 	}

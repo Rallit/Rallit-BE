@@ -202,6 +202,14 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     var docs = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     docs.andExpect(jsonPath(collection + "['400'].content['application/json']"
             + ".examples['날짜 범위']['$ref']").value("#/components/examples/matchRequestInvalidDate"))
+        .andExpect(jsonPath(collection + "['403'].content['application/json']"
+            + ".examples['온보딩 미완료']['$ref']").value("#/components/examples/matchRequestOnboardingRequired"))
+        .andExpect(jsonPath(request + "'].delete.responses['403'].content['application/json']"
+            + ".examples['온보딩 미완료']['$ref']").value("#/components/examples/matchRequestOnboardingRequired"))
+        .andExpect(jsonPath("$.components.examples.matchRequestOnboardingRequired.value.code")
+            .value("MATCH_ONBOARDING_REQUIRED"))
+        .andExpect(jsonPath("$.components.examples.matchRequestOnboardingRequired.value.message")
+            .value("온보딩을 완료해야 매치 요청 기능을 이용할 수 있습니다."))
         .andExpect(jsonPath(collection + "['400'].content['application/json']"
             + ".examples['동성만과 혼합복식']['$ref']").value("#/components/examples/matchRequestInvalidPreferences"))
         .andExpect(jsonPath(collection + "['409'].content['application/json']"

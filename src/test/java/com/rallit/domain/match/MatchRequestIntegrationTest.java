@@ -110,6 +110,22 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void returnsRequestSpecificOnboardingMessageWithExistingCode() throws Exception {
+		var user = User.signUp();
+		entityManager.persist(user);
+		entityManager.flush();
+		String auth = bearer(user);
+		var date = LocalDate.now(clock).plusDays(1);
+
+		for (var request : List.of(create(auth, date), delete(PATH + "/42").header("Authorization", auth))) {
+			mvc.perform(request)
+					.andExpect(status().isForbidden())
+					.andExpect(jsonPath("$.code").value("MATCH_ONBOARDING_REQUIRED"))
+					.andExpect(jsonPath("$.message").value("온보딩을 완료해야 매치 요청 기능을 이용할 수 있습니다."));
+		}
+	}
+
+	@Test
 	void rejectsSavingMixedDoublesTogetherWithSameGenderOnly() throws Exception {
 		var date = LocalDate.now(clock).plusDays(1);
 		String auth = bearer(member());
