@@ -32,7 +32,7 @@ erDiagram
         varchar profile_image_url
         varchar gender
         varchar age_group
-        varchar experience_period
+        date tennis_started_on
         numeric ntrp
         varchar tournament_history
         boolean same_gender_only
