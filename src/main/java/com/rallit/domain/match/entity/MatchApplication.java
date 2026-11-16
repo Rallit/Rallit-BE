@@ -96,7 +96,7 @@ public class MatchApplication extends BaseEntity {
 		if (status == MatchApplicationStatus.CANCELED) {
 			return;
 		}
-		if (status != MatchApplicationStatus.PENDING) {
+		if (status != MatchApplicationStatus.PENDING && status != MatchApplicationStatus.PAYMENT_PENDING) {
 			throw new MatchApplicationNotCancelableException(status);
 		}
 		this.status = MatchApplicationStatus.CANCELED;

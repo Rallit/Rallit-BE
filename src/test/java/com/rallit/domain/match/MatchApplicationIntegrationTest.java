@@ -609,7 +609,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void blocksCancellationByOtherUserAndFromNonPendingStatus() throws Exception {
+	void blocksCancellationByOtherUserAndAfterPaymentOrClosing() throws Exception {
 		Match match = recruitingMatch(activeUser(Gender.MALE));
 		User applicant = activeUser(Gender.FEMALE);
 		User stranger = activeUser(Gender.FEMALE);
@@ -620,7 +620,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.code").value("APPLICATION_NOT_FOUND"));
 		assertThat(applicationStatus(applicationId)).isEqualTo("PENDING");
 
-		for (String status : List.of("PAYMENT_PENDING", "CONFIRMED", "REJECTED", "EXPIRED")) {
+		for (String status : List.of("CONFIRMED", "REJECTED", "EXPIRED")) {
 			jdbcTemplate.update("UPDATE match_application SET status = ? WHERE id = ?", status, applicationId);
 			cancel(applicant, applicationId, null)
 					.andExpect(status().isConflict())

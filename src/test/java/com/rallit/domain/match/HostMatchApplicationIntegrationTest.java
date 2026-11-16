@@ -421,6 +421,32 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void applicantCancelWhilePaymentPendingReturnsSeat() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 1);
+		User accepted = activeUser(Gender.FEMALE);
+		long acceptedId = apply(accepted, match);
+		long waitingId = apply(activeUser(Gender.FEMALE), match);
+		accept(host, match, acceptedId).andExpect(status().isOk());
+
+		accept(host, match, waitingId)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("SEAT_UNAVAILABLE"));
+		assertThat(catchThrowable(() -> apply(activeUser(Gender.FEMALE), match)))
+				.isInstanceOfSatisfying(GeneralException.class, exception -> assertThat(exception.getCode())
+						.isEqualTo(MatchApplicationErrorStatus.RECRUITMENT_FULL));
+
+		mvc.perform(post("/api/v1/applications/{id}/cancel", acceptedId).header("Authorization", bearer(accepted)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.status").value("CANCELED"));
+
+		assertThat(occupiedSeats(match)).isZero();
+		apply(activeUser(Gender.FEMALE), match);
+		accept(host, match, waitingId).andExpect(status().isOk());
+		assertThat(occupiedSeats(match)).isEqualTo(1);
+	}
+
+	@Test
 	void secondAcceptWaitsForMatchLockAndFailsWhenLastSeatIsTaken() throws Exception {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host, 1, 1);

@@ -98,7 +98,8 @@ public class MatchApplicationController {
 
 	@Operation(
 			summary = "결제 전 참가 신청 취소",
-			description = "PENDING 상태의 본인 신청을 취소합니다. 이미 취소된 신청은 기존 취소 정보를 그대로 반환합니다.",
+			description = "결제 전(PENDING, PAYMENT_PENDING) 본인 신청을 취소합니다. 결제 대기 중인 신청을 취소하면 자리가 반환됩니다. "
+					+ "이미 취소된 신청은 기존 취소 정보를 그대로 반환합니다.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@PostMapping("/api/v1/applications/{applicationId}/cancel")
 	public ResponseEntity<ApiResponse<MatchApplicationCancelResponse>> cancel(
