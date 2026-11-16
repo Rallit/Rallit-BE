@@ -248,7 +248,8 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/applications")
                 .authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/match-requests", "/api/v1/match-requests/{id}/results")
+                .requestMatchers(HttpMethod.GET, "/api/v1/match-requests", "/api/v1/match-requests/{id}",
+                    "/api/v1/match-requests/{id}/results")
                 .authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/match-requests")
                 .authenticated()

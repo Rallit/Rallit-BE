@@ -66,7 +66,7 @@ public class MatchRequestController {
 			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
 			@Valid @RequestBody MatchSearchRequest conditions) {
 		var response = requests.create(principal.userId(), conditions);
-		var location = URI.create("/api/v1/match-requests/" + response.request().requestId() + "/results");
+		var location = URI.create("/api/v1/match-requests/" + response.request().requestId());
 		return ResponseEntity.created(location).body(ApiResponse.of(SuccessStatus._CREATED, response));
 	}
 
@@ -76,6 +76,23 @@ public class MatchRequestController {
 	public ResponseEntity<ApiResponse<List<MatchRequestResponse>>> list(
 			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal) {
 		return ResponseEntity.ok(ApiResponse.onSuccess(requests.list(principal.userId())));
+	}
+
+	@GetMapping("/{requestId}")
+	@Operation(summary = "저장한 매칭 요청 조회", description = "본인이 저장한 활성 요청의 조건과 만료 시각을 반환합니다.")
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", useReturnTypeSchema = true)
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 ID는 양의 정수여야 합니다.",
+			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = ApiResponse.class),
+					examples = @ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST)))
+	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "활성 매칭 요청을 찾을 수 없습니다.",
+			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = ApiResponse.class),
+					examples = @ExampleObject(name = "요청 없음", ref = MatchRequestErrorExamples.NOT_FOUND_REF)))
+	public ResponseEntity<ApiResponse<MatchRequestResponse>> detail(
+			@Parameter(hidden = true) @AuthenticationPrincipal UserDetails principal,
+			@PathVariable @Positive Long requestId) {
+		return ResponseEntity.ok(ApiResponse.onSuccess(requests.detail(principal.userId(), requestId)));
 	}
 
 	@GetMapping("/{requestId}/results")

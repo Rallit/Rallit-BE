@@ -69,6 +69,11 @@ public class MatchRequestService {
 				.stream().map(this::toResponse).toList();
 	}
 
+	public MatchRequestResponse detail(Long userId, Long requestId) {
+		requireOnboarding(users.findById(userId));
+		return toResponse(activeRequest(userId, requestId, now()));
+	}
+
 	public MatchSearchResponse results(Long userId, Long requestId, int exactPage, int similarPage, int size) {
 		requireOnboarding(users.findById(userId));
 		var request = activeRequest(userId, requestId, now());

@@ -73,9 +73,15 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.request.expiresAt").value(date.plusDays(2) + "T00:00:00+09:00"))
 				.andReturn();
 		long id = requestId(result.getResponse().getContentAsString());
+		String location = result.getResponse().getHeader("Location");
+		assertThat(location).isEqualTo(PATH + "/" + id);
 		entityManager.flush();
 		entityManager.clear();
 
+		mvc.perform(get(location).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.requestId").value(id))
+				.andExpect(jsonPath("$.result.conditions.dates[0]").value(date.toString()));
 		mvc.perform(get(PATH).header("Authorization", auth))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.length()").value(1))
@@ -115,6 +121,8 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 		mvc.perform(get(PATH).header("Authorization", other))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(0));
+		mvc.perform(get(PATH + "/{id}", id).header("Authorization", other))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_NOT_FOUND"));
 		mvc.perform(get(PATH + "/{id}/results", id).header("Authorization", other))
 				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_NOT_FOUND"));
 		mvc.perform(delete(PATH + "/{id}", id).header("Authorization", other)).andExpect(status().isNotFound());

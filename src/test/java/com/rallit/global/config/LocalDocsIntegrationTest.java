@@ -187,6 +187,8 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
             + ".examples['요청 상한']['$ref']").value("#/components/examples/matchRequestLimitReached"))
         .andExpect(jsonPath(request + "/results'].get.responses['404'].content['application/json']"
             + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"))
+        .andExpect(jsonPath(request + "'].get.responses['404'].content['application/json']"
+            + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"))
         .andExpect(jsonPath(request + "'].delete.responses['404'].content['application/json']"
             + ".examples['요청 없음']['$ref']").value("#/components/examples/matchRequestNotFound"));
     for (var example : Map.of(
