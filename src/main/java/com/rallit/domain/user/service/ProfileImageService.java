@@ -5,9 +5,9 @@ import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.UserStatus;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.storage.ProfileImageStorage;
-import com.rallit.global.storage.ImageKey;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.global.storage.ImageKey;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Optional;
@@ -49,15 +49,12 @@ public class ProfileImageService {
     return new ProfileImageResponse(ProfileImageResponse.urlFor(userId));
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void delete(Long userId) {
-    String previous = lockUser(userId).replaceProfileImage(null);
-    if (previous != null) {
-      new ImageCleanup(null, previous).register();
-    }
+    replaceImageKey(userId, null);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public Image get(Long userId) {
     try {
       return readImageWithReplacementRetry(userId)
@@ -87,15 +84,14 @@ public class ProfileImageService {
   }
 
   private void replaceImageKey(Long userId, String key) {
-    var cleanup = new ImageCleanup(key, null);
+    var update = new ImageKeyUpdate();
     try {
       new TransactionTemplate(transactions).executeWithoutResult(status -> {
-        cleanup.register();
-        cleanup.previous = lockUser(userId).replaceProfileImage(key);
+        update.register();
+        update.previous = lockUser(userId).replaceProfileImage(key);
       });
-    } catch (RuntimeException | Error failure) {
-      if (!cleanup.registered) deleteQuietly(key);
-      throw failure;
+    } finally {
+      deleteQuietly(update.unreferencedKey(key));
     }
   }
 
@@ -104,25 +100,27 @@ public class ProfileImageService {
         .orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
   }
 
-  private final class ImageCleanup implements TransactionSynchronization {
-    private final String uploaded;
+  private static final class ImageKeyUpdate implements TransactionSynchronization {
     private String previous;
-    private boolean registered;
-
-    private ImageCleanup(String uploaded, String previous) {
-      this.uploaded = uploaded;
-      this.previous = previous;
-    }
+    // Before the update starts, the new file is unreferenced.
+    private int completionStatus = STATUS_ROLLED_BACK;
 
     private void register() {
       TransactionSynchronizationManager.registerSynchronization(this);
-      registered = true;
+      completionStatus = STATUS_UNKNOWN;
     }
 
     @Override
     public void afterCompletion(int status) {
-      if (status == STATUS_COMMITTED) deleteQuietly(previous);
-      if (status == STATUS_ROLLED_BACK) deleteQuietly(uploaded);
+      completionStatus = status;
+    }
+
+    private String unreferencedKey(String uploaded) {
+      return switch (completionStatus) {
+        case STATUS_COMMITTED -> previous;
+        case STATUS_ROLLED_BACK -> uploaded;
+        default -> null;
+      };
     }
   }
 
