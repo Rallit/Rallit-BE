@@ -570,6 +570,35 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void nonHostAcceptIsRejectedWithoutWaitingForMatchLock() throws Exception {
+		User host = activeUser(Gender.MALE);
+		Match match = recruitingMatch(host, 1, 2);
+		long applicationId = apply(activeUser(Gender.FEMALE), match);
+		User stranger = activeUser(Gender.MALE);
+		CountDownLatch accepted = new CountDownLatch(1);
+		CountDownLatch release = new CountDownLatch(1);
+
+		Future<?> holder = executor.submit(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+				status -> {
+					matchApplicationService.accept(host.getId(), match.getId(), applicationId);
+					accepted.countDown();
+					await(release);
+				}));
+		assertThat(accepted.await(30, TimeUnit.SECONDS)).isTrue();
+		Future<Throwable> strangerAccept = executor.submit(
+				() -> catchThrowable(() -> matchApplicationService.accept(stranger.getId(), match.getId(),
+						applicationId)));
+
+		try {
+			assertThat(strangerAccept.get(5, TimeUnit.SECONDS)).isInstanceOfSatisfying(GeneralException.class,
+					exception -> assertThat(exception.getCode()).isEqualTo(MatchApplicationErrorStatus.NOT_MATCH_HOST));
+		} finally {
+			release.countDown();
+			holder.get(30, TimeUnit.SECONDS);
+		}
+	}
+
+	@Test
 	void acceptChecksDeadlineAfterWaitingForApplicationLock() throws Exception {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host, 1, 2);

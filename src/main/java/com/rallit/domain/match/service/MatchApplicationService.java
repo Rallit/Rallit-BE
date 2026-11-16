@@ -121,7 +121,7 @@ public class MatchApplicationService {
 	public HostMatchApplicationListResponse getHostApplications(Long userId, Long matchId) {
 		Match match = matchRepository.findDetailById(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		validateHost(match, userId);
+		validateHost(match.getHost().getId(), userId);
 		return HostMatchApplicationListResponse.of(match,
 				matchApplicationRepository.findAllWithApplicantByMatchIdAndStatusIn(matchId,
 						MatchApplicationStatus.ACTIVE), clock.getZone());
@@ -129,9 +129,9 @@ public class MatchApplicationService {
 
 	@Transactional
 	public MatchApplicationAcceptResponse accept(Long userId, Long matchId, Long applicationId) {
+		validateHost(findHostId(matchId), userId);
 		Match match = matchRepository.findByIdForUpdate(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		validateHost(match, userId);
 		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		LocalDateTime now = now();
 		validateRecruiting(match, now);
@@ -148,16 +148,19 @@ public class MatchApplicationService {
 	@Transactional
 	public MatchApplicationRejectResponse reject(Long userId, Long matchId, Long applicationId,
 			MatchApplicationRejectReason reason) {
-		Match match = matchRepository.findById(matchId)
-				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		validateHost(match, userId);
+		validateHost(findHostId(matchId), userId);
 		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		application.reject(reason);
 		return MatchApplicationRejectResponse.from(application);
 	}
 
-	private void validateHost(Match match, Long userId) {
-		if (!match.getHost().getId().equals(userId)) {
+	private Long findHostId(Long matchId) {
+		return matchRepository.findHostIdById(matchId)
+				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
+	}
+
+	private void validateHost(Long hostId, Long userId) {
+		if (!hostId.equals(userId)) {
 			throw new GeneralException(MatchApplicationErrorStatus.NOT_MATCH_HOST);
 		}
 	}

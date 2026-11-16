@@ -146,6 +146,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			""")
 	Optional<Match> findDiscoveryDetail(Long id, CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now);
 
+	@Query("select m.host.id from Match m where m.id = :id")
+	Optional<Long> findHostIdById(@Param("id") Long id);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select m from Match m where m.id = :id")
 	Optional<Match> findByIdForUpdate(@Param("id") Long id);
