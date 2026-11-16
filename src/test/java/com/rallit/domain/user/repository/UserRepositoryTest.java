@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Set;
 
 import com.rallit.domain.region.entity.Area;
@@ -11,7 +13,6 @@ import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.SocialAccount;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
@@ -65,7 +66,7 @@ class UserRepositoryTest extends IntegrationTestSupport {
 		Area area = entityManager.createQuery("select a from Area a where a.code = '11440'", Area.class)
 				.getSingleResult();
 		user.completeOnboarding(new OnboardingProfile("테니스곰123", Gender.FEMALE, AgeGroup.TWENTIES,
-				ExperiencePeriod.THREE_YEARS_OR_MORE, new BigDecimal("3.0"), true,
+				YearMonth.of(2023, 3), new BigDecimal("3.0"), true,
 				Set.of(PreferredMatchType.SINGLES, PreferredMatchType.DOUBLES), Set.of(area),
 				Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		userRepository.saveAndFlush(user);
@@ -76,15 +77,15 @@ class UserRepositoryTest extends IntegrationTestSupport {
 		assertThat(found.getStatus()).isEqualTo(UserStatus.ACTIVE);
 		assertThat(found.getNickname()).isEqualTo("테니스곰123");
 		assertThat(found.getNtrp()).isEqualByComparingTo("3.0");
-		assertThat(found.getExperiencePeriod()).isEqualTo(ExperiencePeriod.THREE_YEARS_OR_MORE);
+		assertThat(found.getTennisStartedOn()).isEqualTo(YearMonth.of(2023, 3));
 		assertThat(found.isSameGenderOnly()).isTrue();
 		assertThat(found.getActivityAreas()).extracting(Area::getCode).containsExactly("11440");
 		assertThat(found.getPreferredMatchTypes())
 				.containsExactlyInAnyOrder(PreferredMatchType.SINGLES, PreferredMatchType.DOUBLES);
 		assertThat(found.getPreferredTimeSlots()).containsExactly(PreferredTimeSlot.WEEKEND_MORNING);
 		assertThat(found.getCreatedAt()).isNotNull();
-		assertThat(jdbcTemplate.queryForObject("SELECT experience_period FROM users WHERE id = ?", String.class,
-				user.getId())).isEqualTo("THREE_YEARS_OR_MORE");
+		assertThat(jdbcTemplate.queryForObject("SELECT tennis_started_on FROM users WHERE id = ?", LocalDate.class,
+				user.getId())).isEqualTo(LocalDate.of(2023, 3, 1));
 	}
 
 	@Test
@@ -103,6 +104,15 @@ class UserRepositoryTest extends IntegrationTestSupport {
 				"UPDATE users SET status = 'ACTIVE', nickname = '성별누락' WHERE id = ?", user.getId()))
 				.isInstanceOf(DataIntegrityViolationException.class)
 				.hasMessageContaining("ck_users_active_profile");
+	}
+
+	@Test
+	void rejectsTennisStartDateOtherThanFirstDayOfMonth() {
+		User user = userRepository.saveAndFlush(User.signUp());
+		assertThatThrownBy(() -> jdbcTemplate.update(
+				"UPDATE users SET tennis_started_on = DATE '2025-10-15' WHERE id = ?", user.getId()))
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_users_tennis_started_on");
 	}
 
 	@Test

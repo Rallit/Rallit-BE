@@ -8,13 +8,14 @@ import com.rallit.domain.user.enums.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.time.YearMonth;
 import java.util.Set;
 
 public record OnboardingRequest(
     @NotNull @Pattern(regexp = NICKNAME_PATTERN) String nickname,
     @NotNull Gender gender,
     @NotNull AgeGroup ageGroup,
-    @NotNull ExperiencePeriod experiencePeriod,
+    @NotNull @Schema(type = "string", example = "2025-10") YearMonth tennisStartedOn,
     @NotNull @Pattern(regexp = "(?:[1-3]\\.[05]|4\\.0\\+)")
         @Schema(allowableValues = {"1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0+"}) String ntrp,
     @NotNull Boolean sameGenderOnly,
@@ -24,7 +25,7 @@ public record OnboardingRequest(
     @NotEmpty Set<@NotNull PreferredTimeSlot> preferredTimeSlots) {
 
   public OnboardingProfile toProfile(Set<Area> areas) {
-    return new OnboardingProfile(nickname, gender, ageGroup, experiencePeriod,
+    return new OnboardingProfile(nickname, gender, ageGroup, tennisStartedOn,
         new BigDecimal(ntrp.replace("+", "")), sameGenderOnly,
         preferredMatchTypes, areas, preferredTimeSlots);
   }

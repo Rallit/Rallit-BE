@@ -49,17 +49,17 @@ class FlywayMigrationTest extends IntegrationTestSupport {
 
 			Flyway.configure().dataSource(dataSource).load().migrate();
 
-			assertThat(jdbc.queryForObject("SELECT experience_period FROM users WHERE id = ?", String.class,
-					userId)).isEqualTo("ONE_TO_THREE_YEARS");
+			assertThat(jdbc.queryForObject("SELECT tennis_started_on FROM users WHERE id = ?", Object.class,
+					userId)).isNull();
 			assertThat(jdbc.queryForList("SELECT match_type FROM user_preferred_match_type WHERE user_id = ?",
 					String.class, userId)).containsExactlyInAnyOrder("DOUBLES", "RALLY");
 			assertThat(jdbc.queryForList("""
 					SELECT column_name FROM information_schema.columns
 					WHERE table_schema = 'public' AND table_name = 'users'
 					""", String.class))
-					.contains("profile_image_key")
+					.contains("profile_image_key", "tennis_started_on")
 					.doesNotContain("activity_latitude", "activity_longitude", "activity_radius_km",
-							"tournament_history", "profile_image_url");
+							"tournament_history", "profile_image_url", "experience_period");
 		}
 	}
 }

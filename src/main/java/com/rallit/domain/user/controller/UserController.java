@@ -44,6 +44,7 @@ public class UserController {
       description = """
           - 내 기본 닉네임을 사용할 수 있습니다. 중복 여부는 영문 대소문자를 구분하지 않습니다.
           - `sameGenderOnly`가 `true`이면 `MIXED_DOUBLES`를 함께 선택할 수 없습니다.
+          - `tennisStartedOn`은 `yyyy-MM` 형식이며 1950-01부터 현재 연월(서울 기준)까지 보낼 수 있습니다.
           """,
       requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
           required = true,
@@ -53,7 +54,7 @@ public class UserController {
                     "nickname": "날쌘발리127",
                     "gender": "FEMALE",
                     "ageGroup": "TWENTIES",
-                    "experiencePeriod": "ONE_TO_THREE_YEARS",
+                    "tennisStartedOn": "2024-11",
                     "ntrp": "4.0+",
                     "sameGenderOnly": false,
                     "preferredMatchTypes": ["DOUBLES", "RALLY"],

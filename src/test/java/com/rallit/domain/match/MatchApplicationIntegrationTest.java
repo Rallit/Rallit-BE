@@ -42,7 +42,6 @@ import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
@@ -666,7 +665,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.getSingleResult();
 		User user = User.signUp();
 		user.completeOnboarding(new OnboardingProfile(nickname(), gender, ageGroup,
-				ExperiencePeriod.ONE_TO_THREE_YEARS, ntrp, false, Set.of(PreferredMatchType.SINGLES), Set.of(area),
+				EntityFixtures.TENNIS_STARTED_ON, ntrp, false, Set.of(PreferredMatchType.SINGLES), Set.of(area),
 				Set.of(PreferredTimeSlot.WEEKEND_MORNING)));
 		return user;
 	}

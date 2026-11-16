@@ -2,6 +2,7 @@ package com.rallit.domain.match.dto.response;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -10,7 +11,6 @@ import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.global.apiPayload.code.BaseErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -28,7 +28,7 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 		List<AgeGroup> preferredAgeGroups, CourtInfo court, HostInfo host) {
 
 	public static MatchDetailResponse from(Match match, long occupiedSeats, ZoneId zone, boolean recruitmentOpen,
-			BaseErrorCode blockReason) {
+			BaseErrorCode blockReason, YearMonth currentMonth) {
 		var card = MatchListItemResponse.from(match, occupiedSeats, zone);
 		var slot = match.getCourtSlot();
 		var court = slot.getCourt();
@@ -42,7 +42,7 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 				new CourtInfo(court.getId(), court.getName(), court.getAddress(), slot.getCourtNumber(),
 						court.getLatitude(), court.getLongitude(), court.isHasParking(), court.isHasShower(),
 						court.getFacilityNotes()),
-				new HostInfo(host.getId(), host.getNickname(), host.getExperiencePeriod(),
+				new HostInfo(host.getId(), host.getNickname(), host.experienceYears(currentMonth),
 						host.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(host.getId())));
 	}
 
@@ -52,7 +52,8 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 	}
 
 	public record HostInfo(Long userId, String nickname,
-			@Schema(types = {"string", "null"}) ExperiencePeriod experiencePeriod,
+			@Schema(description = "만 구력(년). 1년 미만은 0, 시작 연월이 없으면 null",
+					types = {"integer", "null"}) Integer experienceYears,
 			@Schema(description = "Bearer 인증이 필요한 API 상대 경로. 등록된 사진이 없으면 null",
 					types = {"string", "null"}) String profileImageUrl) {
 	}

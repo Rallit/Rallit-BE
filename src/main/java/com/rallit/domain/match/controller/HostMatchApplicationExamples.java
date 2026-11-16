@@ -39,7 +39,7 @@ final class HostMatchApplicationExamples {
 			        "gender": "MALE",
 			        "ntrp": 3.0,
 			        "ageGroup": "TWENTIES",
-			        "experiencePeriod": "ONE_TO_THREE_YEARS"
+			        "experienceYears": 2
 			      }
 			    }],
 			    "participants": [{
@@ -51,7 +51,7 @@ final class HostMatchApplicationExamples {
 			        "gender": "MALE",
 			        "ntrp": 3.0,
 			        "ageGroup": "THIRTIES",
-			        "experiencePeriod": "ONE_TO_THREE_YEARS"
+			        "experienceYears": 2
 			      }
 			    }, {
 			      "host": false,
@@ -66,7 +66,7 @@ final class HostMatchApplicationExamples {
 			        "gender": "FEMALE",
 			        "ntrp": 3.0,
 			        "ageGroup": "TWENTIES",
-			        "experiencePeriod": "SIX_MONTHS_TO_ONE_YEAR"
+			        "experienceYears": 0
 			      }
 			    }]
 			  }

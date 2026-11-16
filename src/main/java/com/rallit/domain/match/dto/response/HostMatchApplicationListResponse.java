@@ -3,6 +3,7 @@ package com.rallit.domain.match.dto.response;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Stream;
@@ -17,7 +18,6 @@ import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -25,16 +25,17 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 		List<PendingApplicationInfo> pendingApplications, List<ParticipantInfo> participants) {
 
 	public static HostMatchApplicationListResponse of(Match match, List<MatchApplication> activeApplications,
-			ZoneId zone) {
+			ZoneId zone, YearMonth currentMonth) {
 		List<MatchApplication> occupying = activeApplications.stream()
 				.filter(application -> MatchApplicationStatus.SEAT_OCCUPYING.contains(application.getStatus()))
 				.toList();
 		List<PendingApplicationInfo> pendingApplications = activeApplications.stream()
 				.filter(application -> application.getStatus() == MatchApplicationStatus.PENDING)
-				.map(PendingApplicationInfo::from)
+				.map(application -> PendingApplicationInfo.from(application, currentMonth))
 				.toList();
-		List<ParticipantInfo> participants = Stream.concat(Stream.of(ParticipantInfo.host(match.getHost())),
-				occupying.stream().map(ParticipantInfo::applicant)).toList();
+		List<ParticipantInfo> participants = Stream.concat(
+				Stream.of(ParticipantInfo.host(match.getHost(), currentMonth)),
+				occupying.stream().map(application -> ParticipantInfo.applicant(application, currentMonth))).toList();
 		return new HostMatchApplicationListResponse(MatchInfo.from(match, zone),
 				RecruitmentInfo.of(match, occupying, pendingApplications.size()), pendingApplications, participants);
 	}
@@ -90,19 +91,20 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 			@Schema(description = "Bearer 인증이 필요한 API 상대 경로. 등록된 사진이 없으면 null",
 					types = {"string", "null"}) String profileImageUrl,
 			Gender gender, BigDecimal ntrp, AgeGroup ageGroup,
-			@Schema(description = "구력") ExperiencePeriod experiencePeriod) {
+			@Schema(description = "만 구력(년). 1년 미만은 0, 시작 연월이 없으면 null",
+					types = {"integer", "null"}) Integer experienceYears) {
 
-		private static UserInfo of(User user, Gender gender) {
+		private static UserInfo of(User user, Gender gender, YearMonth currentMonth) {
 			return new UserInfo(user.getId(), user.getNickname(), profileImageUrlOf(user), gender, user.getNtrp(),
-					user.getAgeGroup(), user.getExperiencePeriod());
+					user.getAgeGroup(), user.experienceYears(currentMonth));
 		}
 	}
 
 	public record PendingApplicationInfo(Long applicationId, LocalDateTime appliedAt, UserInfo applicant) {
 
-		private static PendingApplicationInfo from(MatchApplication application) {
+		private static PendingApplicationInfo from(MatchApplication application, YearMonth currentMonth) {
 			return new PendingApplicationInfo(application.getId(), application.getCreatedAt(),
-					UserInfo.of(application.getApplicant(), application.getApplicantGender()));
+					UserInfo.of(application.getApplicant(), application.getApplicantGender(), currentMonth));
 		}
 	}
 
@@ -116,14 +118,15 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 			@Schema(description = "입금 기한") LocalDateTime paymentDueAt,
 			UserInfo user) {
 
-		private static ParticipantInfo host(User host) {
-			return new ParticipantInfo(true, null, null, null, null, UserInfo.of(host, host.getGender()));
+		private static ParticipantInfo host(User host, YearMonth currentMonth) {
+			return new ParticipantInfo(true, null, null, null, null,
+					UserInfo.of(host, host.getGender(), currentMonth));
 		}
 
-		private static ParticipantInfo applicant(MatchApplication application) {
+		private static ParticipantInfo applicant(MatchApplication application, YearMonth currentMonth) {
 			return new ParticipantInfo(false, application.getId(), application.getStatus(),
 					application.getAcceptedAt(), application.getPaymentDueAt(),
-					UserInfo.of(application.getApplicant(), application.getApplicantGender()));
+					UserInfo.of(application.getApplicant(), application.getApplicantGender(), currentMonth));
 		}
 	}
 }

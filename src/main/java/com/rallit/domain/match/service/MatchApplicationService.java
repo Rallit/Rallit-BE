@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +125,7 @@ public class MatchApplicationService {
 		validateHost(match, userId);
 		return HostMatchApplicationListResponse.of(match,
 				matchApplicationRepository.findAllWithApplicantByMatchIdAndStatusIn(matchId,
-						MatchApplicationStatus.ACTIVE), clock.getZone());
+						MatchApplicationStatus.ACTIVE), clock.getZone(), YearMonth.now(clock));
 	}
 
 	@Transactional

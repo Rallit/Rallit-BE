@@ -19,6 +19,9 @@ import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.support.IntegrationTestSupport;
+import java.time.Clock;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,7 +47,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
         "nickname": "%s",
         "gender": "FEMALE",
         "ageGroup": "TWENTIES",
-        "experiencePeriod": "ONE_TO_THREE_YEARS",
+        "tennisStartedOn": "2024-11",
         "ntrp": "4.0+",
         "sameGenderOnly": false,
         "preferredMatchTypes": ["DOUBLES", "RALLY"],
@@ -57,6 +60,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
   @Autowired UserRegistrationService users;
   @Autowired TokenSessionService sessions;
   @Autowired JdbcTemplate jdbc;
+  @Autowired Clock clock;
   @MockitoSpyBean UserRepository userRepository;
 
   @Test
@@ -72,6 +76,9 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.result.onboardingCompleted").value(true))
         .andExpect(jsonPath("$.result.socialDisplayName").value("환영 인사 이름"))
         .andExpect(jsonPath("$.result.profile.ntrp").value("4.0+"))
+        .andExpect(jsonPath("$.result.profile.tennisStartedOn").value("2024-11"))
+        .andExpect(jsonPath("$.result.profile.experienceYears")
+            .value((int) ChronoUnit.YEARS.between(YearMonth.of(2024, 11), YearMonth.now(clock))))
         .andExpect(jsonPath("$.result.profile.sameGenderOnly").value(false))
         .andExpect(jsonPath("$.result.profile.activityAreaCodes[0]").value("11410"));
     submit(member, body.replace("\"11440\", \"11410\"", "\"11410\", \"11440\", \"11440\""))
@@ -79,6 +86,8 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("WEEKEND_MORNING", "WEEKEND_AFTERNOON"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("COMMON409"));
+    submit(member, body.replace("2024-11", "2024-12"))
+        .andExpect(status().isConflict());
 
     mvc.perform(get("/api/v1/users/me").header("Authorization", member.bearer()))
         .andExpect(status().isOk())
@@ -93,6 +102,14 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("\"sameGenderOnly\": false,", ""))
         .andExpect(status().isBadRequest());
     submit(member, body.replace("4.0+", "4.0")).andExpect(status().isBadRequest());
+    submit(member, body.replace("2024-11", "2024-13")).andExpect(status().isBadRequest());
+    submit(member, body.replace("2024-11", "2024-1")).andExpect(status().isBadRequest());
+    submit(member, body.replace("2024-11", "1949-12"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("테니스 시작 시기를 확인해 주세요."));
+    submit(member, body.replace("2024-11", YearMonth.now(clock).plusMonths(1).toString()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("테니스 시작 시기를 확인해 주세요."));
     submit(member, body.replace("11440", "99999")).andExpect(status().isBadRequest());
     submit(member, body.replace("\"11440\", \"11410\"", "\"11440\", \"11410\", \"11680\", \"11110\""))
         .andExpect(status().isBadRequest());
@@ -112,6 +129,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("false", "0")).andExpect(status().isBadRequest());
     submit(member, body.replace("\"11440\"", "11440")).andExpect(status().isBadRequest());
     submit(member, body.replace("\"4.0+\"", "3.0")).andExpect(status().isBadRequest());
+    submit(member, body.replace("\"2024-11\"", "202411")).andExpect(status().isBadRequest());
   }
 
   @Test
@@ -180,7 +198,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
 
   private Map<String, Object> storedProfile(Member member) {
     return jdbc.queryForMap("""
-        SELECT status, nickname, gender, age_group, experience_period, ntrp, same_gender_only
+        SELECT status, nickname, gender, age_group, tennis_started_on, ntrp, same_gender_only
         FROM users WHERE id = ?
         """, member.id());
   }
