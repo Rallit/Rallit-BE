@@ -67,9 +67,7 @@ public class MatchDiscoveryService {
 			result = matches.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
 					before, endsBy, allTypes, types, pageable);
 		}
-		if (page > 0 && page >= result.getTotalPages()) {
-			throw new GeneralException(MatchErrorStatus.MATCH_PAGE_OUT_OF_RANGE);
-		}
+		MatchPageRange.requireInRange(result);
 		var counts = occupiedSeats(result.stream().map(Match::getId).toList());
 		return PageResponse.from(result.map(match -> MatchListItemResponse.from(match,
 				counts.getOrDefault(match.getId(), 0L), clock.getZone())));
