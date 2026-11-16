@@ -74,7 +74,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void persistsConditionsAndReopensResultsWhenOnlySimilarMatchesExist() throws Exception {
 		var date = LocalDate.now(clock).plusDays(2);
-		long similar = recruitInSeodaemun(date);
+		long similar = recruitMatch(date, "11410", "37.5824", "126.92985", MatchType.SINGLES);
 		String auth = bearer(member());
 
 		var result = mvc.perform(create(auth, date.plusDays(1), date))
@@ -107,6 +107,55 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
 				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(similar))
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("AREA"));
+	}
+
+	@Test
+	void returnsTheFullExactCountWhenPreviewContainsOneItem() throws Exception {
+		var date = LocalDate.now(clock).plusDays(1);
+		recruitMatch(date, "11440", "37.560", "126.900", MatchType.SINGLES);
+		recruitMatch(date, "11440", "37.562", "126.904", MatchType.SINGLES);
+
+		mvc.perform(create(bearer(member()), date))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.result.exactMatchCount").value(2))
+				.andExpect(jsonPath("$.result.hasResults").value(true));
+	}
+
+	@Test
+	void returnsNoResultsWhenBothSearchSectionsAreEmpty() throws Exception {
+		var date = LocalDate.now(clock).plusDays(1);
+
+		mvc.perform(create(bearer(member()), date))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.result.exactMatchCount").value(0))
+				.andExpect(jsonPath("$.result.hasResults").value(false));
+	}
+
+	@Test
+	void readsExistingJsonbConditionsAndUsesThemToSearchAgain() throws Exception {
+		var date = LocalDate.now(clock).plusDays(1);
+		long matchId = recruitMatch(date, "11440", "37.560", "126.900", MatchType.WOMENS_DOUBLES);
+		var owner = member();
+		var now = LocalDateTime.now(clock);
+		var savedJson = """
+				{"dates":["%s"],"areaCodes":["11440","11410"],"startTimeFrom":"14:00","startTimeTo":"17:00",
+				 "matchTypes":["DOUBLES"],"minNtrp":1.0,"maxNtrp":4.0,"sameGenderOnly":false}
+				""".formatted(date);
+		long id = jdbc.queryForObject("""
+				insert into match_request (owner_id, conditions, expires_at, created_at, updated_at)
+				values (?, cast(? as jsonb), ?, ?, ?) returning id
+				""", Long.class, owner.getId(), savedJson, date.plusDays(1).atStartOfDay(), now, now);
+		entityManager.clear();
+		String auth = bearer(owner);
+
+		mvc.perform(get(PATH + "/{id}", id).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.conditions.matchTypes[0]").value("DOUBLES"))
+				.andExpect(jsonPath("$.result.conditions.areaCodes[0]").value("11440"))
+				.andExpect(jsonPath("$.result.conditions.areaCodes[1]").value("11410"));
+		mvc.perform(get(PATH + "/{id}/results", id).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(matchId));
 	}
 
 	@Test
@@ -278,16 +327,17 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		return "Bearer " + sessions.login(user.getId(), LoginTarget.SERVICE).accessToken();
 	}
 
-	private long recruitInSeodaemun(LocalDate date) {
+	private long recruitMatch(LocalDate date, String areaCode, String latitude, String longitude, MatchType type) {
 		var host = member();
-		var area = entityManager.createQuery("select a from Area a where a.code = '11410'", Area.class)
+		var area = entityManager.createQuery("select a from Area a where a.code = :areaCode", Area.class)
+				.setParameter("areaCode", areaCode)
 				.getSingleResult();
-		var court = Court.builder().area(area).name("가좌테니스장").address("서울 서대문구")
-				.latitude(new BigDecimal("37.5824")).longitude(new BigDecimal("126.92985")).build();
+		var court = Court.builder().area(area).name("테스트 테니스장").address("서울특별시")
+				.latitude(new BigDecimal(latitude)).longitude(new BigDecimal(longitude)).build();
 		entityManager.persist(court);
 		var slot = EntityFixtures.courtSlot(court, host, "1", date.atTime(14, 0));
 		entityManager.persist(slot);
-		var match = Match.builder().courtSlot(slot).host(host).matchTypes(Set.of(MatchType.SINGLES))
+		var match = Match.builder().courtSlot(slot).host(host).matchTypes(Set.of(type))
 				.maleRecruitCount(1).femaleRecruitCount(1).participationFee(10000)
 				.recruitmentDeadline(date.atTime(13, 0)).build();
 		entityManager.persist(match);
