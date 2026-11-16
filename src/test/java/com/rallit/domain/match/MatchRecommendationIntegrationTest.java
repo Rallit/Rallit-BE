@@ -26,7 +26,6 @@ import com.rallit.domain.region.repository.AreaRepository;
 import com.rallit.domain.user.entity.OnboardingProfile;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
@@ -481,7 +480,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		var area = areas.findAllByCodeIn(Set.of(MAPO)).getFirst();
 		var user = User.signUp();
 		user.completeOnboarding(new OnboardingProfile("추천" + UUID.randomUUID().toString().substring(0, 8),
-				gender, AgeGroup.TWENTIES, ExperiencePeriod.ONE_TO_THREE_YEARS, new BigDecimal(ntrp), false,
+				gender, AgeGroup.TWENTIES, EntityFixtures.TENNIS_STARTED_ON, new BigDecimal(ntrp), false,
 				Set.of(PreferredMatchType.SINGLES, PreferredMatchType.DOUBLES), Set.of(area),
 				Set.of(preference)));
 		entityManager.persist(user);

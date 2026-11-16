@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.UUID;
 
@@ -78,7 +80,9 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.recruitmentDeadline").value(date + "T09:00:00+09:00"))
 				.andExpect(jsonPath("$.result.canApply").value(true))
 				.andExpect(jsonPath("$.result.court.address").isString())
-				.andExpect(jsonPath("$.result.court.evidenceFileKey").doesNotExist());
+				.andExpect(jsonPath("$.result.court.evidenceFileKey").doesNotExist())
+				.andExpect(jsonPath("$.result.host.experienceYears")
+						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON, YearMonth.now(clock))));
 		var application = mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId)
 						.header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"refundPolicyAgreed\":true}"))

@@ -15,6 +15,7 @@ public class OnboardingProfileValidationException extends RuntimeException {
   public enum Reason {
     INVALID_REQUIRED_VALUES,
     INVALID_ACTIVITY_AREA,
-    INVALID_MATCH_PREFERENCES
+    INVALID_MATCH_PREFERENCES,
+    INVALID_TENNIS_START
   }
 }

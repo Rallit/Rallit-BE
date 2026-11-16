@@ -15,6 +15,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -165,8 +166,8 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.gender").value("MALE"))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.ntrp").value(3.0))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.ageGroup").value("TWENTIES"))
-				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.experiencePeriod")
-						.value("ONE_TO_THREE_YEARS"))
+				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.experienceYears")
+						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON, YearMonth.now(clock))))
 				.andExpect(jsonPath("$.result.pendingApplications[1].applicationId").value(pendingFemaleId))
 				.andExpect(jsonPath("$.result.participants.length()").value(3))
 				.andExpect(jsonPath("$.result.participants[0].host").value(true))

@@ -1,7 +1,10 @@
 package com.rallit.domain.user.entity;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -9,7 +12,6 @@ import java.util.stream.Collectors;
 
 import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.enums.AgeGroup;
-import com.rallit.domain.user.enums.ExperiencePeriod;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.enums.PreferredTimeSlot;
@@ -68,9 +70,7 @@ public class User extends BaseEntity {
 	@Column(length = 30)
 	private AgeGroup ageGroup;
 
-	@Enumerated(EnumType.STRING)
-	@Column(length = 30)
-	private ExperiencePeriod experiencePeriod;
+	private LocalDate tennisStartedOn;
 
 	@Column(precision = 2, scale = 1)
 	private BigDecimal ntrp;
@@ -122,6 +122,15 @@ public class User extends BaseEntity {
 		this.email = Objects.requireNonNull(email);
 	}
 
+	public YearMonth getTennisStartedOn() {
+		return tennisStartedOn == null ? null : YearMonth.from(tennisStartedOn);
+	}
+
+	public Integer experienceYears(YearMonth currentMonth) {
+		YearMonth startedOn = getTennisStartedOn();
+		return startedOn == null ? null : (int) ChronoUnit.YEARS.between(startedOn, currentMonth);
+	}
+
 	public boolean isWithdrawn() {
 		return status == UserStatus.WITHDRAWN;
 	}
@@ -137,7 +146,7 @@ public class User extends BaseEntity {
 		nickname = profile.nickname();
 		gender = profile.gender();
 		ageGroup = profile.ageGroup();
-		experiencePeriod = profile.experiencePeriod();
+		tennisStartedOn = profile.tennisStartedOn().atDay(1);
 		ntrp = profile.ntrp();
 		applyMatchPreferences(profile);
 		status = UserStatus.ACTIVE;
@@ -147,7 +156,7 @@ public class User extends BaseEntity {
 		return Objects.equals(nickname, profile.nickname())
 				&& gender == profile.gender()
 				&& ageGroup == profile.ageGroup()
-				&& experiencePeriod == profile.experiencePeriod()
+				&& Objects.equals(getTennisStartedOn(), profile.tennisStartedOn())
 				&& ntrp != null && ntrp.compareTo(profile.ntrp()) == 0
 				&& sameGenderOnly == profile.sameGenderOnly()
 				&& preferredMatchTypes.equals(profile.preferredMatchTypes())

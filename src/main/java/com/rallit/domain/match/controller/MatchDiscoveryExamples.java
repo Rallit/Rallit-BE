@@ -77,7 +77,7 @@ final class MatchDiscoveryExamples {
 			    "host": {
 			      "userId": 7,
 			      "nickname": "랠릿조회데모호스트",
-			      "experiencePeriod": "ONE_TO_THREE_YEARS",
+			      "experienceYears": 2,
 			      "profileImageUrl": null
 			    }
 			  }
