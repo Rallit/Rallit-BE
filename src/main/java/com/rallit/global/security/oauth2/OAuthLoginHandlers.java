@@ -104,7 +104,8 @@ public class OAuthLoginHandlers {
   private String destination(HttpServletRequest request, LoginTarget target) {
     if (target == LoginTarget.SERVICE
         && request.getAttribute(RedisAuthorizationRequestRepository.FRONTEND_CALLBACK)
-            instanceof String callback) {
+            instanceof String callback
+        && properties.allowsServiceCallback(callback)) {
       return callback;
     }
     return properties.callbackUrl(target);

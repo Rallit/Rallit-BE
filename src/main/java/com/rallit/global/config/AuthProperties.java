@@ -21,6 +21,11 @@ public record AuthProperties(
     Boolean secureCookies,
     List<String> serviceOrigins,
     List<String> adminOrigins) {
+  private static final Set<String> SERVICE_CALLBACKS =
+      Set.of("https://rallit.co.kr/auth/callback", "https://dev.rallit.co.kr/auth/callback");
+  private static final String LOCAL_SERVICE_ORIGIN = "http://localhost:5173";
+  private static final String LOCAL_SERVICE_CALLBACK = LOCAL_SERVICE_ORIGIN + "/auth/callback";
+
   public AuthProperties {
     validateCallback(frontendCallbackUrl, !Boolean.FALSE.equals(secureCookies), "rallit.co.kr");
     validateCallback(
@@ -46,6 +51,16 @@ public record AuthProperties(
       case SERVICE -> frontendCallbackUrl;
       case ADMIN -> adminFrontendCallbackUrl;
     };
+  }
+
+  public boolean allowsServiceCallback(String callback) {
+    return callback != null
+        && (SERVICE_CALLBACKS.contains(callback)
+            || (LOCAL_SERVICE_CALLBACK.equals(callback) && allowsLocalServiceFrontend()));
+  }
+
+  public boolean allowsLocalServiceFrontend() {
+    return origins(false).contains(LOCAL_SERVICE_ORIGIN);
   }
 
   public String cookieName(com.rallit.domain.auth.model.LoginTarget t, String kind) {

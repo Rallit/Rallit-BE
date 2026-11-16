@@ -34,12 +34,22 @@ public class AuthCookieManager {
 
   public void add(
       HttpServletResponse response, String name, String value, String path, long seconds) {
+    add(response, name, value, path, seconds, "Lax");
+  }
+
+  private void add(
+      HttpServletResponse response,
+      String name,
+      String value,
+      String path,
+      long seconds,
+      String sameSite) {
     response.addHeader(
         HttpHeaders.SET_COOKIE,
         ResponseCookie.from(name, value)
             .httpOnly(true)
             .secure(properties.secure())
-            .sameSite("Lax")
+            .sameSite(sameSite)
             .path(path)
             .maxAge(Math.max(0, seconds))
             .build()
@@ -48,12 +58,26 @@ public class AuthCookieManager {
 
   public void writeRefresh(HttpServletResponse response, SessionTokens tokens, LoginTarget target) {
     clearLegacyCookies(response, target);
+    addRefresh(
+        response,
+        target,
+        tokens.refreshToken(),
+        Duration.between(clock.instant(), tokens.sessionExpiresAt()).toSeconds());
+  }
+
+  private void addRefresh(
+      HttpServletResponse response, LoginTarget target, String value, long seconds) {
+    String sameSite =
+        target == LoginTarget.SERVICE && properties.secure() && properties.allowsLocalServiceFrontend()
+            ? "None"
+            : "Lax";
     add(
         response,
         name(target, "refresh"),
-        tokens.refreshToken(),
+        value,
         properties.cookiePath(target, true),
-        Duration.between(clock.instant(), tokens.sessionExpiresAt()).toSeconds());
+        seconds,
+        sameSite);
   }
 
   public void clearLegacyCookies(HttpServletResponse response, LoginTarget target) {
@@ -67,7 +91,7 @@ public class AuthCookieManager {
   }
 
   public void clear(HttpServletResponse response, LoginTarget target) {
-    add(response, name(target, "refresh"), "", properties.cookiePath(target, true), 0);
+    addRefresh(response, target, "", 0);
     clearLegacyCookies(response, target);
   }
 }

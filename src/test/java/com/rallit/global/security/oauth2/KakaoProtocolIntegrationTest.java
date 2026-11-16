@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -31,11 +32,17 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
+@SpringBootTest(
+    properties = {
+      "RALLIT_ENV_FILE=.env.test-disabled",
+      "SERVICE_ORIGINS=https://rallit.co.kr,https://dev.rallit.co.kr,http://localhost:5173"
+    })
 @AutoConfigureMockMvc
 class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
   static final String DEV_ORIGIN = "https://dev.rallit.co.kr";
   static final String DEV_CALLBACK = DEV_ORIGIN + "/auth/callback";
+  static final String LOCAL_ORIGIN = "http://localhost:5173";
+  static final String LOCAL_CALLBACK = LOCAL_ORIGIN + "/auth/callback";
   static final String SERVICE_CALLBACK = "https://rallit.co.kr/auth/callback";
   static final HttpServer server;
   static final Map<String, String> profiles = new java.util.concurrent.ConcurrentHashMap<>();
@@ -124,6 +131,9 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
             .andExpect(status().is3xxRedirection())
             .andReturn()
             .getResponse();
+    assertThat(response.getHeaders("Set-Cookie"))
+        .anySatisfy(
+            c -> assertThat(c).startsWith("__Host-rallit_oauth_").contains("SameSite=Lax"));
     String state =
         Arrays.stream(URI.create(response.getHeader("Location")).getRawQuery().split("&"))
             .filter(v -> v.startsWith("state="))
@@ -207,6 +217,9 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
     ", " + SERVICE_CALLBACK + ", false",
     SERVICE_CALLBACK + ", " + SERVICE_CALLBACK + ", true",
     DEV_CALLBACK + ", " + DEV_CALLBACK + ", true",
+    LOCAL_CALLBACK + ", " + LOCAL_CALLBACK + ", true",
+    "http://localhost:5174/auth/callback, " + SERVICE_CALLBACK + ", false",
+    LOCAL_CALLBACK + "?next=other, " + SERVICE_CALLBACK + ", false",
     DEV_CALLBACK + "/, " + SERVICE_CALLBACK + ", false",
     DEV_CALLBACK + "?next=other, " + SERVICE_CALLBACK + ", false",
     "https://dev.rallit.co.kr.example.test/auth/callback, " + SERVICE_CALLBACK + ", false"
@@ -241,9 +254,12 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
             c ->
                 assertThat(c)
                     .startsWith("__Host-rallit_refresh=")
-                    .contains("HttpOnly", "Secure", "SameSite=Lax"));
+                    .contains("HttpOnly", "Secure", "SameSite=None"));
     assertThat(response.getHeaders("Set-Cookie"))
         .noneMatch(c -> c.startsWith("__Host-rallit_admin_refresh="));
+    assertThat(response.getHeaders("Set-Cookie"))
+        .filteredOn(c -> !c.startsWith("__Host-rallit_refresh="))
+        .allMatch(c -> c.contains("SameSite=Lax"));
     mvc.perform(
             get("/api/v1/auth/kakao/callback")
                 .param("code", "test-code")
@@ -254,7 +270,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
 
   @Test
   void repeatedCallbackUsesDefaultDestination() throws Exception {
-    var attempt = start("service", DEV_CALLBACK, DEV_CALLBACK);
+    var attempt = start("service", LOCAL_CALLBACK, LOCAL_CALLBACK);
     mvc.perform(
             get("/api/v1/auth/kakao/callback")
                 .param("code", "test-code")
@@ -280,33 +296,36 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
         .andExpect(redirectedUrl(DEV_CALLBACK));
   }
 
-  @Test
-  void devOriginCanPreflightServiceRefreshOnly() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {DEV_ORIGIN, LOCAL_ORIGIN})
+  void developerFrontendCanPreflightServiceRefreshOnly(String origin) throws Exception {
     mvc.perform(
             options("/api/v1/auth/refresh")
-                .header("Origin", DEV_ORIGIN)
+                .header("Origin", origin)
                 .header("Access-Control-Request-Method", "POST")
                 .header("Access-Control-Request-Headers", "content-type,x-requested-with"))
         .andExpect(status().isOk())
-        .andExpect(header().string("Access-Control-Allow-Origin", DEV_ORIGIN))
+        .andExpect(header().string("Access-Control-Allow-Origin", origin))
         .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
     mvc.perform(
             options("/api/v1/admin/auth/refresh")
-                .header("Origin", DEV_ORIGIN)
+                .header("Origin", origin)
                 .header("Access-Control-Request-Method", "POST"))
         .andExpect(status().isForbidden());
   }
 
-  @Test
-  void refreshSuppliesMemoryAccessTokenAndLogoutNeedsNoCsrfEndpoint() throws Exception {
-    var attempt = start("service", DEV_CALLBACK);
+  @ParameterizedTest
+  @ValueSource(strings = {DEV_ORIGIN, LOCAL_ORIGIN})
+  void refreshSuppliesMemoryAccessTokenAndLogoutNeedsNoCsrfEndpoint(String origin) throws Exception {
+    String callback = origin + "/auth/callback";
+    var attempt = start("service", callback);
     var logged =
         mvc.perform(
                 get("/api/v1/auth/kakao/callback")
                     .param("code", "test-code")
                     .param("state", attempt.state())
                     .cookie(attempt.binding()))
-            .andExpect(redirectedUrl(DEV_CALLBACK))
+            .andExpect(redirectedUrl(callback))
             .andReturn()
             .getResponse();
     Cookie refresh = cookie(logged.getHeaders("Set-Cookie"), "__Host-rallit_refresh");
@@ -320,12 +339,12 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
         mvc.perform(
                 post("/api/v1/auth/refresh")
                     .cookie(refresh, new Cookie("__Host-rallit_access", "retired-cookie"))
-                    .header("Origin", DEV_ORIGIN)
+                    .header("Origin", origin)
                     .header("X-Requested-With", "XMLHttpRequest")
                     .contentType("application/json")
                     .content("{}"))
             .andExpect(status().isOk())
-            .andExpect(header().string("Access-Control-Allow-Origin", DEV_ORIGIN))
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
             .andExpect(jsonPath("$.result.refreshToken").doesNotExist())
             .andReturn()
             .getResponse();
@@ -335,13 +354,28 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.socialDisplayName").value("카카오 이름"));
     Cookie nextRefresh = cookie(rotated.getHeaders("Set-Cookie"), "__Host-rallit_refresh");
-    mvc.perform(
-            post("/api/v1/auth/logout")
-                .cookie(nextRefresh)
-                .header("Origin", DEV_ORIGIN)
-                .header("X-Requested-With", "XMLHttpRequest")
-                .contentType("application/json"))
-        .andExpect(status().isNoContent());
+    assertThat(rotated.getHeaders("Set-Cookie"))
+        .anySatisfy(
+            c ->
+                assertThat(c)
+                    .startsWith("__Host-rallit_refresh=")
+                    .contains("Secure", "SameSite=None"));
+    var loggedOut =
+        mvc.perform(
+                post("/api/v1/auth/logout")
+                    .cookie(nextRefresh)
+                    .header("Origin", origin)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .contentType("application/json"))
+            .andExpect(status().isNoContent())
+            .andReturn()
+            .getResponse();
+    assertThat(loggedOut.getHeaders("Set-Cookie"))
+        .anySatisfy(
+            c ->
+                assertThat(c)
+                    .startsWith("__Host-rallit_refresh=;")
+                    .contains("Max-Age=0", "Secure", "SameSite=None"));
   }
 
   Cookie cookie(Collection<String> headers, String name) {
@@ -448,7 +482,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
         .noneMatch(c -> c.startsWith("__Host-rallit_admin_refresh="));
     jdbc.update("update users set role='ADMIN' where id=?", id);
     try {
-      var allowed = start("admin");
+      var allowed = start("admin", LOCAL_CALLBACK);
       var response =
           mvc.perform(
                   get("/api/v1/auth/kakao/callback")
@@ -463,7 +497,7 @@ class KakaoProtocolIntegrationTest extends IntegrationTestSupport {
               c ->
                   assertThat(c)
                       .startsWith("__Host-rallit_admin_refresh=")
-                      .contains("Path=/", "HttpOnly", "Secure"));
+                      .contains("Path=/", "HttpOnly", "Secure", "SameSite=Lax"));
       assertThat(response.getHeaders("Set-Cookie"))
           .noneMatch(c -> c.startsWith("__Host-rallit_refresh="));
     } finally {
