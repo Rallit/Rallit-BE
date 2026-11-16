@@ -1,6 +1,7 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -32,12 +35,14 @@ import com.rallit.domain.user.enums.Gender;
 import com.rallit.support.EntityFixtures;
 import com.rallit.support.IntegrationTestSupport;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -51,13 +56,20 @@ import org.springframework.transaction.support.TransactionTemplate;
 class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	private static final String PATH = "/api/v1/match-requests";
+	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
 	@Autowired private MockMvc mvc;
 	@Autowired private EntityManager entityManager;
 	@Autowired private TokenSessionService sessions;
 	@Autowired private JdbcTemplate jdbc;
-	@Autowired private Clock clock;
+	@MockitoBean private Clock clock;
 	@Autowired private PlatformTransactionManager transactionManager;
+
+	@BeforeEach
+	void setUpClock() {
+		when(clock.getZone()).thenReturn(SEOUL);
+		at(LocalDateTime.of(2026, 11, 16, 12, 0));
+	}
 
 	@Test
 	void persistsConditionsAndReopensResultsWhenOnlySimilarMatchesExist() throws Exception {
@@ -133,8 +145,10 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void limitsActiveRequestsAndFreesSpaceWhenOneExpires() throws Exception {
+	void limitsActiveRequestsAndFreesSpaceExactlyAtSeoulMidnight() throws Exception {
 		var today = LocalDate.now(clock);
+		var midnight = today.plusDays(1).atStartOfDay();
+		at(midnight.minusSeconds(1));
 		String auth = bearer(member());
 		long expiring = savedRequest(auth, today);
 		savedRequest(auth, today.plusDays(1));
@@ -142,12 +156,18 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 		mvc.perform(create(auth, today.plusDays(3)))
 				.andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_LIMIT_REACHED"));
-		assertThat(jdbc.update("update match_request set expires_at = ? where id = ?",
-				today.atStartOfDay(), expiring)).isEqualTo(1);
-		entityManager.clear();
-
+		mvc.perform(get(PATH).header("Authorization", auth))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(3));
 		mvc.perform(get(PATH + "/{id}/results", expiring).header("Authorization", auth))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isOk());
+
+		at(midnight);
+		mvc.perform(get(PATH).header("Authorization", auth))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(2));
+		mvc.perform(get(PATH + "/{id}", expiring).header("Authorization", auth))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_NOT_FOUND"));
+		mvc.perform(get(PATH + "/{id}/results", expiring).header("Authorization", auth))
+				.andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_NOT_FOUND"));
 		mvc.perform(create(auth, today.plusDays(3))).andExpect(status().isCreated());
 		mvc.perform(get(PATH).header("Authorization", auth))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(3));
@@ -193,6 +213,10 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 				entityManager.remove(entityManager.find(User.class, user.getId()));
 			});
 		}
+	}
+
+	private void at(LocalDateTime time) {
+		when(clock.instant()).thenReturn(time.atZone(SEOUL).toInstant());
 	}
 
 	private long savedRequest(String auth, LocalDate date) throws Exception {
