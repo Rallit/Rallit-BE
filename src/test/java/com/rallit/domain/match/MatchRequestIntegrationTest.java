@@ -161,15 +161,29 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void rejectsPastStartTimeWhenTodayIsSelectedButAcceptsTheSameTimeForTomorrow() throws Exception {
+		var today = LocalDate.now(clock);
+		var tomorrow = today.plusDays(1);
+		at(today.atTime(15, 0));
+		String auth = bearer(member());
+
+		mvc.perform(create(auth, today, tomorrow))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_PAST_START_TIME"));
+		mvc.perform(create(auth, tomorrow)).andExpect(status().isCreated());
+	}
+
+	@Test
 	void limitsActiveRequestsAndFreesSpaceExactlyAtSeoulMidnight() throws Exception {
 		var today = LocalDate.now(clock);
 		var midnight = today.plusDays(1).atStartOfDay();
-		at(midnight.minusSeconds(1));
-		String auth = bearer(member());
-		long expiring = savedRequest(auth, today);
-		savedRequest(auth, today.plusDays(1));
-		savedRequest(auth, today.plusDays(2));
+		var owner = member();
+		String initialAuth = bearer(owner);
+		long expiring = savedRequest(initialAuth, today);
+		savedRequest(initialAuth, today.plusDays(1));
+		savedRequest(initialAuth, today.plusDays(2));
 
+		at(midnight.minusSeconds(1));
+		String auth = bearer(owner);
 		mvc.perform(create(auth, today.plusDays(3)))
 				.andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_LIMIT_REACHED"));
 		mvc.perform(get(PATH).header("Authorization", auth))

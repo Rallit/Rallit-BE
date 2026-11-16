@@ -2,6 +2,7 @@ package com.rallit.domain.match.service;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +46,9 @@ public class MatchRequestService {
 		var dates = request.dates().stream().map(MatchDate::parse).distinct().sorted().toList();
 		if (dates.getFirst().isBefore(today) || !dates.getLast().isBefore(today.plusDays(SELECTABLE_DAYS))) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE);
+		}
+		if (dates.getFirst().equals(today) && !today.atTime(LocalTime.parse(request.startTimeFrom())).isAfter(now)) {
+			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME);
 		}
 		if (request.sameGenderOnly() && request.matchTypes().contains(PreferredMatchType.MIXED_DOUBLES)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_PREFERENCES);

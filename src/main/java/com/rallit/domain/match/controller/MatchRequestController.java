@@ -46,12 +46,14 @@ public class MatchRequestController {
 	private final MatchRequestService requests;
 
 	@PostMapping
-	@Operation(summary = "매칭 요청 저장", description = "조건을 저장하고 정확 일치 건수와 결과 화면을 열 수 있는지를 반환합니다.")
+	@Operation(summary = "매칭 요청 저장", description = "조건을 저장하고 정확 일치 건수와 결과 화면을 열 수 있는지를 반환합니다. "
+			+ "오늘이 포함되면 시작 시간은 현재 시각보다 늦어야 합니다.")
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", useReturnTypeSchema = true)
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "검색 조건이 유효하지 않습니다.",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 					schema = @Schema(implementation = ApiResponse.class), examples = {
 					@ExampleObject(name = "날짜 범위", ref = MatchRequestErrorExamples.INVALID_DATE_REF),
+					@ExampleObject(name = "오늘의 지난 시작 시각", ref = MatchRequestErrorExamples.PAST_START_TIME_REF),
 					@ExampleObject(name = "동성만과 혼합복식", ref = MatchRequestErrorExamples.INVALID_PREFERENCES_REF),
 					@ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST),
 					@ExampleObject(name = "지원하지 않는 자치구", value = MatchDiscoveryExamples.INVALID_SEARCH_AREA),

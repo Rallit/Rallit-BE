@@ -14,12 +14,14 @@ class MatchRequestErrorExamples {
 
 	private static final String EXAMPLE_PREFIX = "#/components/examples/";
 	private static final String INVALID_DATE = "matchRequestInvalidDate";
+	private static final String PAST_START_TIME = "matchRequestPastStartTime";
 	private static final String INVALID_PREFERENCES = "matchRequestInvalidPreferences";
 	private static final String NOT_FOUND = "matchRequestNotFound";
 	private static final String LIMIT_REACHED = "matchRequestLimitReached";
 	private static final String ONBOARDING_REQUIRED = "matchRequestOnboardingRequired";
 
 	static final String INVALID_DATE_REF = EXAMPLE_PREFIX + INVALID_DATE;
+	static final String PAST_START_TIME_REF = EXAMPLE_PREFIX + PAST_START_TIME;
 	static final String INVALID_PREFERENCES_REF = EXAMPLE_PREFIX + INVALID_PREFERENCES;
 	static final String NOT_FOUND_REF = EXAMPLE_PREFIX + NOT_FOUND;
 	static final String LIMIT_REACHED_REF = EXAMPLE_PREFIX + LIMIT_REACHED;
@@ -28,6 +30,7 @@ class MatchRequestErrorExamples {
 	OpenApiCustomizer registerMatchRequestErrorExamples() {
 		return api -> api.getComponents()
 				.addExamples(INVALID_DATE, example(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE))
+				.addExamples(PAST_START_TIME, example(MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME))
 				.addExamples(INVALID_PREFERENCES, example(MatchErrorStatus.MATCH_REQUEST_INVALID_PREFERENCES))
 				.addExamples(NOT_FOUND, example(MatchErrorStatus.MATCH_REQUEST_NOT_FOUND))
 				.addExamples(LIMIT_REACHED, example(MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED))
