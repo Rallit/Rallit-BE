@@ -39,8 +39,8 @@ class MatchApplicationEligibility {
 		if (recruitCount <= 0 || (match.isSameGenderOnly() && match.getHost().getGender() != applicant.getGender())) {
 			return Optional.of(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
 		}
-		if (applications.countByMatchIdAndApplicantGenderAndStatus(match.getId(),
-				applicant.getGender(), MatchApplicationStatus.CONFIRMED) >= recruitCount) {
+		if (applications.countByMatchIdAndApplicantGenderAndStatusIn(match.getId(),
+				applicant.getGender(), MatchApplicationStatus.SEAT_OCCUPYING) >= recruitCount) {
 			return Optional.of(MatchApplicationErrorStatus.RECRUITMENT_FULL);
 		}
 		if (applications.existsActiveApplication(match.getId(), applicant.getId())) {

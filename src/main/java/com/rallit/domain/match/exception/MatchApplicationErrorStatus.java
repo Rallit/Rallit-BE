@@ -18,7 +18,7 @@ public enum MatchApplicationErrorStatus implements BaseErrorCode {
 	APPLICATION_DUPLICATED(HttpStatus.CONFLICT, "이미 진행 중인 참가 신청이 있습니다."),
 	APPLICATION_NOT_CANCELABLE(HttpStatus.CONFLICT, "현재 상태에서는 참가 신청을 취소할 수 없습니다."),
 	APPLICATION_NOT_PENDING(HttpStatus.CONFLICT, "수락 또는 거절을 기다리는 참가 신청이 아닙니다."),
-	RECRUITMENT_FULL(HttpStatus.CONFLICT, "해당 성별의 모집 인원이 모두 확정되었습니다."),
+	RECRUITMENT_FULL(HttpStatus.CONFLICT, "해당 성별의 모집 인원이 모두 찼습니다."),
 	SEAT_UNAVAILABLE(HttpStatus.CONFLICT, "해당 성별의 잔여석이 없습니다.");
 
 	private final HttpStatus httpStatus;

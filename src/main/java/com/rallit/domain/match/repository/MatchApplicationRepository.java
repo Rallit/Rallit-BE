@@ -21,9 +21,6 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 	boolean existsByMatchIdAndApplicantIdAndStatusIn(Long matchId, Long applicantId,
 			Collection<MatchApplicationStatus> statuses);
 
-	long countByMatchIdAndApplicantGenderAndStatus(Long matchId, Gender applicantGender,
-			MatchApplicationStatus status);
-
 	long countByMatchIdAndApplicantGenderAndStatusIn(Long matchId, Gender applicantGender,
 			Collection<MatchApplicationStatus> statuses);
 

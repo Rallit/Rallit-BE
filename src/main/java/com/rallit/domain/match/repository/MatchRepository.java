@@ -50,7 +50,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			and (m.sameGenderOnly = false or m.host.gender = :gender)
 			and (select count(a) from MatchApplication a
 				where a.match.id = m.id and a.applicantGender = :gender
-				and a.status = com.rallit.domain.match.enums.MatchApplicationStatus.CONFIRMED)
+				and a.status in (com.rallit.domain.match.enums.MatchApplicationStatus.PAYMENT_PENDING,
+					com.rallit.domain.match.enums.MatchApplicationStatus.CONFIRMED))
 				< (case when :gender = com.rallit.domain.user.enums.Gender.MALE
 					then m.maleRecruitCount else m.femaleRecruitCount end)
 			and not exists (

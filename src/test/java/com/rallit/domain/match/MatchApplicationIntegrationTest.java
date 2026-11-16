@@ -290,16 +290,18 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void rejectsGenderWhoseSeatsAreAllConfirmedButNotOnlyPending() throws Exception {
-		Match match = recruitingMatch(activeUser(Gender.MALE));
-		long firstMaleId = id(apply(activeUser(Gender.MALE), match.getId(), AGREED));
-		apply(activeUser(Gender.MALE), match.getId(), AGREED).andExpect(status().isCreated());
-		jdbcTemplate.update("UPDATE match_application SET status = 'CONFIRMED' WHERE id = ?", firstMaleId);
+	void rejectsGenderWhoseSeatsAreAllOccupiedButNotOnlyPending() throws Exception {
+		for (String occupyingStatus : List.of("PAYMENT_PENDING", "CONFIRMED")) {
+			Match match = recruitingMatch(activeUser(Gender.MALE));
+			long firstMaleId = id(apply(activeUser(Gender.MALE), match.getId(), AGREED));
+			apply(activeUser(Gender.MALE), match.getId(), AGREED).andExpect(status().isCreated());
+			jdbcTemplate.update("UPDATE match_application SET status = ? WHERE id = ?", occupyingStatus, firstMaleId);
 
-		apply(activeUser(Gender.MALE), match.getId(), AGREED)
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("RECRUITMENT_FULL"));
-		apply(activeUser(Gender.FEMALE), match.getId(), AGREED).andExpect(status().isCreated());
+			apply(activeUser(Gender.MALE), match.getId(), AGREED)
+					.andExpect(status().isConflict())
+					.andExpect(jsonPath("$.code").value("RECRUITMENT_FULL"));
+			apply(activeUser(Gender.FEMALE), match.getId(), AGREED).andExpect(status().isCreated());
+		}
 	}
 
 	@Test
