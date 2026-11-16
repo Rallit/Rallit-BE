@@ -79,6 +79,19 @@ public class MatchApplication extends BaseEntity {
 		return new MatchApplication(match, applicant, refundPolicyAgreedAt);
 	}
 
+	public void accept(LocalDateTime acceptedAt, LocalDateTime paymentDueAt) {
+		validatePending();
+		this.status = MatchApplicationStatus.PAYMENT_PENDING;
+		this.acceptedAt = acceptedAt;
+		this.paymentDueAt = paymentDueAt;
+	}
+
+	public void reject(MatchApplicationRejectReason rejectReason) {
+		validatePending();
+		this.status = MatchApplicationStatus.REJECTED;
+		this.rejectReason = rejectReason;
+	}
+
 	public void cancel(MatchApplicationCancelReason cancelReason, LocalDateTime canceledAt) {
 		if (status == MatchApplicationStatus.CANCELED) {
 			return;
@@ -89,5 +102,11 @@ public class MatchApplication extends BaseEntity {
 		this.status = MatchApplicationStatus.CANCELED;
 		this.cancelReason = cancelReason;
 		this.canceledAt = canceledAt;
+	}
+
+	private void validatePending() {
+		if (status != MatchApplicationStatus.PENDING) {
+			throw new IllegalStateException("Match application is not pending: " + status);
+		}
 	}
 }

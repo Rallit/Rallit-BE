@@ -24,6 +24,9 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 	long countByMatchIdAndApplicantGenderAndStatus(Long matchId, Gender applicantGender,
 			MatchApplicationStatus status);
 
+	long countByMatchIdAndApplicantGenderAndStatusIn(Long matchId, Gender applicantGender,
+			Collection<MatchApplicationStatus> statuses);
+
 	default boolean existsActiveApplication(Long matchId, Long applicantId) {
 		return existsByMatchIdAndApplicantIdAndStatusIn(matchId, applicantId, MatchApplicationStatus.ACTIVE);
 	}
@@ -86,14 +89,18 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 	Optional<MatchApplication> findByIdAndApplicantIdForUpdate(@Param("id") Long id,
 			@Param("applicantId") Long applicantId);
 
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select a from MatchApplication a where a.id = :id and a.match.id = :matchId")
+	Optional<MatchApplication> findByIdAndMatchIdForUpdate(@Param("id") Long id, @Param("matchId") Long matchId);
+
 	@Query("""
 			select a from MatchApplication a
 			join fetch a.applicant
-			where a.match.id = :matchId and a.status = :status
+			where a.match.id = :matchId and a.status in :statuses
 			order by a.id
 			""")
-	List<MatchApplication> findAllWithApplicantByMatchIdAndStatus(@Param("matchId") Long matchId,
-			@Param("status") MatchApplicationStatus status);
+	List<MatchApplication> findAllWithApplicantByMatchIdAndStatusIn(@Param("matchId") Long matchId,
+			@Param("statuses") Collection<MatchApplicationStatus> statuses);
 
 	interface MatchApplicationCount {
 

@@ -10,10 +10,13 @@ import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.user.enums.Gender;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface MatchRepository extends JpaRepository<Match, Long> {
 
@@ -72,4 +75,18 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			where m.id = :id and s.status = :slotStatus and m.status = :matchStatus and s.startsAt > :now
 			""")
 	Optional<Match> findDiscoveryDetail(Long id, CourtSlotStatus slotStatus, MatchStatus matchStatus, LocalDateTime now);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select m from Match m where m.id = :id")
+	Optional<Match> findByIdForUpdate(@Param("id") Long id);
+
+	@Query("""
+			select m from Match m
+			join fetch m.host
+			left join fetch m.matchTypes
+			join fetch m.courtSlot s
+			join fetch s.court
+			where m.id = :id
+			""")
+	Optional<Match> findDetailById(@Param("id") Long id);
 }
