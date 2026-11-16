@@ -6,6 +6,7 @@ import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationRejectReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.exception.MatchApplicationNotCancelableException;
+import com.rallit.domain.match.exception.MatchApplicationNotPendingException;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.global.entity.BaseEntity;
@@ -104,9 +105,9 @@ public class MatchApplication extends BaseEntity {
 		this.canceledAt = canceledAt;
 	}
 
-	private void validatePending() {
+	public void validatePending() {
 		if (status != MatchApplicationStatus.PENDING) {
-			throw new IllegalStateException("Match application is not pending: " + status);
+			throw new MatchApplicationNotPendingException();
 		}
 	}
 }

@@ -165,9 +165,7 @@ public class MatchApplicationService {
 	private MatchApplication findPendingApplicationForUpdate(Long matchId, Long applicationId) {
 		MatchApplication application = matchApplicationRepository.findByIdAndMatchIdForUpdate(applicationId, matchId)
 				.orElseThrow(() -> new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_FOUND));
-		if (application.getStatus() != MatchApplicationStatus.PENDING) {
-			throw new GeneralException(MatchApplicationErrorStatus.APPLICATION_NOT_PENDING);
-		}
+		application.validatePending();
 		return application;
 	}
 
