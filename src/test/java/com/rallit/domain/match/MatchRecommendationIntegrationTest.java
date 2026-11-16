@@ -141,8 +141,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		long timeOnly = match(host, exactArea, date, "13:00", "2.5", "4.0", MatchType.SINGLES, true);
 		long both = match(host, nearby, date, "16:00", "2.5", "4.0", MatchType.SINGLES, true);
 		match(host, nearby, date, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
-		match(host, nearby, date, "14:00", "2.5", "3.5", MatchType.SINGLES, true);
-		match(host, nearby, date, "14:00", "4.0", "4.0", MatchType.SINGLES, true);
+		match(host, nearby, date, "14:00", "2.0", "2.5", MatchType.SINGLES, true);
 		match(host, nearby, date, "14:00", "2.5", "4.0", MatchType.RALLY, true);
 		match(host, tooFar, date, "14:00", "2.5", "4.0", MatchType.SINGLES, true);
 		match(viewer, nearby, date, "14:00", "2.5", "4.0", MatchType.SINGLES, true);
@@ -251,31 +250,38 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void comparesOnlyConfiguredNtrpBoundsWhenSearchSpecifiesLevels() throws Exception {
+	void includesOverlappingAndUnrestrictedNtrpRangesInExactAndSimilarResults() throws Exception {
 		var date = saturday();
 		var host = member(Gender.MALE, "3.0");
 		var original = court(MAPO, "37.560", "126.900");
 		var nearby = court(SEODAEMUN, "37.5824", "126.92985");
-		long lowerBoundOnly = match(host, original, date, "14:00", "2.5", null, MatchType.SINGLES, false);
-		long upperBoundOnly = match(host, nearby, date, "14:00", null, "3.5", MatchType.SINGLES, false);
-		long unspecifiedExact = match(host, original, date, "14:00", null, null, MatchType.SINGLES, false);
-		long unspecifiedSimilar = match(host, nearby, date, "14:00", null, null, MatchType.SINGLES, false);
-		match(host, original, date, "15:00", "3.5", null, MatchType.SINGLES, false);
-		match(host, nearby, date, "15:00", null, "3.0", MatchType.SINGLES, false);
+		long lowerBoundOnly = match(host, original, date, "14:00", "2.0", null, MatchType.SINGLES, false);
+		long upperBoundOnly = match(host, nearby, date, "14:00", null, "1.0", MatchType.SINGLES, false);
+		long unspecifiedExact = match(host, original, date, "14:30", null, null, MatchType.SINGLES, false);
+		long unspecifiedSimilar = match(host, nearby, date, "14:30", null, null, MatchType.SINGLES, false);
+		long partialOverlap = match(host, original, date, "14:45", "1.5", "2.5", MatchType.SINGLES, false);
+		match(host, original, date, "15:00", "2.5", null, MatchType.SINGLES, false);
+		match(host, nearby, date, "15:00", "2.5", "3.0", MatchType.SINGLES, false);
 		String auth = bearer(viewer());
 
-		mvc.perform(search(auth, date).param("minNtrp", "3.0").param("maxNtrp", "3.5"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(1))
-				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(lowerBoundOnly))
-				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
-				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(upperBoundOnly));
-		mvc.perform(search(auth, date))
+		mvc.perform(search(auth, date).param("minNtrp", "1.0").param("maxNtrp", "2.0"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(lowerBoundOnly))
 				.andExpect(jsonPath("$.result.exactMatches.items[1].match.matchId").value(unspecifiedExact))
-				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(3))
+				.andExpect(jsonPath("$.result.exactMatches.items[2].match.matchId").value(partialOverlap))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(2))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(upperBoundOnly))
 				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(unspecifiedSimilar));
+		mvc.perform(search(auth, date).param("minNtrp", "1.5").param("maxNtrp", "2.0"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(3))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(unspecifiedSimilar));
+		mvc.perform(search(auth, date))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(4))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(3));
 	}
 
 	@Test

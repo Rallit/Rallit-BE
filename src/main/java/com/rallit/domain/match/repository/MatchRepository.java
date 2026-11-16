@@ -121,9 +121,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			and cast(s.startsAt as LocalTime) >= :startTime
 			and s.endsAt <= timestampadd(minute, :endMinute, cast(cast(s.startsAt as LocalDate) as LocalDateTime))
 			and (:filterNtrp = false or (
-			""" + HAS_NTRP_BOUND + """
-				and (m.minNtrp is null or m.minNtrp <= :minimumNtrp)
-				and (m.maxNtrp is null or m.maxNtrp >= :maximumNtrp)
+				(m.minNtrp is null or m.minNtrp <= :maximumNtrp)
+				and (m.maxNtrp is null or m.maxNtrp >= :minimumNtrp)
 			))
 			order by s.startsAt, m.id
 			""")

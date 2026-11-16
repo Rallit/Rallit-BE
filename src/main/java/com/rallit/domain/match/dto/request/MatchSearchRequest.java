@@ -28,8 +28,8 @@ public record MatchSearchRequest(
 		@Pattern(regexp = CLOCK_TIME + "|24:00") String startTimeTo,
 		@Schema(description = "선택한 경기 방식 중 하나 이상과 일치해야 합니다. DOUBLES는 남복·여복을 포함합니다.")
 		List<@NotNull PreferredMatchType> matchTypes,
-		@Schema(description = "희망 NTRP 최솟값. maxNtrp와 함께 전달합니다. 선택 범위 전체가 매치의 설정된 모집 경계에 "
-				+ "들어와야 하며, 모집 경계가 모두 미설정인 매치는 제외합니다.", example = "2.5",
+		@Schema(description = "희망 NTRP 최솟값. maxNtrp와 함께 전달합니다. 모집 범위와 경계를 포함해 겹치면 반환하며, "
+				+ "설정되지 않은 모집 경계에는 제한이 없습니다.", example = "2.5",
 				minimum = "1.0", maximum = "4.0", multipleOf = 0.5)
 		BigDecimal minNtrp,
 		@Schema(description = "희망 NTRP 최댓값. minNtrp와 함께 전달합니다. 4.0+는 숫자 4.0으로 전달합니다.",
