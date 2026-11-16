@@ -1,6 +1,9 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -27,8 +30,10 @@ import com.jayway.jsonpath.JsonPath;
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.court.entity.Court;
+import com.rallit.domain.match.dto.request.MatchSearchRequest;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.match.service.MatchRecommendationService;
 import com.rallit.domain.region.entity.Area;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
@@ -43,6 +48,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -63,6 +69,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	@Autowired private TokenSessionService sessions;
 	@Autowired private JdbcTemplate jdbc;
 	@MockitoBean private Clock clock;
+	@MockitoSpyBean private MatchRecommendationService recommendations;
 	@Autowired private PlatformTransactionManager transactionManager;
 
 	@BeforeEach
@@ -219,6 +226,23 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(create(auth, today, tomorrow))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_PAST_START_TIME"));
 		mvc.perform(create(auth, tomorrow)).andExpect(status().isCreated());
+	}
+
+	@Test
+	void rejectsTodayWhenPreviewFinishesAtTheSelectedStartTime() throws Exception {
+		var today = LocalDate.now(clock);
+		var owner = member();
+		String auth = bearer(owner);
+		doAnswer(invocation -> {
+			Object result = invocation.callRealMethod();
+			at(today.atTime(14, 0));
+			return result;
+		}).when(recommendations).search(eq(owner.getId()), any(MatchSearchRequest.class), eq(0), eq(0), eq(1));
+
+		mvc.perform(create(auth, today))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_PAST_START_TIME"));
+		mvc.perform(get(PATH).header("Authorization", bearer(owner)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(0));
 	}
 
 	@Test

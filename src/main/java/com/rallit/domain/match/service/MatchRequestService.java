@@ -1,6 +1,7 @@
 package com.rallit.domain.match.service;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
@@ -23,11 +24,12 @@ import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class MatchRequestService {
 
 	private static final int MAX_ACTIVE_REQUESTS = 3;
@@ -37,24 +39,15 @@ public class MatchRequestService {
 	private final UserRepository users;
 	private final MatchRecommendationService recommendations;
 	private final Clock clock;
+	private final PlatformTransactionManager transactions;
 
-	@Transactional
 	public MatchRequestCreatedResponse create(Long userId, MatchSearchRequest request) {
-		User owner = requireOnboarding(users.findByIdForUpdate(userId));
-		var now = now();
-		var today = now.toLocalDate();
+		requireOnboarding(users.findById(userId));
 		var dates = request.dates().stream().map(MatchDate::parse).distinct().sorted().toList();
-		if (dates.getFirst().isBefore(today) || !dates.getLast().isBefore(today.plusDays(SELECTABLE_DAYS))) {
-			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE);
-		}
-		if (dates.getFirst().equals(today) && !today.atTime(LocalTime.parse(request.startTimeFrom())).isAfter(now)) {
-			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME);
-		}
+		var startTime = LocalTime.parse(request.startTimeFrom());
+		validateSchedule(dates, startTime, now());
 		if (request.sameGenderOnly() && request.matchTypes().contains(PreferredMatchType.MIXED_DOUBLES)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_PREFERENCES);
-		}
-		if (requests.countByOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(userId, now) >= MAX_ACTIVE_REQUESTS) {
-			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED);
 		}
 
 		var conditions = new MatchRequestConditions(dates.stream().map(Object::toString).toList(),
@@ -62,22 +55,33 @@ public class MatchRequestService {
 				request.matchTypes().stream().distinct().toList(), request.minNtrp(), request.maxNtrp(),
 				request.sameGenderOnly());
 		var preview = recommendations.search(userId, toSearchRequest(conditions), 0, 0, 1);
-		var saved = requests.save(new MatchRequest(owner, conditions, dates.getLast().plusDays(1).atStartOfDay()));
+		var saved = new TransactionTemplate(transactions).execute(transaction -> {
+			var owner = requireOnboarding(users.findByIdForUpdate(userId));
+			var now = now();
+			validateSchedule(dates, startTime, now);
+			if (requests.countByOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(userId, now) >= MAX_ACTIVE_REQUESTS) {
+				throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED);
+			}
+			return requests.save(new MatchRequest(owner, conditions, dates.getLast().plusDays(1).atStartOfDay()));
+		});
 		return new MatchRequestCreatedResponse(toResponse(saved), preview.exactMatches().totalElements(),
 				preview.hasResults());
 	}
 
+	@Transactional(readOnly = true)
 	public List<MatchRequestResponse> list(Long userId) {
 		requireOnboarding(users.findById(userId));
 		return requests.findAllByOwnerIdAndDeletedAtIsNullAndExpiresAtAfterOrderByCreatedAtDescIdDesc(userId, now())
 				.stream().map(this::toResponse).toList();
 	}
 
+	@Transactional(readOnly = true)
 	public MatchRequestResponse detail(Long userId, Long requestId) {
 		requireOnboarding(users.findById(userId));
 		return toResponse(activeRequest(userId, requestId, now()));
 	}
 
+	@Transactional(readOnly = true)
 	public MatchSearchResponse results(Long userId, Long requestId, int exactPage, int similarPage, int size) {
 		requireOnboarding(users.findById(userId));
 		var request = activeRequest(userId, requestId, now());
@@ -89,6 +93,16 @@ public class MatchRequestService {
 		requireOnboarding(users.findByIdForUpdate(userId));
 		var now = now();
 		activeRequest(userId, requestId, now).delete(now);
+	}
+
+	private static void validateSchedule(List<LocalDate> dates, LocalTime startTime, LocalDateTime now) {
+		var today = now.toLocalDate();
+		if (dates.getFirst().isBefore(today) || !dates.getLast().isBefore(today.plusDays(SELECTABLE_DAYS))) {
+			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE);
+		}
+		if (dates.getFirst().equals(today) && !today.atTime(startTime).isAfter(now)) {
+			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME);
+		}
 	}
 
 	private MatchRequest activeRequest(Long userId, Long requestId, LocalDateTime now) {
