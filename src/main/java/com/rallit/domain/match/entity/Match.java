@@ -8,6 +8,8 @@ import java.util.Set;
 import com.rallit.domain.court.entity.CourtSlot;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
+import com.rallit.domain.match.exception.InvalidMatchNtrpException;
+import com.rallit.domain.user.entity.Ntrp;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.AgeGroup;
 import com.rallit.global.entity.BaseEntity;
@@ -66,6 +68,9 @@ public class Match extends BaseEntity {
 	private BigDecimal maxNtrp;
 
 	@Column(nullable = false)
+	private boolean sameGenderOnly;
+
+	@Column(nullable = false)
 	private Integer participationFee;
 
 	@Column(nullable = false)
@@ -96,7 +101,9 @@ public class Match extends BaseEntity {
 	@Builder
 	private Match(CourtSlot courtSlot, User host, Set<MatchType> matchTypes, Integer maleRecruitCount,
 			Integer femaleRecruitCount, BigDecimal minNtrp, BigDecimal maxNtrp, Integer participationFee,
-			LocalDateTime recruitmentDeadline, Set<AgeGroup> preferredAgeGroups) {
+			LocalDateTime recruitmentDeadline, Set<AgeGroup> preferredAgeGroups, boolean sameGenderOnly) {
+		validateNtrp(minNtrp);
+		validateNtrp(maxNtrp);
 		this.courtSlot = courtSlot;
 		this.host = host;
 		this.status = MatchStatus.PENDING_APPROVAL;
@@ -104,6 +111,7 @@ public class Match extends BaseEntity {
 		this.femaleRecruitCount = femaleRecruitCount;
 		this.minNtrp = minNtrp;
 		this.maxNtrp = maxNtrp;
+		this.sameGenderOnly = sameGenderOnly;
 		this.participationFee = participationFee;
 		this.recruitmentDeadline = recruitmentDeadline;
 		if (preferredAgeGroups != null) {
@@ -111,6 +119,12 @@ public class Match extends BaseEntity {
 		}
 		if (matchTypes != null) {
 			this.matchTypes.addAll(matchTypes);
+		}
+	}
+
+	private static void validateNtrp(BigDecimal value) {
+		if (value != null && !Ntrp.isSupported(value)) {
+			throw new InvalidMatchNtrpException();
 		}
 	}
 }
