@@ -1,6 +1,7 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -275,6 +277,54 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(create(auth, today.plusDays(3))).andExpect(status().isCreated());
 		mvc.perform(get(PATH).header("Authorization", auth))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.result.length()").value(3));
+	}
+
+	@Test
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	void searchesBeforeUserLockAndRejectsStartTimePassedWhileWaiting() throws Exception {
+		var tx = new TransactionTemplate(transactionManager);
+		var owner = tx.execute(status -> member());
+		var today = LocalDate.now(clock);
+		var previewFinished = new CountDownLatch(1);
+		try (var pool = Executors.newSingleThreadExecutor()) {
+			String auth = bearer(owner);
+			doAnswer(invocation -> {
+				Object result = invocation.callRealMethod();
+				previewFinished.countDown();
+				return result;
+			}).when(recommendations).search(eq(owner.getId()), any(MatchSearchRequest.class), eq(0), eq(0), eq(1));
+
+			var response = tx.execute(status -> {
+				jdbc.queryForObject("select id from users where id = ? for update", Long.class, owner.getId());
+				var pending = pool.submit(() -> mvc.perform(create(auth, today)).andReturn().getResponse());
+				await().alias("preview completes while the user row is locked")
+						.pollInSameThread().atMost(10, TimeUnit.SECONDS)
+						.until(() -> previewFinished.getCount() == 0);
+				// Poll on the lock holder's connection: the other pool connection is waiting for this lock.
+				await().alias("creation waits for the user lock")
+						.pollInSameThread().atMost(10, TimeUnit.SECONDS)
+						.until(() -> Boolean.TRUE.equals(jdbc.queryForObject("""
+								select exists (
+								    select 1 from pg_stat_activity
+								    where pg_backend_pid() = any(pg_blocking_pids(pid))
+								)
+								""", Boolean.class)));
+				at(today.atTime(14, 0));
+				return pending;
+			});
+
+			var result = response.get(10, TimeUnit.SECONDS);
+			assertThat(result.getStatus()).isEqualTo(400);
+			assertThat((String) JsonPath.read(result.getContentAsString(), "$.code"))
+					.isEqualTo("MATCH_REQUEST_PAST_START_TIME");
+			assertThat(jdbc.queryForObject("select count(*) from match_request where owner_id = ?",
+					Long.class, owner.getId())).isZero();
+		} finally {
+			tx.executeWithoutResult(status -> {
+				jdbc.update("delete from match_request where owner_id = ?", owner.getId());
+				entityManager.remove(entityManager.find(User.class, owner.getId()));
+			});
+		}
 	}
 
 	@Test
