@@ -34,6 +34,8 @@ import com.rallit.support.EntityFixtures;
 import com.rallit.support.IntegrationTestSupport;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -228,6 +230,26 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				Long.class)).isEqualTo(25L);
 	}
 
+	@ParameterizedTest
+	@CsvSource({
+			"1, WEEKEND_MORNING, 11:59, 12:00",
+			"2, WEEKDAY_AFTERNOON, 12:00, 11:59"
+	})
+	void classifiesSundayMorningAndWeekdayNoon(int daysAfterSaturday, PreferredTimeSlot preference,
+			String matchingTime, String excludedTime) throws Exception {
+		var date = saturday().plusDays(daysAfterSaturday);
+		var host = member(Gender.MALE, "3.0");
+		var viewer = member(Gender.FEMALE, "4.0", preference);
+		var original = court(MAPO, "37.560", "126.900");
+		long expected = match(host, original, date, matchingTime, "3.5", "4.0", MatchType.SINGLES, false);
+		match(host, original, date, excludedTime, "3.5", "4.0", MatchType.SINGLES, false);
+
+		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", bearer(viewer)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(1))
+				.andExpect(jsonPath("$.result.items[0].match.matchId").value(expected));
+	}
+
 	@Test
 	void comparesOnlyConfiguredNtrpBoundsWhenSearchSpecifiesLevels() throws Exception {
 		var date = saturday();
@@ -413,12 +435,16 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private User member(Gender gender, String ntrp) {
+		return member(gender, ntrp, PreferredTimeSlot.WEEKEND_AFTERNOON);
+	}
+
+	private User member(Gender gender, String ntrp, PreferredTimeSlot preference) {
 		var area = areas.findAllByCodeIn(Set.of(MAPO)).getFirst();
 		var user = User.signUp();
 		user.completeOnboarding(new OnboardingProfile("추천" + UUID.randomUUID().toString().substring(0, 8),
 				gender, AgeGroup.TWENTIES, ExperiencePeriod.ONE_TO_THREE_YEARS, new BigDecimal(ntrp), false,
 				Set.of(PreferredMatchType.SINGLES, PreferredMatchType.DOUBLES), Set.of(area),
-				Set.of(PreferredTimeSlot.WEEKEND_AFTERNOON)));
+				Set.of(preference)));
 		entityManager.persist(user);
 		entityManager.flush();
 		return user;
