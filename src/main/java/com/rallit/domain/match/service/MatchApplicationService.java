@@ -132,9 +132,9 @@ public class MatchApplicationService {
 		Match match = matchRepository.findByIdForUpdate(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
 		validateHost(match, userId);
+		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		LocalDateTime now = now();
 		validateRecruiting(match, now);
-		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
 		int recruitCount = application.getApplicantGender() == Gender.MALE
 				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
 		if (matchApplicationRepository.countByMatchIdAndApplicantGenderAndStatusIn(matchId,
