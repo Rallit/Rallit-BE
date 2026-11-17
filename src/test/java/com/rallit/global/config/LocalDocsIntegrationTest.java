@@ -139,12 +139,17 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
             .value("2026-11-15T14:00:00+09:00"))
         .andExpect(jsonPath(listJson + ".examples['검색 결과 없음'].value.result.totalElements").value(0))
         .andExpect(jsonPath(detailJson + ".examples['신청 가능'].value.result.canApply").value(true))
+        .andExpect(jsonPath(detailJson + ".examples['신청 가능'].value.result.court.facilities[0].type").value("PARKING"))
+        .andExpect(jsonPath(detailJson + ".examples['신청 가능'].value.result.court.facilities[1].note").isString())
         .andExpect(jsonPath(detailJson + ".examples['신청 가능'].value.result.recruitmentDeadline")
             .value("2026-11-15T13:00:00+09:00"))
         .andExpect(jsonPath("$.components.schemas.MatchListItemResponse.properties.startsAt.format").value("date-time"))
         .andExpect(jsonPath("$.components.schemas.MatchListItemResponse.properties.courtThumbnailUrl.type[*]",
             containsInAnyOrder("string", "null")))
         .andExpect(jsonPath("$.components.schemas.CourtInfo.properties.thumbnailUrl.type[*]",
+            containsInAnyOrder("string", "null")))
+        .andExpect(jsonPath("$.components.schemas.CourtInfo.properties.facilities.type").value("array"))
+        .andExpect(jsonPath("$.components.schemas.CourtFacilityResponse.properties.note.type[*]",
             containsInAnyOrder("string", "null")))
         .andExpect(jsonPath("$.components.schemas.MatchDetailResponse.properties.applicationBlockReason.type[*]",
             containsInAnyOrder("string", "null")))

@@ -6,6 +6,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 
+import com.rallit.domain.court.dto.CourtFacilityResponse;
 import com.rallit.domain.court.dto.CourtThumbnailResponse;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchStatus;
@@ -42,14 +43,16 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 				match.getPreferredAgeGroups().stream().sorted().toList(),
 				new CourtInfo(court.getId(), court.getName(), court.getAddress(), slot.getCourtNumber(),
 						court.getLatitude(), court.getLongitude(), court.isHasParking(), court.isHasShower(),
-						court.getFacilityNotes(), card.courtThumbnailUrl()),
+						court.getFacilityNotes(), CourtFacilityResponse.from(court), card.courtThumbnailUrl()),
 				new HostInfo(host.getId(), host.getNickname(), host.experienceYears(currentMonth),
 						host.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(host.getId())));
 	}
 
 	public record CourtInfo(Long courtId, String name, String address, String courtNumber, BigDecimal latitude,
 			BigDecimal longitude, boolean hasParking, boolean hasShower,
-			@Schema(types = {"string", "null"}) String facilityNotes,
+			@Schema(description = "코트 공통 이용 안내", types = {"string", "null"}) String facilityNotes,
+			@Schema(description = "이용 가능한 시설과 항목별 안내. 해당 시설이 없으면 빈 배열")
+			List<CourtFacilityResponse> facilities,
 			@Schema(description = CourtThumbnailResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
 					types = {"string", "null"}) String thumbnailUrl) {
 	}

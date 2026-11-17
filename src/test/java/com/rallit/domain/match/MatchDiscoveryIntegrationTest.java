@@ -2,6 +2,7 @@ package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -287,6 +288,54 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void detailKeepsGeneralCourtNotesSeparateFromFacilityNotes() throws Exception {
+		String bearer = bearer(activeUser());
+		var matches = createRecruitingMatches(LocalDate.now(clock).plusDays(7));
+		jdbc.update("update court set facility_notes = ? where id = ?", "입구에서 예약 내역을 보여주세요.",
+				matches.courtId());
+
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.court.facilityNotes").value("입구에서 예약 내역을 보여주세요."))
+				.andExpect(jsonPath("$.result.court.facilities", hasSize(2)))
+				.andExpect(jsonPath("$.result.court.facilities[0].type").value("PARKING"))
+				.andExpect(jsonPath("$.result.court.facilities[0].note").value(nullValue()))
+				.andExpect(jsonPath("$.result.court.facilities[1].type").value("SHOWER"))
+				.andExpect(jsonPath("$.result.court.facilities[1].note").value(nullValue()));
+	}
+
+	@Test
+	void detailReturnsEachAvailableCourtFacilityWithItsOwnNote() throws Exception {
+		String bearer = bearer(activeUser());
+		var matches = createRecruitingMatches(LocalDate.now(clock).plusDays(7));
+		jdbc.update("update court set parking_note = ?, shower_note = ? where id = ?",
+				"지하 3층 주차장", "남녀 샤워실 각 1개", matches.courtId());
+
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.court.hasParking").value(true))
+				.andExpect(jsonPath("$.result.court.hasShower").value(true))
+				.andExpect(jsonPath("$.result.court.facilities", hasSize(2)))
+				.andExpect(jsonPath("$.result.court.facilities[0].type").value("PARKING"))
+				.andExpect(jsonPath("$.result.court.facilities[0].note").value("지하 3층 주차장"))
+				.andExpect(jsonPath("$.result.court.facilities[1].type").value("SHOWER"))
+				.andExpect(jsonPath("$.result.court.facilities[1].note").value("남녀 샤워실 각 1개"));
+
+		jdbc.update("update court set has_shower = false where id = ?", matches.courtId());
+		entityManager.clear();
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.court.facilities", hasSize(1)))
+				.andExpect(jsonPath("$.result.court.facilities[0].type").value("PARKING"));
+
+		jdbc.update("update court set has_parking = false where id = ?", matches.courtId());
+		entityManager.clear();
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.court.facilities", hasSize(0)));
+	}
+
+	@Test
 	void detailExplainsGenderCapacityAndRecruitmentDeadline() throws Exception {
 		User viewer = activeUser();
 		String bearer = bearer(viewer);
@@ -328,7 +377,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		jdbc.update("update match set status = 'RECRUITING' where id in (?, ?, ?)",
 				singles.getId(), rally.getId(), doubles.getId());
 		entityManager.clear();
-		return new RecruitingMatches(singles.getId(), rally.getId(), doubles.getId());
+		return new RecruitingMatches(singles.getId(), rally.getId(), doubles.getId(), court.getId());
 	}
 
 	private Match createMatch(User host, Court court, LocalDate date, int hour, MatchType type,
@@ -364,6 +413,6 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		return "Bearer " + sessions.login(user.getId(), LoginTarget.SERVICE).accessToken();
 	}
 
-	private record RecruitingMatches(long singlesId, long rallyId, long doublesId) {
+	private record RecruitingMatches(long singlesId, long rallyId, long doublesId, long courtId) {
 	}
 }

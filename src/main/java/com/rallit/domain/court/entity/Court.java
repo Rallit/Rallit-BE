@@ -53,12 +53,18 @@ public class Court extends BaseEntity {
 	@Column(columnDefinition = "text")
 	private String facilityNotes;
 
+	@Column(columnDefinition = "text")
+	private String parkingNote;
+
+	@Column(columnDefinition = "text")
+	private String showerNote;
+
 	@Column(length = 500)
 	private String thumbnailImageKey;
 
 	@Builder
 	private Court(String name, String address, BigDecimal latitude, BigDecimal longitude, Area area, boolean hasParking,
-			boolean hasShower, String facilityNotes, String thumbnailImageKey) {
+			boolean hasShower, String facilityNotes, String parkingNote, String showerNote, String thumbnailImageKey) {
 		this.name = name;
 		this.address = address;
 		this.latitude = latitude;
@@ -67,6 +73,8 @@ public class Court extends BaseEntity {
 		this.hasParking = hasParking;
 		this.hasShower = hasShower;
 		this.facilityNotes = facilityNotes;
+		this.parkingNote = parkingNote;
+		this.showerNote = showerNote;
 		this.thumbnailImageKey = thumbnailImageKey;
 	}
 

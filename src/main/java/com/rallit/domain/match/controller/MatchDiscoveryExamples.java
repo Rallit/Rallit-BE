@@ -72,8 +72,12 @@ final class MatchDiscoveryExamples {
 			      "latitude": 37.555000,
 			      "longitude": 126.910000,
 			      "hasParking": true,
-			      "hasShower": false,
+			      "hasShower": true,
 			      "facilityNotes": "랠릿 로컬 매치 조회 데모",
+			      "facilities": [
+			        { "type": "PARKING", "note": "지하 3층 주차장" },
+			        { "type": "SHOWER", "note": "남녀 샤워실 각 1개" }
+			      ],
 			      "thumbnailUrl": "/api/v1/courts/1/thumbnail"
 			    },
 			    "host": {
