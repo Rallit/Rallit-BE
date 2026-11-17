@@ -1,9 +1,9 @@
-package com.rallit.domain.user.service;
+package com.rallit.domain.image.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.rallit.domain.image.ImageUploadPurpose;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.awt.image.BufferedImage;
@@ -18,8 +18,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
-class ProfileImageNormalizerTest {
-  private final ProfileImageNormalizer normalizer = new ProfileImageNormalizer();
+class ImageNormalizerTest {
+  private final ImageNormalizer normalizer = new ImageNormalizer();
 
   @ParameterizedTest
   @CsvSource({"4097, 2", "4096, 3200"})

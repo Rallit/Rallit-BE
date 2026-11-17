@@ -1,10 +1,14 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.service;
 
 import com.rallit.domain.court.exception.CourtErrorStatus;
 import com.rallit.domain.court.repository.CourtRepository;
-import com.rallit.domain.user.entity.User;
+import com.rallit.domain.image.dto.ImageUploadRequest;
+import com.rallit.domain.image.dto.ImageUploadResponse;
+import com.rallit.domain.image.entity.ImageUpload;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
+import com.rallit.domain.image.exception.ImageUploadErrorStatus;
+import com.rallit.domain.image.repository.ImageUploadRepository;
 import com.rallit.domain.user.repository.UserRepository;
-import com.rallit.domain.user.service.ProfileImageNormalizer;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.storage.ImageKey;
@@ -34,14 +38,14 @@ public class ImageUploadService {
   private final CourtRepository courts;
   private final PresignedImageStorage presigned;
   private final S3ImageObjects objects;
-  private final ProfileImageNormalizer normalizer;
+  private final ImageNormalizer normalizer;
   private final PlatformTransactionManager transactions;
   private final Clock clock;
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public ImageUploadResponse initiate(Long ownerId, Long targetId, ImageUploadPurpose purpose,
       ImageUploadRequest request) {
-    if (request.size() > ProfileImageNormalizer.MAX_BYTES) {
+    if (request.size() > ImageNormalizer.MAX_BYTES) {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE);
     }
     validateFileName(request);
@@ -52,7 +56,7 @@ public class ImageUploadService {
     var id = UUID.randomUUID();
     try {
       var form = presigned.signUpload(stagingKey(id), MediaType.parseMediaType(request.contentType()),
-          ProfileImageNormalizer.MAX_BYTES);
+          ImageNormalizer.MAX_BYTES);
       uploads.save(new ImageUpload(id, ownerId, targetId, purpose, request.contentType(),
           request.size(), form.expiresAt()));
       return new ImageUploadResponse(ImageUploadResponse.Mode.S3, id, form.url(), form.fields(),
@@ -69,7 +73,7 @@ public class ImageUploadService {
 
     String stagedKey = stagingKey(uploadId);
     try {
-      var staged = presigned.readUpload(stagedKey, ProfileImageNormalizer.MAX_BYTES);
+      var staged = presigned.readUpload(stagedKey, ImageNormalizer.MAX_BYTES);
       if (staged.isEmpty()) {
         if (checkTicket(uploads.findById(uploadId), ownerId, targetId, purpose).isCompleted()) return;
         throw new GeneralException(ImageUploadErrorStatus.IMAGE_UPLOAD_NOT_READY);
@@ -121,7 +125,7 @@ public class ImageUploadService {
     return ticket;
   }
 
-  private ProfileImageNormalizer.NormalizedImage normalize(ImageUpload ticket,
+  private ImageNormalizer.NormalizedImage normalize(ImageUpload ticket,
       PresignedImageStorage.StagedImage staged) {
     if (staged.contents().length != ticket.getContentSize()
         || !ticket.getContentType().equals(staged.contentType())) {

@@ -1,4 +1,4 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

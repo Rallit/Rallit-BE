@@ -1,4 +1,4 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

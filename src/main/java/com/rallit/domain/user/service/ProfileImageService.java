@@ -1,7 +1,7 @@
 package com.rallit.domain.user.service;
 
-import com.rallit.domain.image.ImageKeyUpdate;
-import com.rallit.domain.image.ImageUploadPurpose;
+import com.rallit.domain.image.service.ImageKeyUpdate;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.UserStatus;
 import com.rallit.domain.user.repository.UserRepository;

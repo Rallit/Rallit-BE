@@ -1,5 +1,7 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.service;
 
+import com.rallit.domain.image.dto.ImageLinkResponse;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.storage.PresignedImageStorage;

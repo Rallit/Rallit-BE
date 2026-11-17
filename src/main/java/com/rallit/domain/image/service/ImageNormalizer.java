@@ -1,4 +1,4 @@
-package com.rallit.domain.user.service;
+package com.rallit.domain.image.service;
 
 import com.drew.imaging.ImageProcessingException;
 import com.drew.imaging.jpeg.JpegMetadataReader;
@@ -6,7 +6,7 @@ import com.drew.lang.ByteArrayReader;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifReader;
-import com.rallit.domain.image.ImageUploadPurpose;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.domain.user.exception.UserErrorStatus;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
@@ -31,7 +31,7 @@ import javax.imageio.stream.MemoryCacheImageOutputStream;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ProfileImageNormalizer {
+public class ImageNormalizer {
   public static final int MAX_BYTES = 5 * 1024 * 1024;
   private static final int MAX_DIMENSION = 4_096;
   private static final long MAX_PIXELS = 12_500_000L;

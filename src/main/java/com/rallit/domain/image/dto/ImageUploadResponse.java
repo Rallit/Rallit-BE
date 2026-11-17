@@ -1,4 +1,4 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.dto;
 
 import java.time.Instant;
 import java.util.Map;

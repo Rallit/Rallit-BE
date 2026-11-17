@@ -2,9 +2,9 @@ package com.rallit.domain.court.controller;
 
 import com.rallit.domain.court.exception.CourtErrorStatus;
 import com.rallit.domain.court.service.CourtThumbnailService;
-import com.rallit.domain.image.ImageLinkResponse;
-import com.rallit.domain.image.ImageLinkService;
-import com.rallit.domain.image.ImageUploadPurpose;
+import com.rallit.domain.image.dto.ImageLinkResponse;
+import com.rallit.domain.image.service.ImageLinkService;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;

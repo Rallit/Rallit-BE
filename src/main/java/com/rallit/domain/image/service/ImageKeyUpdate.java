@@ -1,4 +1,4 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.service;
 
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;

@@ -1,4 +1,4 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.exception;
 
 import com.rallit.global.apiPayload.code.BaseErrorCode;
 import com.rallit.global.apiPayload.code.ErrorReasonDTO;
@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 @RequiredArgsConstructor
-enum ImageUploadErrorStatus implements BaseErrorCode {
+public enum ImageUploadErrorStatus implements BaseErrorCode {
   IMAGE_UPLOAD_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지 업로드 요청을 찾을 수 없습니다."),
   IMAGE_UPLOAD_EXPIRED(HttpStatus.GONE, "이미지 업로드 요청이 만료되었습니다."),
   IMAGE_UPLOAD_NOT_READY(HttpStatus.CONFLICT, "이미지를 업로드한 후 완료해 주세요."),

@@ -1,8 +1,8 @@
 package com.rallit.domain.user.controller;
 
-import com.rallit.domain.image.ImageLinkResponse;
-import com.rallit.domain.image.ImageLinkService;
-import com.rallit.domain.image.ImageUploadPurpose;
+import com.rallit.domain.image.dto.ImageLinkResponse;
+import com.rallit.domain.image.service.ImageLinkService;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.domain.user.service.ProfileImageService;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.security.authentication.UserDetails;

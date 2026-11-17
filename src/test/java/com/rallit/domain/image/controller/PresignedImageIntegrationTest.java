@@ -1,4 +1,4 @@
-package com.rallit.domain.user.controller;
+package com.rallit.domain.image.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,7 +23,7 @@ import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.court.repository.CourtRepository;
 import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.repository.UserRepository;
-import com.rallit.domain.user.service.ProfileImageNormalizer;
+import com.rallit.domain.image.service.ImageNormalizer;
 import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.global.config.S3PresignedProperties;
 import com.rallit.global.storage.PresignedImageStorage;
@@ -77,12 +77,12 @@ import tools.jackson.databind.ObjectMapper;
     "rallit.s3.presigned.download-expiry-seconds=456"
 })
 @AutoConfigureMockMvc
-class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
+class PresignedImageIntegrationTest extends IntegrationTestSupport {
   private static final String WRITE_PATH = "/api/v1/users/me/profile-image";
   private static final String UPLOAD_PATH = WRITE_PATH + "/uploads";
   private static final String UPLOAD_URL = "https://image-test.s3.example.test/";
   private static final String ADMIN_ORIGIN = "https://admin.rallit.co.kr";
-  private static final int MAX_BYTES = ProfileImageNormalizer.MAX_BYTES;
+  private static final int MAX_BYTES = ImageNormalizer.MAX_BYTES;
 
   @Autowired MockMvc mvc;
   @Autowired UserRegistrationService registration;

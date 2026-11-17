@@ -1,5 +1,6 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.entity;
 
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -16,7 +17,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "image_upload")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-class ImageUpload {
+public class ImageUpload {
   @Id private UUID id;
   @Column(nullable = false) private Long ownerId;
   @Column(nullable = false) private Long targetId;
@@ -28,7 +29,7 @@ class ImageUpload {
   @Column(nullable = false) private Instant expiresAt;
   private Instant completedAt;
 
-  ImageUpload(UUID id, Long ownerId, Long targetId, ImageUploadPurpose purpose, String contentType,
+  public ImageUpload(UUID id, Long ownerId, Long targetId, ImageUploadPurpose purpose, String contentType,
       long contentSize, Instant expiresAt) {
     this.id = id;
     this.ownerId = ownerId;
@@ -39,15 +40,15 @@ class ImageUpload {
     this.expiresAt = expiresAt;
   }
 
-  boolean belongsTo(Long owner, Long target, ImageUploadPurpose purpose) {
+  public boolean belongsTo(Long owner, Long target, ImageUploadPurpose purpose) {
     return ownerId.equals(owner) && targetId.equals(target) && this.purpose == purpose;
   }
 
-  boolean isCompleted() {
+  public boolean isCompleted() {
     return completedAt != null;
   }
 
-  void complete(Instant now) {
+  public void complete(Instant now) {
     completedAt = now;
   }
 }

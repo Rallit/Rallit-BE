@@ -1,6 +1,10 @@
-package com.rallit.domain.image;
+package com.rallit.domain.image.controller;
 
 import com.rallit.domain.court.dto.CourtThumbnailResponse;
+import com.rallit.domain.image.dto.ImageUploadRequest;
+import com.rallit.domain.image.dto.ImageUploadResponse;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
+import com.rallit.domain.image.service.ImageUploadService;
 import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.security.authentication.UserDetails;
