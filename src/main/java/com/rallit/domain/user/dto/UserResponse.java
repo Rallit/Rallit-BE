@@ -11,7 +11,7 @@ public record UserResponse(
     String nickname,
     UserRole role,
     boolean onboardingCompleted,
-    @Schema(description = "백엔드 기준 상대 경로. 조회에 Bearer 토큰이 필요하며, 올린 사진이 없으면 null",
+    @Schema(description = ProfileImageResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
         example = "/api/v1/users/1/profile-image", types = {"string", "null"})
     String profileImageUrl,
     @Schema(description = "카카오·구글 소셜 로그인에서 받은 온보딩 환영 인사용 소셜 이름. 값이 없으면 null.",

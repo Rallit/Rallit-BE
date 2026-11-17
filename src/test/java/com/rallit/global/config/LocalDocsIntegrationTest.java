@@ -2,6 +2,7 @@ package com.rallit.global.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,6 +54,10 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
   @Test
   void swaggerExposesOnlyThePresignedPhotoUploadAndReadPaths() throws Exception {
     String thumbnail = "$.paths['/api/v1/courts/{courtId}/thumbnail/url'].get";
+    String profileIssue = "$.paths['/api/v1/users/me/profile-image/uploads'].post.responses";
+    String courtIssue = "$.paths['/api/v1/admin/courts/{courtId}/thumbnail/uploads'].post.responses";
+    String profileComplete = "$.paths['/api/v1/users/me/profile-image/uploads/{uploadId}/complete'].post.responses";
+    String courtComplete = "$.paths['/api/v1/admin/courts/{courtId}/thumbnail/uploads/{uploadId}/complete'].post.responses";
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.paths['/api/v1/courts/{courtId}/thumbnail']").doesNotExist())
@@ -63,6 +68,22 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath(thumbnail + ".tags[0]").value("코트"))
         .andExpect(jsonPath(thumbnail + ".operationId").value("getCourtThumbnailUrl"))
         .andExpect(jsonPath(thumbnail + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(thumbnail + ".responses['404'].content['application/json']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{userId}/profile-image/url'].get.responses['404']").exists())
+        .andExpect(jsonPath(profileIssue + "['201'].content['application/json']").exists())
+        .andExpect(jsonPath(profileIssue + "['200']").doesNotExist())
+        .andExpect(jsonPath(profileIssue + "['413'].content['application/json']").exists())
+        .andExpect(jsonPath(courtIssue + "['201']").exists())
+        .andExpect(jsonPath(courtIssue + "['404']").exists())
+        .andExpect(jsonPath(profileComplete + "['409'].content['application/json']").exists())
+        .andExpect(jsonPath(profileComplete + "['410']").exists())
+        .andExpect(jsonPath(courtComplete + "['409']").exists())
+        .andExpect(jsonPath(courtComplete + "['410']").exists())
+        .andExpect(jsonPath("$.components.schemas.UserResponse.properties.profileImageUrl.description",
+            containsString("/url")))
+        .andExpect(jsonPath("$.components.schemas.MatchListItemResponse.properties.courtThumbnailUrl.description",
+            containsString("/url")))
+        .andExpect(jsonPath("$.components.schemas.ImageUploadRequest.properties.size.maximum").value(5242880))
         .andExpect(jsonPath("$.components.schemas.ImageLinkResponse.properties.expiresAt.format").value("date-time"));
   }
 

@@ -19,6 +19,7 @@ import com.rallit.domain.match.enums.MatchType;
 import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.Gender;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MatchApplicationDetailResponse(Long applicationId, MatchApplicationStatus status,
@@ -72,7 +73,9 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 		}
 	}
 
-	public record HostInfo(Long userId, String nickname, String profileImageUrl, BigDecimal ntrp) {
+	public record HostInfo(Long userId, String nickname,
+			@Schema(description = ProfileImageResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
+					types = {"string", "null"}) String profileImageUrl, BigDecimal ntrp) {
 
 		private static HostInfo from(User host) {
 			return new HostInfo(host.getId(), host.getNickname(), profileImageUrlOf(host), host.getNtrp());
@@ -87,7 +90,9 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 		}
 	}
 
-	public record ParticipantInfo(Long userId, String nickname, String profileImageUrl, Gender gender,
+	public record ParticipantInfo(Long userId, String nickname,
+			@Schema(description = ProfileImageResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
+					types = {"string", "null"}) String profileImageUrl, Gender gender,
 			BigDecimal ntrp, boolean host) {
 
 		private static ParticipantInfo host(User host) {

@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes,
 		OffsetDateTime startsAt, OffsetDateTime endsAt, String courtName,
-		@Schema(description = "Bearer 인증이 필요한 코트 대표 사진 상대 경로. 사진이 없으면 null",
+		@Schema(description = CourtThumbnailResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
 				types = {"string", "null"}) String courtThumbnailUrl,
 		Integer participationFee,
 		@Schema(description = "모집 NTRP 하한. 미설정이면 null", types = {"number", "null"}) BigDecimal minNtrp,
