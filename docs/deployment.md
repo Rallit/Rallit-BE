@@ -187,7 +187,7 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 | 항목 | 내용 |
 | --- | --- |
 | 버킷 | 서울 리전, 퍼블릭 액세스 차단. 최종 사진은 `profile-images/`와 `court-thumbnails/`에 저장하고 임시 경로 `image-uploads/`에는 수명 주기 규칙을 설정 |
-| IAM 역할 | 세 접두사의 객체를 읽고 쓰고 지울 권한을 EC2 앱의 역할에 부여. 사진 삭제와 교체 후 정리에 `s3:DeleteObject` 사용 |
+| IAM 역할 | 이미지 버킷에 `s3:ListBucket`을 부여하고, 세 접두사에 필요한 객체 읽기·쓰기·삭제 권한을 EC2 앱 역할에 부여 |
 | CORS | 버킷에서 일반·운영자 프론트 Origin과 브라우저의 `POST` 업로드, `GET` 조회를 허용 |
 
 ### 환경변수
@@ -210,6 +210,8 @@ S3_PRESIGNED_DOWNLOAD_EXPIRY=600
 ### 인증
 
 AWS SDK의 기본 인증 체인으로 EC2 IAM 역할의 임시 자격 증명을 사용합니다. 기본 체인은 환경변수 자격 증명을 인스턴스 역할보다 먼저 사용하므로 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 서버 `.env`나 코드에 추가하지 않습니다.
+
+배포 전에 EC2 앱 역할로 존재하지 않는 `image-uploads/` 키에 `GetObject`를 요청해 `404 NoSuchKey`가 돌아오는지 확인합니다. 누락을 확인하면 백엔드는 완료 요청에 `409 IMAGE_UPLOAD_NOT_READY`를 반환합니다. AWS는 버킷에 `s3:ListBucket`이 없으면 누락에도 `403 AccessDenied`를 반환하며, 백엔드는 권한 및 저장소 실패를 `503`으로 처리합니다. [AWS GetObject 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
 
 app은 Docker 브리지 네트워크에서 실행되므로 컨테이너에서 인스턴스 메타데이터(IMDSv2)에 접근할 수 있도록 메타데이터 옵션의 PUT 응답 홉 제한을 2 이상으로 둡니다. 아래 명령이 역할 이름을 출력하면 정상입니다. 자격 증명 값 자체는 조회하거나 기록하지 않습니다.
 
