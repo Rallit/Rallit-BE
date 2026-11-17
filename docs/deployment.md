@@ -147,14 +147,21 @@ RETURNING id, thumbnail_image_key;
 SQL
 ```
 
-온보딩 완료 회원으로 Swagger를 인증한 뒤 `GET /api/v1/courts/{courtId}/thumbnail`을 실행합니다. 연결한 코트의 이미지를 얻을 수 있습니다. 매치 목록·홈 추천·저장한 요청 결과의 카드에는 `courtThumbnailUrl`, 매치 상세에는 `court.thumbnailUrl`이 나타납니다. 프론트에서는 해당 상대 경로에 Bearer 토큰을 붙여 이미지를 요청하고, URL이 `null`이거나 이미지가 없으면 공통 이미지를 표시합니다.
+온보딩 완료 회원으로 Swagger를 인증한 뒤 `GET /api/v1/courts/{courtId}/thumbnail/url`을 실행합니다. 파일시스템 모드에서는 Bearer로 읽을 수 있는 상대 URL과 `expiresAt=null`을 반환합니다. 매치 목록·홈 추천·저장한 요청 결과의 카드에서는 `courtThumbnailUrl`, 매치 상세에서는 `court.thumbnailUrl`을 읽어 `/url`을 붙입니다. 사진이 없으면 공통 이미지를 표시합니다.
 
 #### 기존 사진을 유지하며 S3로 전환
 
-1. 비공개 버킷에 암호화와 공개 액세스 차단을 적용합니다. EC2 앱에는 IAM 역할로 HTTPS를 통한 이미지 읽기·쓰기에 필요한 권한을 부여합니다. 프로필은 `profile-images/`, 코트 사진은 `court-thumbnails/` 아래에서 관리합니다. 앱의 코트 사진 작업은 조회이므로 코트 등록은 별도 운영 권한으로 수행합니다. [S3 보안 가이드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html)
+1. 비공개 버킷에 암호화와 공개 액세스 차단을 적용합니다. EC2 앱의 IAM 역할에 `image-uploads/`, `profile-images/`, `court-thumbnails/`에 필요한 읽기·쓰기·삭제 권한을 부여합니다. 임시 키인 `image-uploads/`에는 완료되지 않은 객체를 만료시키는 수명 주기 규칙을 설정합니다. 브라우저가 S3에 연결하므로 버킷 CORS의 `AllowedOrigins`에 실제 일반·운영자 프론트 Origin을, `AllowedMethods`에 `GET`과 `POST`를 넣습니다. [S3 보안 가이드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html) · [S3 CORS 구성](https://docs.aws.amazon.com/AmazonS3/latest/userguide/enabling-cors-examples.html)
 2. DB의 `users.profile_image_key`가 가리키는 기존 볼륨 파일을 `profile-images/{기존 키}`에 복사합니다. 코트 사진도 `court.thumbnail_image_key`에 기록한 이름으로 `court-thumbnails/`에 준비합니다. 기존 키와 복사한 객체를 대조하고, 전환 직전 이미지 변경을 잠시 멈춰 마지막 변경분을 동기화합니다.
-3. 서버 `.env`에 `IMAGE_STORAGE_BACKEND=s3`, `IMAGE_S3_BUCKET`, `IMAGE_S3_REGION`을 설정하고 배포합니다. 시험 회원의 기존 사진 조회와 새 사진 등록·교체·삭제, 코트 사진 조회를 확인한 뒤 이미지 변경을 재개합니다.
-4. 같은 IAM 역할에서 누락 객체와 접근 거절을 각각 검증합니다. 앱은 `NoSuchKey`를 `404`, 권한·통신 실패를 `503`으로 매핑합니다. S3는 `s3:ListBucket` 권한이 없으면 누락 객체에도 `403`을 반환할 수 있으므로 역할 설정과 실제 응답을 함께 확인합니다. [S3 GetObject 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
+3. 서버 `.env`에 `IMAGE_STORAGE_BACKEND=s3`, `IMAGE_S3_BUCKET`, `IMAGE_S3_REGION`을 설정하고 함께 확인한 일반·운영자 프론트와 배포합니다. 시험 회원의 기존 사진 조회와 새 사진 등록·교체·삭제, 운영자 사진 등록과 회원 코트 사진 조회가 통과하면 이미지 변경을 재개합니다.
+4. 앱 컨테이너의 IAM 역할로 임시 객체 읽기와 정리가 되는지 확인합니다. S3 모드의 조회 URL은 브라우저가 S3에 요청하므로 서명 만료와 CORS, S3의 오류 응답에 따른 프론트 대체 이미지 동작도 확인합니다. [S3 GetObject 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
+
+#### Presigned API 검증
+
+- 프로필 사진은 `POST /api/v1/users/me/profile-image/uploads`, 코트 대표 사진은 운영자 세션의 `POST /api/v1/admin/courts/{courtId}/thumbnail/uploads`에서 발급합니다. 요청 데이터는 파일명, MIME 타입과 바이트 크기입니다.
+- 발급 응답의 `url`과 서명 폼 필드를 사용해 브라우저가 S3에 파일을 POST합니다. 성공 후 각 발급 경로 뒤에 `/{uploadId}/complete`를 붙여 인증 호출합니다. 백엔드는 업로드한 이미지에 크기·실제 형식·픽셀 제한을 적용하고, 리사이즈와 촬영 메타데이터 제거를 한 뒤 최종 키를 DB에 반영합니다.
+- S3 모드의 조회는 기존 이미지 경로 뒤에 `/url`을 붙여 인증 호출하고, 결과의 만료형 URL을 브라우저가 사용합니다. 프로필 업로드의 파일시스템 응답은 `mode=FILESYSTEM`입니다.
+- 로컬 S3 호환 서버를 쓰는 경우 `IMAGE_S3_ENDPOINT`에 브라우저와 백엔드가 함께 접근할 수 있는 주소를 설정합니다. 로컬 검증에는 호환 서버에서 설정한 테스트 전용 자격증명을 사용합니다.
 
 전환 확인이 끝날 때까지 기존 볼륨을 보존합니다. 새 사진 쓰기를 재개한 뒤 파일시스템으로 복구한다면, 현재 DB 키에 해당하는 S3 객체를 볼륨에 동기화한 후 `IMAGE_STORAGE_BACKEND=filesystem`으로 돌립니다.
 

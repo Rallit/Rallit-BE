@@ -45,6 +45,7 @@ services:
       IMAGE_STORAGE_BACKEND: ${IMAGE_STORAGE_BACKEND:-filesystem}
       IMAGE_S3_BUCKET: ${IMAGE_S3_BUCKET:-}
       IMAGE_S3_REGION: ${IMAGE_S3_REGION:-}
+      IMAGE_S3_ENDPOINT: ${IMAGE_S3_ENDPOINT:-}
       PROFILE_IMAGE_STORAGE_PATH: /app/profile-images
       COURT_THUMBNAIL_STORAGE_PATH: /app/court-thumbnails
     volumes:

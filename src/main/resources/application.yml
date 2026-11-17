@@ -33,6 +33,7 @@ rallit:
     s3:
       bucket: ${IMAGE_S3_BUCKET:}
       region: ${IMAGE_S3_REGION:}
+      endpoint: ${IMAGE_S3_ENDPOINT:}
   profile-image:
     storage-path: ${PROFILE_IMAGE_STORAGE_PATH:./build/profile-images}
   court-thumbnail:
