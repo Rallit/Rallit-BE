@@ -42,7 +42,12 @@ services:
       SERVICE_ORIGINS: ${SERVICE_ORIGINS:?SERVICE_ORIGINS를 .env에 설정하세요}
       ADMIN_ORIGINS: ${ADMIN_ORIGINS:?ADMIN_ORIGINS를 .env에 설정하세요}
       AUTH_SECURE_COOKIES: "true"
+      PROFILE_IMAGE_STORAGE: ${PROFILE_IMAGE_STORAGE:-filesystem}
       PROFILE_IMAGE_STORAGE_PATH: /app/profile-images
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_PRESIGNED_UPLOAD_EXPIRY: ${S3_PRESIGNED_UPLOAD_EXPIRY:-300}
+      S3_PRESIGNED_DOWNLOAD_EXPIRY: ${S3_PRESIGNED_DOWNLOAD_EXPIRY:-600}
     volumes:
       - profile-images:/app/profile-images
     mem_limit: ${APP_MEM_LIMIT:-700m}
