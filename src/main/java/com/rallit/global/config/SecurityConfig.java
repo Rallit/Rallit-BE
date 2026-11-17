@@ -147,6 +147,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/api/v1/admin/me")
                     .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/courts/{courtId}/thumbnail/uploads",
+                        "/api/v1/admin/courts/{courtId}/thumbnail/uploads/{uploadId}/complete")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .denyAll())
         .build();
@@ -235,13 +238,16 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/nickname-availability")
                 .authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/users/{userId}/profile-image")
+                .requestMatchers(HttpMethod.GET, "/api/v1/users/{userId}/profile-image/url")
                 .authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/v1/users/me/profile-image")
+                .requestMatchers(HttpMethod.POST, "/api/v1/users/me/profile-image/uploads",
+                    "/api/v1/users/me/profile-image/uploads/{uploadId}/complete")
                 .authenticated()
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/profile-image")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
+                .authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/courts/{courtId}/thumbnail/url")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}",
                     "/api/v1/matches/recommendations")

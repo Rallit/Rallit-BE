@@ -6,6 +6,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 
+import com.rallit.domain.court.dto.CourtThumbnailResponse;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
@@ -41,20 +42,22 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 				match.getPreferredAgeGroups().stream().sorted().toList(),
 				new CourtInfo(court.getId(), court.getName(), court.getAddress(), slot.getCourtNumber(),
 						court.getLatitude(), court.getLongitude(), court.isHasParking(), court.isHasShower(),
-						court.getFacilityNotes()),
+						court.getFacilityNotes(), card.courtThumbnailUrl()),
 				new HostInfo(host.getId(), host.getNickname(), host.experienceYears(currentMonth),
 						host.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(host.getId())));
 	}
 
 	public record CourtInfo(Long courtId, String name, String address, String courtNumber, BigDecimal latitude,
 			BigDecimal longitude, boolean hasParking, boolean hasShower,
-			@Schema(types = {"string", "null"}) String facilityNotes) {
+			@Schema(types = {"string", "null"}) String facilityNotes,
+			@Schema(description = CourtThumbnailResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
+					types = {"string", "null"}) String thumbnailUrl) {
 	}
 
 	public record HostInfo(Long userId, String nickname,
 			@Schema(description = "만 구력(년). 1년 미만은 0, 시작 연월이 없으면 null",
 					types = {"integer", "null"}) Integer experienceYears,
-			@Schema(description = "Bearer 인증이 필요한 API 상대 경로. 등록된 사진이 없으면 null",
+			@Schema(description = ProfileImageResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
 					types = {"string", "null"}) String profileImageUrl) {
 	}
 }

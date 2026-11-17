@@ -47,6 +47,11 @@ remove_old_images() {
 }
 
 docker compose config --quiet
+s3_bucket="$(docker compose config --environment | sed -n 's/^S3_BUCKET=//p')"
+if [[ -z "${s3_bucket//[[:space:]]/}" ]]; then
+  echo "S3_BUCKET을 .env에 설정한 뒤 배포하세요." >&2
+  exit 1
+fi
 docker compose pull --quiet app
 
 services="$(docker compose config --services)"

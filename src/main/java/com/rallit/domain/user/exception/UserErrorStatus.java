@@ -11,10 +11,7 @@ public enum UserErrorStatus implements BaseErrorCode {
   INVALID_MATCH_PREFERENCES(HttpStatus.BAD_REQUEST, "COMMON400", "동성만 매칭과 혼합복식은 함께 선택할 수 없습니다."),
   INVALID_TENNIS_START(HttpStatus.BAD_REQUEST, "COMMON400", "테니스 시작 시기를 확인해 주세요."),
   NICKNAME_CONFLICT(HttpStatus.CONFLICT, "NICKNAME_CONFLICT", "이미 사용 중인 닉네임입니다."),
-  ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "COMMON409", "이미 온보딩을 완료했습니다."),
-  INVALID_PROFILE_IMAGE(HttpStatus.BAD_REQUEST, "COMMON400", "JPG, JPEG 또는 PNG 사진을 선택해 주세요."),
-  PROFILE_IMAGE_DIMENSIONS_TOO_LARGE(HttpStatus.BAD_REQUEST, "COMMON400",
-      "프로필 사진은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 올릴 수 있습니다.");
+  ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "COMMON409", "이미 온보딩을 완료했습니다.");
 
   private final HttpStatus status;
   private final String code;

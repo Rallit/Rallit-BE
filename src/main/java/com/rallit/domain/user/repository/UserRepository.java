@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -22,6 +23,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
       """, nativeQuery = true)
   boolean isNicknameTakenByAnotherUser(@Param("nickname") String nickname, @Param("userId") Long userId);
 
+  @Transactional(readOnly = true)
   @Query("select u.profileImageKey from User u where u.id = :id and u.status <> :excludedStatus")
   Optional<String> findProfileImageKey(@Param("id") Long id, @Param("excludedStatus") UserStatus excludedStatus);
 }

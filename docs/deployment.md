@@ -99,7 +99,7 @@ chmod 600 .env
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth 클라이언트 ID, 비밀 키 및 BE 콜백 주소를 모두 입력 |
 | `FRONTEND_CALLBACK_URL`, `ADMIN_FRONTEND_CALLBACK_URL` | 배포된 일반·운영자 FE의 로그인 완료 주소 |
 | `SERVICE_ORIGINS`, `ADMIN_ORIGINS` | 배포된 FE의 정확한 Origin. 여러 개면 쉼표로 구분 |
-| `PROFILE_IMAGE_STORAGE`, `AWS_REGION`, `S3_BUCKET`, `S3_PRESIGNED_*` | 이미지 저장소 설정. [5장](#5-s3-이미지-저장소) 참고 |
+| `AWS_REGION`, `S3_BUCKET`, `S3_PRESIGNED_*` | 이미지 저장소 설정. [5장](#5-s3-이미지-저장소) 참고 |
 
 `SERVICE_ORIGINS`와 `ADMIN_ORIGINS`는 `temp`와 `prod` 모두에서 반영됩니다. 서비스·운영자 목적에 맞는 Origin만 각각 허용합니다. 로그인 완료 콜백은 별도 검증을 거치며, Secure 설정에서는 일반 FE는 `rallit.co.kr`, 운영자 FE는 `admin.rallit.co.kr`의 HTTPS(기본 포트 또는 443) 주소만 허용합니다. 다른 테스트 도메인을 콜백으로 넣으면 앱이 시작되지 않습니다.
 
@@ -180,28 +180,26 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 
 ## 5. S3 이미지 저장소
 
-프로필 사진은 현재 `profile-images` Docker 볼륨에 저장합니다. 아래 설정은 Presigned URL 기반 S3 저장소(#45)를 위한 준비 단계이며 앱은 아직 이 값을 사용하지 않습니다. S3 값이 없어도 기본 `filesystem` 모드로 기동합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
+프로필 사진과 코트 대표 사진은 S3에 저장합니다. 브라우저는 Presigned POST 폼으로 업로드하고 만료형 Presigned GET URL로 조회합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
 
 ### 사전 준비
 
 | 항목 | 내용 |
 | --- | --- |
-| 버킷 | 서울 리전, 퍼블릭 액세스 차단. `profile-images/`, `court-thumbnails/` 접두사 사용 |
-| IAM 역할 | 위 접두사에 필요한 객체 권한만 부여한 역할을 EC2 인스턴스에 연결 |
-| CORS | 브라우저가 Presigned URL로 S3에 직접 `PUT`·`GET`하므로 `SERVICE_ORIGINS`와 같은 Origin과 업로드 요청의 `Content-Type` 헤더를 허용 |
+| 버킷 | 서울 리전, 퍼블릭 액세스 차단. 최종 사진은 `profile-images/`와 `court-thumbnails/`에 저장하고 임시 경로 `image-uploads/`에는 수명 주기 규칙을 설정 |
+| IAM 역할 | 이미지 버킷에 `s3:ListBucket`을 부여하고, 세 접두사에 필요한 객체 읽기·쓰기·삭제 권한을 EC2 앱 역할에 부여 |
+| CORS | 버킷에서 일반·운영자 프론트 Origin과 브라우저의 `POST` 업로드, `GET` 조회를 허용 |
 
 ### 환경변수
 
 | 이름 | 기본값 | 설정 키 | 설명 |
 | --- | --- | --- | --- |
-| `PROFILE_IMAGE_STORAGE` | `filesystem` | `rallit.profile-image.storage` | 프로필 사진 저장 방식. `filesystem` 또는 `s3`(#45 구현 후) |
 | `AWS_REGION` | `ap-northeast-2` | `rallit.s3.region` | 버킷 리전 |
-| `S3_BUCKET` | 없음 | `rallit.s3.bucket` | 버킷 이름. 서버 `.env`로만 주입 |
+| `S3_BUCKET` | 필수 | `rallit.s3.bucket` | 버킷 이름. 서버 `.env`로 주입 |
 | `S3_PRESIGNED_UPLOAD_EXPIRY` | `300` | `rallit.s3.presigned.upload-expiry-seconds` | 업로드 URL 만료(초) |
 | `S3_PRESIGNED_DOWNLOAD_EXPIRY` | `600` | `rallit.s3.presigned.download-expiry-seconds` | 조회 URL 만료(초) |
 
 ```dotenv
-PROFILE_IMAGE_STORAGE=filesystem
 AWS_REGION=ap-northeast-2
 S3_BUCKET=<버킷 이름>
 S3_PRESIGNED_UPLOAD_EXPIRY=300
@@ -212,6 +210,8 @@ S3_PRESIGNED_DOWNLOAD_EXPIRY=600
 
 AWS SDK의 기본 인증 체인으로 EC2 IAM 역할의 임시 자격 증명을 사용합니다. 기본 체인은 환경변수 자격 증명을 인스턴스 역할보다 먼저 사용하므로 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 서버 `.env`나 코드에 추가하지 않습니다.
 
+배포 전에 EC2 앱 역할로 존재하지 않는 `image-uploads/` 키에 `GetObject`를 요청해 `404 NoSuchKey`가 돌아오는지 확인합니다. 누락을 확인하면 백엔드는 완료 요청에 `409 IMAGE_UPLOAD_NOT_READY`를 반환합니다. AWS는 버킷에 `s3:ListBucket`이 없으면 누락에도 `403 AccessDenied`를 반환하며, 백엔드는 권한 및 저장소 실패를 `503`으로 처리합니다. [AWS GetObject 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
+
 app은 Docker 브리지 네트워크에서 실행되므로 컨테이너에서 인스턴스 메타데이터(IMDSv2)에 접근할 수 있도록 메타데이터 옵션의 PUT 응답 홉 제한을 2 이상으로 둡니다. 아래 명령이 역할 이름을 출력하면 정상입니다. 자격 증명 값 자체는 조회하거나 기록하지 않습니다.
 
 ```bash
@@ -220,9 +220,34 @@ docker compose exec -T app sh -c 'token=$(curl -fsS -X PUT http://169.254.169.25
 
 ### S3 전환
 
-1. Presigned URL API가 배포되고 기존 볼륨 이미지를 옮기기 전까지 `PROFILE_IMAGE_STORAGE=filesystem`을 유지하고 `profile-images` 볼륨을 삭제하지 않습니다.
-2. 볼륨 파일을 `profile-images/{기존 키}`로 복사하고, 전환 직전 변경분을 다시 동기화한 뒤 DB의 `profile_image_key`마다 객체가 있는지 확인합니다.
-3. 실제 버킷에서 업로드·조회·삭제를 확인한 뒤 `PROFILE_IMAGE_STORAGE=s3`로 바꾸고 다시 배포합니다.
+1. 일반·운영자 프론트의 Presigned 연동, S3 전용 백엔드 빌드, 운영 버킷·IAM·CORS 설정을 준비합니다.
+2. 기존 이미지 등록·교체·삭제를 잠시 막고 처리 중인 요청이 끝났는지 확인합니다. 운영 DB의 기존 프로필 키를 백업한 뒤, 새 S3 업로드를 받기 전에 키를 초기화합니다. 가입 상태와 나머지 프로필 정보는 유지되고 기존 사진은 기본 이미지로 전환됩니다. 코트 키는 운영에 값이 없는지 확인합니다.
+3. 아래 SQL을 운영 전환 시점에 한 번만 실행합니다.
+
+```sql
+UPDATE users SET profile_image_key = NULL WHERE profile_image_key IS NOT NULL;
+```
+
+4. S3 전용 백엔드와 Presigned 방식의 프론트를 배포합니다. 시험 계정으로 프로필 등록·교체·조회·삭제, 운영자 코트 등록과 회원의 조회를 확인한 뒤 쓰기를 재개합니다.
+5. 전환 검증이 끝나면 기존 사진 볼륨을 정리합니다.
+
+### 첫 전환 롤백
+
+- S3 전용 배포 전에 마지막 파일시스템 배포의 앱 이미지 태그, `compose.yml`, `deploy.sh`, 이미지 볼륨 연결 및 경로 설정을 확보합니다. 기존 볼륨과 프로필 키 백업은 전환 검증까지 보존합니다.
+- 자동 복구는 이전 앱 이미지를 현재 Compose 설정으로 실행합니다. 첫 전환에서 파일시스템 방식으로 돌아가야 하면 이미지 쓰기를 멈춘 상태에서 당시 Compose·배포 스크립트와 이미지 경로 설정을 복구하고, 기존 볼륨을 마운트한 뒤 백업한 프로필 키를 복원합니다. 이전 백엔드·프론트의 업로드 및 조회 계약을 맞추고 시험 계정으로 사진을 조회한 뒤 쓰기를 재개합니다.
+- S3 쓰기를 재개한 뒤에는 새 이미지 키와 S3 객체를 읽을 수 있는 버전으로 복구합니다.
+
+### Presigned API 검증
+
+- 프로필 사진은 `POST /api/v1/users/me/profile-image/uploads`, 코트 대표 사진은 운영자 세션의 `POST /api/v1/admin/courts/{courtId}/thumbnail/uploads`에서 발급합니다. 요청 데이터는 파일명, MIME 타입과 바이트 크기입니다.
+- 발급 응답의 `url`과 서명 폼 필드를 사용해 브라우저가 S3에 파일을 POST합니다. 성공 후 각 발급 경로 뒤에 `/{uploadId}/complete`를 붙여 인증 호출합니다. 백엔드는 업로드한 이미지에 크기·실제 형식·픽셀 제한을 적용하고, 리사이즈와 촬영 메타데이터 제거를 한 뒤 최종 키를 DB에 반영합니다.
+- 조회는 응답에 담긴 이미지 경로 뒤에 `/url`을 붙여 인증 호출하고, 결과의 만료형 URL을 브라우저가 사용합니다.
+
+### 로컬 MinIO 검증
+
+MinIO에서 테스트 버킷을 생성하고 로컬 백엔드 실행 환경에 `S3_BUCKET`, `S3_ENDPOINT`와 테스트용 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 전달합니다. `S3_ENDPOINT`에는 백엔드와 브라우저가 같은 주소로 접근할 수 있는 URL을 지정합니다. 사진은 운영과 같은 발급 → MinIO POST → 완료 호출로 연결합니다.
+
+온보딩 완료 회원 세션으로 `GET /api/v1/courts/{courtId}/thumbnail/url`이 반환한 서명 URL을 사용해 코트 사진을 조회합니다. 매치 카드에는 `courtThumbnailUrl`, 상세에는 `court.thumbnailUrl`이 포함됩니다. 사진이 없으면 공통 이미지를 표시합니다.
 
 ### AWS 계정 이전
 

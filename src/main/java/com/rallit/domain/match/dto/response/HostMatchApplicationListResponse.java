@@ -88,7 +88,7 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 	}
 
 	public record UserInfo(Long userId, String nickname,
-			@Schema(description = "Bearer 인증이 필요한 API 상대 경로. 등록된 사진이 없으면 null",
+			@Schema(description = ProfileImageResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
 					types = {"string", "null"}) String profileImageUrl,
 			Gender gender, BigDecimal ntrp, AgeGroup ageGroup,
 			@Schema(description = "만 구력(년). 1년 미만은 0, 시작 연월이 없으면 null",

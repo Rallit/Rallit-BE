@@ -11,6 +11,7 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
@@ -33,6 +34,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			log.error("Application request processing error", exception);
 		}
 		return ResponseEntity.status(reason.getHttpStatus())
+				.contentType(MediaType.APPLICATION_JSON)
 				.body(ApiResponse.onFailure(reason.getCode(), reason.getMessage(), null));
 	}
 

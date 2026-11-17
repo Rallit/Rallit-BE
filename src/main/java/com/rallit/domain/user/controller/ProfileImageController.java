@@ -1,20 +1,22 @@
 package com.rallit.domain.user.controller;
 
-import com.rallit.domain.user.dto.ProfileImageResponse;
+import com.rallit.domain.image.dto.ImageLinkResponse;
+import com.rallit.domain.image.service.ImageLinkService;
+import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.domain.user.service.ProfileImageService;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "회원")
 @SecurityRequirement(name = "bearerAuth")
@@ -23,21 +25,28 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/users")
 public class ProfileImageController {
   private final ProfileImageService images;
+  private final ImageLinkService links;
 
-  @Operation(
-      summary = "내 프로필 사진 등록 및 교체",
-      description = "JPG·JPEG·PNG, 최대 5MB입니다. 원본은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 지원합니다. 처리 요청이 몰리면 503을 반환합니다.")
-  @PutMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<ApiResponse<ProfileImageResponse>> upload(
-      @AuthenticationPrincipal UserDetails principal, @RequestPart("file") MultipartFile file) {
-    return ResponseEntity.ok(ApiResponse.onSuccess(images.upload(principal.userId(), file)));
-  }
-
-  @Operation(summary = "회원 프로필 사진 조회", description = "로그인한 회원이 프로필 사진 파일을 조회합니다.")
-  @GetMapping(value = "/{userId}/profile-image", produces = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE})
-  public ResponseEntity<Resource> get(@PathVariable Long userId) {
-    var image = images.get(userId);
-    return ResponseEntity.ok().contentType(image.mediaType()).body(image.contents());
+  @GetMapping("/{userId}/profile-image/url")
+  @Operation(summary = "회원 프로필 사진 URL 조회", description = "로그인한 회원에게 이미지 URL과 만료 시각을 반환합니다.")
+  @ApiResponses({
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", useReturnTypeSchema = true),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
+          description = "회원 인증이 필요합니다.",
+          content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+              schema = @Schema(implementation = ApiResponse.class))),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+          description = "프로필 사진을 찾을 수 없습니다.",
+          content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+              schema = @Schema(implementation = ApiResponse.class))),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503",
+          description = "이미지 URL을 일시적으로 발급할 수 없습니다.",
+          content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+              schema = @Schema(implementation = ApiResponse.class)))
+  })
+  public ResponseEntity<ApiResponse<ImageLinkResponse>> getProfileImageUrl(@PathVariable Long userId) {
+    return ResponseEntity.ok(ApiResponse.onSuccess(
+        links.link(ImageUploadPurpose.PROFILE, images.imageKey(userId))));
   }
 
   @Operation(

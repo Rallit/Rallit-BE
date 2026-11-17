@@ -2,6 +2,7 @@ package com.rallit.global.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -32,7 +33,7 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.tags[*].name",
-            containsInAnyOrder("인증", "회원", "매치 조회", "매치 추천", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
+            containsInAnyOrder("인증", "회원", "매치 조회", "코트", "이미지 업로드", "매치 추천", "매치 참가 신청", "호스트 - 참가 신청자 관리", "운영자")))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.tags[0]").value("인증"))
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.responses['302']").exists())
         .andExpect(jsonPath("$.paths['/api/v1/auth/kakao'].get.parameters[*].name",
@@ -48,6 +49,42 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.paths['/api/v1/admin/auth/logout'].post.tags[0]").value("운영자"))
         .andExpect(jsonPath("$.paths['/api/v1/admin/me'].get.tags[0]").value("운영자"))
         .andExpect(jsonPath("$.paths['/api/v1/admin/me'].get.security[0].bearerAuth").exists());
+  }
+
+  @Test
+  void swaggerExposesOnlyThePresignedPhotoUploadAndReadPaths() throws Exception {
+    String thumbnail = "$.paths['/api/v1/courts/{courtId}/thumbnail/url'].get";
+    String profileIssue = "$.paths['/api/v1/users/me/profile-image/uploads'].post.responses";
+    String courtIssue = "$.paths['/api/v1/admin/courts/{courtId}/thumbnail/uploads'].post.responses";
+    String profileComplete = "$.paths['/api/v1/users/me/profile-image/uploads/{uploadId}/complete'].post.responses";
+    String courtComplete = "$.paths['/api/v1/admin/courts/{courtId}/thumbnail/uploads/{uploadId}/complete'].post.responses";
+    mvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/courts/{courtId}/thumbnail']").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{userId}/profile-image']").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/users/me/profile-image'].put").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/users/me/profile-image/uploads'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{userId}/profile-image/url'].get").exists())
+        .andExpect(jsonPath(thumbnail + ".tags[0]").value("코트"))
+        .andExpect(jsonPath(thumbnail + ".operationId").value("getCourtThumbnailUrl"))
+        .andExpect(jsonPath(thumbnail + ".security[0].bearerAuth").exists())
+        .andExpect(jsonPath(thumbnail + ".responses['404'].content['application/json']").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{userId}/profile-image/url'].get.responses['404']").exists())
+        .andExpect(jsonPath(profileIssue + "['201'].content['application/json']").exists())
+        .andExpect(jsonPath(profileIssue + "['200']").doesNotExist())
+        .andExpect(jsonPath(profileIssue + "['413'].content['application/json']").exists())
+        .andExpect(jsonPath(courtIssue + "['201']").exists())
+        .andExpect(jsonPath(courtIssue + "['404']").exists())
+        .andExpect(jsonPath(profileComplete + "['409'].content['application/json']").exists())
+        .andExpect(jsonPath(profileComplete + "['410']").exists())
+        .andExpect(jsonPath(courtComplete + "['409']").exists())
+        .andExpect(jsonPath(courtComplete + "['410']").exists())
+        .andExpect(jsonPath("$.components.schemas.UserResponse.properties.profileImageUrl.description",
+            containsString("/url")))
+        .andExpect(jsonPath("$.components.schemas.MatchListItemResponse.properties.courtThumbnailUrl.description",
+            containsString("/url")))
+        .andExpect(jsonPath("$.components.schemas.ImageUploadRequest.properties.size.maximum").value(5242880))
+        .andExpect(jsonPath("$.components.schemas.ImageLinkResponse.properties.expiresAt.format").value("date-time"));
   }
 
   @Test
@@ -105,6 +142,10 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath(detailJson + ".examples['신청 가능'].value.result.recruitmentDeadline")
             .value("2026-11-15T13:00:00+09:00"))
         .andExpect(jsonPath("$.components.schemas.MatchListItemResponse.properties.startsAt.format").value("date-time"))
+        .andExpect(jsonPath("$.components.schemas.MatchListItemResponse.properties.courtThumbnailUrl.type[*]",
+            containsInAnyOrder("string", "null")))
+        .andExpect(jsonPath("$.components.schemas.CourtInfo.properties.thumbnailUrl.type[*]",
+            containsInAnyOrder("string", "null")))
         .andExpect(jsonPath("$.components.schemas.MatchDetailResponse.properties.applicationBlockReason.type[*]",
             containsInAnyOrder("string", "null")))
         .andExpect(jsonPath(list + ".responses['400'].content['application/json']"

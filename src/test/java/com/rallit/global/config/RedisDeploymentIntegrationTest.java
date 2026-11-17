@@ -41,6 +41,7 @@ class RedisDeploymentIntegrationTest extends DeploymentTestSupport {
     values.put("ADMIN_FRONTEND_CALLBACK_URL", "https://admin.example.test/auth/callback");
     values.put("SERVICE_ORIGINS", "https://frontend.example.test");
     values.put("ADMIN_ORIGINS", "https://admin.example.test");
+    values.put("S3_ENDPOINT", "http://minio.example.test:19000");
 
     environmentFile = temporary.resolve("compose.env");
     Files.write(
@@ -88,6 +89,14 @@ class RedisDeploymentIntegrationTest extends DeploymentTestSupport {
           .isEqualTo("https://frontend.example.test/auth/callback");
       assertThat(app.path("SERVICE_ORIGINS").asText()).isEqualTo("https://frontend.example.test");
     }
+  }
+
+  @Test
+  void deploymentDoesNotPassTheLocalS3EndpointToTheApp() throws Exception {
+    var result = compose("", "config", "--format", "json");
+    assertThat(result.exitCode()).as(result.output()).isZero();
+    var environment = json.readTree(result.output()).path("services").path("app").path("environment");
+    assertThat(environment.has("S3_ENDPOINT")).isFalse();
   }
 
   private String authenticated(String container, String... args) throws Exception {
