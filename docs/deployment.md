@@ -99,7 +99,7 @@ chmod 600 .env
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth 클라이언트 ID, 비밀 키 및 BE 콜백 주소를 모두 입력 |
 | `FRONTEND_CALLBACK_URL`, `ADMIN_FRONTEND_CALLBACK_URL` | 배포된 일반·운영자 FE의 로그인 완료 주소 |
 | `SERVICE_ORIGINS`, `ADMIN_ORIGINS` | 배포된 FE의 정확한 Origin. 여러 개면 쉼표로 구분 |
-| `PROFILE_IMAGE_STORAGE`, `AWS_REGION`, `S3_BUCKET`, `S3_PRESIGNED_*` | 이미지 저장소 설정. [5장](#5-s3-이미지-저장소) 참고 |
+| `AWS_REGION`, `S3_BUCKET`, `S3_PRESIGNED_*` | 이미지 저장소 설정. [5장](#5-s3-이미지-저장소) 참고 |
 
 `SERVICE_ORIGINS`와 `ADMIN_ORIGINS`는 `temp`와 `prod` 모두에서 반영됩니다. 서비스·운영자 목적에 맞는 Origin만 각각 허용합니다. 로그인 완료 콜백은 별도 검증을 거치며, Secure 설정에서는 일반 FE는 `rallit.co.kr`, 운영자 FE는 `admin.rallit.co.kr`의 HTTPS(기본 포트 또는 443) 주소만 허용합니다. 다른 테스트 도메인을 콜백으로 넣으면 앱이 시작되지 않습니다.
 
@@ -180,7 +180,7 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 
 ## 5. S3 이미지 저장소
 
-`PROFILE_IMAGE_STORAGE`로 프로필 사진과 코트 대표 사진의 저장소를 선택합니다. 기본 `filesystem` 모드에서는 Docker의 `profile-images`와 `court-thumbnails` 볼륨을 사용합니다. JVM을 직접 실행할 때 기본 경로는 `build/profile-images`와 `build/court-thumbnails`입니다. `s3` 모드의 브라우저 업로드와 조회는 Presigned 방식을 사용합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
+프로필 사진과 코트 대표 사진은 S3에 저장합니다. 브라우저는 Presigned POST 폼으로 업로드하고 만료형 Presigned GET URL로 조회합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
 
 ### 사전 준비
 
@@ -194,15 +194,13 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 
 | 이름 | 기본값 | 설정 키 | 설명 |
 | --- | --- | --- | --- |
-| `PROFILE_IMAGE_STORAGE` | `filesystem` | `rallit.profile-image.storage` | 프로필·코트 사진의 저장 방식 |
 | `AWS_REGION` | `ap-northeast-2` | `rallit.s3.region` | 버킷 리전 |
-| `S3_BUCKET` | 없음 | `rallit.s3.bucket` | 버킷 이름. 서버 `.env`로만 주입 |
+| `S3_BUCKET` | 필수 | `rallit.s3.bucket` | 버킷 이름. 서버 `.env`로 주입 |
 | `S3_PRESIGNED_UPLOAD_EXPIRY` | `300` | `rallit.s3.presigned.upload-expiry-seconds` | 업로드 URL 만료(초) |
 | `S3_PRESIGNED_DOWNLOAD_EXPIRY` | `600` | `rallit.s3.presigned.download-expiry-seconds` | 조회 URL 만료(초) |
 | `S3_ENDPOINT` | 없음 | `rallit.s3.endpoint` | 로컬 S3 호환 서버 주소 |
 
 ```dotenv
-PROFILE_IMAGE_STORAGE=filesystem
 AWS_REGION=ap-northeast-2
 S3_BUCKET=<버킷 이름>
 S3_PRESIGNED_UPLOAD_EXPIRY=300
@@ -221,37 +219,29 @@ docker compose exec -T app sh -c 'token=$(curl -fsS -X PUT http://169.254.169.25
 
 ### S3 전환
 
-1. 파일시스템 모드로 #45를 먼저 배포하고, 팀 프론트에 업로드 발급·완료 및 조회 URL 계약을 반영합니다. 전환 검증이 끝날 때까지 기존 볼륨을 보존합니다.
-2. 프로필과 코트 대표 사진을 각각 `profile-images/{기존 키}`와 `court-thumbnails/{기존 키}`로 복사합니다. 이미지 변경을 잠시 멈추고 마지막 변경분과 DB 키에 대응하는 객체를 확인합니다.
-3. 서버 `.env`에 `PROFILE_IMAGE_STORAGE=s3`, `S3_BUCKET`, `AWS_REGION`을 지정해 배포합니다. 시험 계정에서 기존 사진 조회, 새 사진 등록·교체·삭제, 운영자 코트 등록과 회원의 조회, URL 만료와 브라우저 CORS를 확인한 후 쓰기를 재개합니다.
-4. 새 사진을 받은 이후 파일시스템으로 복구할 때는 현재 DB 키에 대응하는 S3 객체를 기존 볼륨에 동기화하고 `PROFILE_IMAGE_STORAGE=filesystem`으로 전환합니다.
+1. 일반·운영자 프론트의 Presigned 연동, S3 전용 백엔드 빌드, 운영 버킷·IAM·CORS 설정을 준비합니다.
+2. 기존 이미지 등록·교체·삭제를 잠시 막고 처리 중인 요청이 끝났는지 확인합니다. 운영 DB의 기존 프로필 키를 백업한 뒤, 새 S3 업로드를 받기 전에 키를 초기화합니다. 가입 상태와 나머지 프로필 정보는 유지되고 기존 사진은 기본 이미지로 전환됩니다. 코트 키는 운영에 값이 없는지 확인합니다.
+3. 아래 SQL을 운영 전환 시점에 한 번만 실행합니다.
+
+```sql
+UPDATE users SET profile_image_key = NULL WHERE profile_image_key IS NOT NULL;
+```
+
+4. S3 전용 백엔드와 Presigned 방식의 프론트를 배포합니다. 시험 계정으로 프로필 등록·교체·조회·삭제, 운영자 코트 등록과 회원의 조회를 확인한 뒤 쓰기를 재개합니다.
+5. 전환 검증이 끝나면 기존 사진 볼륨을 정리합니다. 쓰기 재개 전에 이전 배포로 되돌릴 경우 기존 볼륨과 백업한 프로필 키를 함께 복원합니다. 쓰기 재개 이후에는 새 이미지 키와 S3 객체를 보존하는 버전으로 복구합니다.
 
 ### Presigned API 검증
 
 - 프로필 사진은 `POST /api/v1/users/me/profile-image/uploads`, 코트 대표 사진은 운영자 세션의 `POST /api/v1/admin/courts/{courtId}/thumbnail/uploads`에서 발급합니다. 요청 데이터는 파일명, MIME 타입과 바이트 크기입니다.
 - 발급 응답의 `url`과 서명 폼 필드를 사용해 브라우저가 S3에 파일을 POST합니다. 성공 후 각 발급 경로 뒤에 `/{uploadId}/complete`를 붙여 인증 호출합니다. 백엔드는 업로드한 이미지에 크기·실제 형식·픽셀 제한을 적용하고, 리사이즈와 촬영 메타데이터 제거를 한 뒤 최종 키를 DB에 반영합니다.
-- S3 모드의 조회는 기존 이미지 경로 뒤에 `/url`을 붙여 인증 호출하고, 결과의 만료형 URL을 브라우저가 사용합니다. 프로필 업로드의 파일시스템 응답은 `mode=FILESYSTEM`입니다.
+- 조회는 응답에 담긴 이미지 경로 뒤에 `/url`을 붙여 인증 호출하고, 결과의 만료형 URL을 브라우저가 사용합니다.
 - 로컬 S3 호환 서버를 쓰는 경우 `S3_ENDPOINT`에 브라우저와 백엔드가 함께 접근할 수 있는 주소를 설정합니다. 로컬 검증에는 호환 서버에서 설정한 테스트 전용 자격증명을 사용합니다.
 
-### 로컬 코트 대표 사진 연결
+### 로컬 MinIO 검증
 
-Flyway 마이그레이션이 적용된 로컬 테스트 DB에서 코트 ID 하나를 선택하고 JPEG 샘플을 준비합니다. 아래의 `LOCAL_DB_URL`은 `psql`용 로컬 연결 주소이며, `court_id`와 `sample_image`는 테스트 데이터에 맞게 지정합니다.
+MinIO에서 테스트 버킷을 생성하고 백엔드 실행 환경에 `S3_BUCKET`, `S3_ENDPOINT`와 로컬 테스트용 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 전달합니다. `S3_ENDPOINT`에는 백엔드와 브라우저가 같은 주소로 접근할 수 있는 URL을 지정합니다. 사진은 운영과 같은 발급 → MinIO POST → 완료 호출로 연결합니다.
 
-```bash
-court_id=1
-sample_image=/path/to/sample.jpg
-image_key="$(uuidgen | tr '[:upper:]' '[:lower:]').jpg"
-mkdir -p build/court-thumbnails
-cp "$sample_image" "build/court-thumbnails/$image_key"
-psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -v court_id="$court_id" -v image_key="$image_key" <<'SQL'
-UPDATE court
-SET thumbnail_image_key = :'image_key', updated_at = CURRENT_TIMESTAMP
-WHERE id = :'court_id'::bigint
-RETURNING id, thumbnail_image_key;
-SQL
-```
-
-온보딩 완료 회원으로 Swagger를 인증한 뒤 `GET /api/v1/courts/{courtId}/thumbnail/url`을 실행합니다. 파일시스템 모드에서는 Bearer로 읽을 수 있는 상대 URL과 `expiresAt=null`을 반환합니다. 매치 목록·홈 추천·저장한 요청 결과의 카드에서는 `courtThumbnailUrl`, 매치 상세에서는 `court.thumbnailUrl`을 읽어 `/url`을 붙입니다. 사진이 없으면 공통 이미지를 표시합니다.
+온보딩 완료 회원 세션으로 `GET /api/v1/courts/{courtId}/thumbnail/url`이 반환한 서명 URL을 사용해 코트 사진을 조회합니다. 매치 카드에는 `courtThumbnailUrl`, 상세에는 `court.thumbnailUrl`이 포함됩니다. 사진이 없으면 공통 이미지를 표시합니다.
 
 ### AWS 계정 이전
 
