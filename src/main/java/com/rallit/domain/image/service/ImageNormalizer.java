@@ -7,7 +7,7 @@ import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifReader;
 import com.rallit.domain.image.enums.ImageUploadPurpose;
-import com.rallit.domain.user.exception.UserErrorStatus;
+import com.rallit.domain.image.exception.ImageUploadErrorStatus;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.awt.AlphaComposite;
@@ -46,7 +46,7 @@ public class ImageNormalizer {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE);
     }
     if (contents.length == 0 || filename == null) {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+      throw new GeneralException(ImageUploadErrorStatus.INVALID_IMAGE_FORMAT);
     }
     if (!normalizationSlots.tryAcquire()) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
@@ -54,7 +54,7 @@ public class ImageNormalizer {
     try {
       return normalize(contents, filename.toLowerCase(Locale.ROOT), purpose);
     } catch (IOException | ImageProcessingException | IllegalArgumentException failure) {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
+      throw new GeneralException(ImageUploadErrorStatus.INVALID_IMAGE_FORMAT, failure);
     } finally {
       normalizationSlots.release();
     }
@@ -65,7 +65,7 @@ public class ImageNormalizer {
     try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(original))) {
       var readers = ImageIO.getImageReaders(input);
       if (!readers.hasNext()) {
-        throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+        throw new GeneralException(ImageUploadErrorStatus.INVALID_IMAGE_FORMAT);
       }
       var reader = readers.next();
       try {
@@ -87,16 +87,16 @@ public class ImageNormalizer {
 
   private ImageSize validatedSize(ImageReader reader) throws IOException {
     reader.addIIOReadWarningListener((source, warning) -> {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+      throw new GeneralException(ImageUploadErrorStatus.INVALID_IMAGE_FORMAT);
     });
     int width = reader.getWidth(0);
     int height = reader.getHeight(0);
     if (width <= 0 || height <= 0) {
-      throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+      throw new GeneralException(ImageUploadErrorStatus.INVALID_IMAGE_FORMAT);
     }
     // A reader may allocate memory for the original image even when subsampling.
     if (width > MAX_DIMENSION || height > MAX_DIMENSION || (long) width * height > MAX_PIXELS) {
-      throw new GeneralException(UserErrorStatus.PROFILE_IMAGE_DIMENSIONS_TOO_LARGE);
+      throw new GeneralException(ImageUploadErrorStatus.IMAGE_DIMENSIONS_TOO_LARGE);
     }
     return new ImageSize(width, height);
   }
@@ -114,7 +114,7 @@ public class ImageNormalizer {
     if ("jpeg".equalsIgnoreCase(format) && (filename.endsWith(".jpeg") || filename.endsWith(".jpg"))) {
       return "jpeg";
     }
-    throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
+    throw new GeneralException(ImageUploadErrorStatus.INVALID_IMAGE_FORMAT);
   }
 
   private int readOrientation(byte[] original, String format) throws IOException, ImageProcessingException {

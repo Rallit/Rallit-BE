@@ -22,13 +22,15 @@ class ImageNormalizerTest {
   private final ImageNormalizer normalizer = new ImageNormalizer();
 
   @ParameterizedTest
-  @CsvSource({"4097, 2", "4096, 3200"})
-  void rejectsImagesAboveTheSourceDimensionOrPixelLimit(int width, int height) throws IOException {
+  @CsvSource({"4097, 2, PROFILE", "4096, 3200, PROFILE", "4097, 2, COURT", "4096, 3200, COURT"})
+  void rejectsImagesAboveTheSourceDimensionOrPixelLimit(int width, int height, ImageUploadPurpose purpose)
+      throws IOException {
     var file = png(width, height);
 
-    assertThatThrownBy(() -> normalizer.normalizeUpload(file, "avatar.png", ImageUploadPurpose.PROFILE))
-        .isInstanceOf(GeneralException.class)
-        .hasMessageContaining("4,096");
+    assertThatThrownBy(() -> normalizer.normalizeUpload(file, "photo.png", purpose))
+        .isInstanceOfSatisfying(GeneralException.class,
+            failure -> assertThat(failure.getErrorReasonHttpStatus().getCode()).isEqualTo("COMMON400"))
+        .hasMessage("사진은 가로·세로 각각 4,096픽셀, 총 1,250만 픽셀까지 올릴 수 있습니다.");
   }
 
   @ParameterizedTest
