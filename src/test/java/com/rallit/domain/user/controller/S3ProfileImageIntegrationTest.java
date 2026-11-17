@@ -25,6 +25,7 @@ import com.rallit.domain.user.enums.Gender;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.domain.user.service.ProfileImageNormalizer;
 import com.rallit.domain.user.service.UserRegistrationService;
+import com.rallit.global.config.S3PresignedProperties;
 import com.rallit.global.storage.PresignedImageStorage;
 import com.rallit.support.EntityFixtures;
 import com.rallit.support.IntegrationTestSupport;
@@ -35,7 +36,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,9 +67,11 @@ import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
     "RALLIT_ENV_FILE=.env.test-disabled",
-    "rallit.image-storage.backend=s3",
-    "rallit.image-storage.s3.bucket=image-test",
-    "rallit.image-storage.s3.region=ap-northeast-2"
+    "rallit.profile-image.storage=s3",
+    "rallit.s3.bucket=image-test",
+    "rallit.s3.region=ap-northeast-2",
+    "rallit.s3.presigned.upload-expiry-seconds=123",
+    "rallit.s3.presigned.download-expiry-seconds=456"
 })
 @AutoConfigureMockMvc
 class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
@@ -84,6 +86,7 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
   @Autowired TokenSessionService sessions;
   @Autowired CourtRepository courts;
   @Autowired Clock clock;
+  @Autowired S3PresignedProperties presignedProperties;
   @Autowired ObjectMapper json;
   @Autowired JdbcTemplate jdbc;
   @Autowired EntityManager entities;
@@ -95,9 +98,9 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
 
   @BeforeEach
   void fakeSignedRequests() throws Exception {
-    when(presigned.signUpload(anyString(), any(MediaType.class), eq(Duration.ofMinutes(5)), eq((long) MAX_BYTES)))
+    when(presigned.signUpload(anyString(), any(MediaType.class), eq((long) MAX_BYTES)))
         .thenAnswer(call -> new PresignedImageStorage.SignedUpload(UPLOAD_URL,
-            Map.of("key", call.getArgument(0)), clock.instant().plusSeconds(300)));
+            Map.of("key", call.getArgument(0)), clock.instant().plus(presignedProperties.uploadLifetime())));
     when(client.deleteObject(any(DeleteObjectRequest.class))).thenAnswer(call -> {
       assertConnectionReleased();
       return DeleteObjectResponse.builder().build();
@@ -106,6 +109,8 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
 
   @Test
   void finalizesTheDirectUploadAndIssuesASignedReadWithoutProxyingBytes() throws Exception {
+    assertThat(presignedProperties.uploadExpirySeconds()).isEqualTo(123);
+    assertThat(presignedProperties.downloadExpirySeconds()).isEqualTo(456);
     var user = member(LoginTarget.SERVICE);
     byte[] original = ProfileImageIntegrationTest.withPngExif(png(48, 24),
         ProfileImageIntegrationTest.rotatedExifWithGps());
@@ -325,8 +330,8 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
 
   private PresignedImageStorage.SignedRead signRead(String prefix, String key) throws IOException {
     var signed = new PresignedImageStorage.SignedRead(UPLOAD_URL + prefix + key + "?X-Amz-Signature=test",
-        clock.instant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusSeconds(300));
-    when(presigned.signRead(prefix, key, Duration.ofMinutes(5))).thenAnswer(call -> {
+        clock.instant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plus(presignedProperties.downloadLifetime()));
+    when(presigned.signRead(prefix, key)).thenAnswer(call -> {
       assertConnectionReleased();
       return signed;
     });

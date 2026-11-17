@@ -1,10 +1,10 @@
 package com.rallit.global.storage;
 
+import com.rallit.global.config.S3PresignedProperties;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -39,7 +39,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@ConditionalOnProperty(name = "rallit.image-storage.backend", havingValue = "s3")
+@ConditionalOnProperty(name = "rallit.profile-image.storage", havingValue = "s3")
 public class PresignedImageStorage {
   private static final Pattern STAGING_KEY = Pattern.compile(
       "image-uploads/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
@@ -54,21 +54,23 @@ public class PresignedImageStorage {
   private final AwsCredentialsProvider credentialsProvider;
   private final ObjectMapper json;
   private final Clock clock;
+  private final S3PresignedProperties properties;
   private final String bucket;
   private final String region;
   private final String uploadUrl;
 
   public PresignedImageStorage(S3Client client, S3Presigner presigner, AwsCredentialsProvider credentialsProvider,
-      ObjectMapper json, Clock clock,
-      @Value("${rallit.image-storage.s3.bucket}") String bucket,
-      @Value("${rallit.image-storage.s3.region}") String region,
-      @Value("${rallit.image-storage.s3.endpoint:}") String endpoint) {
-    Assert.hasText(bucket, "rallit.image-storage.s3.bucket is required for S3 image storage");
+      ObjectMapper json, Clock clock, S3PresignedProperties properties,
+      @Value("${rallit.s3.bucket}") String bucket,
+      @Value("${rallit.s3.region}") String region,
+      @Value("${rallit.s3.endpoint:}") String endpoint) {
+    Assert.hasText(bucket, "rallit.s3.bucket is required for S3 image storage");
     this.client = client;
     this.presigner = presigner;
     this.credentialsProvider = credentialsProvider;
     this.json = json;
     this.clock = clock;
+    this.properties = properties;
     this.bucket = bucket;
     this.region = region;
     this.uploadUrl = S3EndpointProvider.defaultProvider().resolveEndpoint(params -> {
@@ -79,11 +81,11 @@ public class PresignedImageStorage {
     }).join().endpointUrl().toUri().toASCIIString();
   }
 
-  public SignedUpload signUpload(String stagingKey, MediaType mediaType, Duration ttl, long maximumBytes)
+  public SignedUpload signUpload(String stagingKey, MediaType mediaType, long maximumBytes)
       throws IOException {
     requireStagingKey(stagingKey);
     Instant now = clock.instant();
-    Instant expiresAt = now.plus(ttl);
+    Instant expiresAt = now.plus(properties.uploadLifetime());
     String date = SIGNING_DATE.format(now);
     try {
       var credentials = credentialsProvider.resolveCredentials();
@@ -112,10 +114,11 @@ public class PresignedImageStorage {
     }
   }
 
-  public SignedRead signRead(String prefix, String key, Duration ttl) throws IOException {
+  public SignedRead signRead(String prefix, String key) throws IOException {
     var request = GetObjectRequest.builder().bucket(bucket).key(prefix + ImageKey.requireValid(key)).build();
     try {
-      var signed = presigner.presignGetObject(builder -> builder.signatureDuration(ttl).getObjectRequest(request));
+      var signed = presigner.presignGetObject(
+          builder -> builder.signatureDuration(properties.downloadLifetime()).getObjectRequest(request));
       if (!signed.isBrowserExecutable()) {
         throw new IOException("Signed S3 image read requires additional request headers");
       }

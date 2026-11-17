@@ -13,7 +13,6 @@ import com.rallit.global.storage.S3ImageObjects;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,10 +29,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "rallit.image-storage.backend", havingValue = "s3")
+@ConditionalOnProperty(name = "rallit.profile-image.storage", havingValue = "s3")
 public class ImageUploadService {
-  private static final Duration UPLOAD_LIFETIME = Duration.ofMinutes(5);
-
   private final ImageUploadRepository uploads;
   private final UserRepository users;
   private final CourtRepository courts;
@@ -57,7 +54,7 @@ public class ImageUploadService {
     var id = UUID.randomUUID();
     try {
       var form = presigned.signUpload(stagingKey(id), MediaType.parseMediaType(request.contentType()),
-          UPLOAD_LIFETIME, ProfileImageNormalizer.MAX_BYTES);
+          ProfileImageNormalizer.MAX_BYTES);
       uploads.save(new ImageUpload(id, ownerId, targetId, purpose, request.contentType(),
           request.size(), form.expiresAt()));
       return new ImageUploadResponse(ImageUploadResponse.Mode.S3, id, form.url(), form.fields(),

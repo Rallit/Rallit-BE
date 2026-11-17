@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "rallit.image-storage.backend", havingValue = "s3")
+@ConditionalOnProperty(name = "rallit.profile-image.storage", havingValue = "s3")
 public class S3ProfileImageStorage implements ProfileImageStorage {
   private static final String PREFIX = "profile-images/";
   private final S3ImageObjects objects;

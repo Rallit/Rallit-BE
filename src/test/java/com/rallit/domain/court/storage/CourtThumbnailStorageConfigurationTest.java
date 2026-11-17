@@ -22,7 +22,7 @@ class CourtThumbnailStorageConfigurationTest {
 
 		new ApplicationContextRunner()
 				.withUserConfiguration(CourtThumbnailStorageConfiguration.class)
-				.withPropertyValues("rallit.image-storage.backend=s3")
+				.withPropertyValues("rallit.profile-image.storage=s3")
 				.withBean(S3ImageObjects.class, () -> new S3ImageObjects(client, "image-test"))
 				.run(context -> {
 					assertThat(context).hasSingleBean(CourtThumbnailStorage.class);

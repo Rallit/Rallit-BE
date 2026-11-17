@@ -127,7 +127,7 @@ Redis는 `local-db` 프로필과 독립적으로 항상 실행됩니다. RDS로 
 
 ### 이미지 저장소
 
-기본값인 `IMAGE_STORAGE_BACKEND=filesystem`은 프로필 이미지를 `profile-images` 볼륨에서 읽고 씁니다. 코트 대표 사진은 별도 `court-thumbnails` 볼륨에서 읽습니다. JVM을 직접 실행하는 로컬 환경의 기본 경로는 각각 `build/profile-images`와 `build/court-thumbnails`입니다.
+기본값인 `PROFILE_IMAGE_STORAGE=filesystem`은 프로필 이미지를 `profile-images` 볼륨에서 읽고 씁니다. 코트 대표 사진은 별도 `court-thumbnails` 볼륨에서 읽습니다. JVM을 직접 실행하는 로컬 환경의 기본 경로는 각각 `build/profile-images`와 `build/court-thumbnails`입니다.
 
 #### 로컬 코트 대표 사진 연결
 
@@ -153,17 +153,19 @@ SQL
 
 1. 비공개 버킷에 암호화와 공개 액세스 차단을 적용합니다. EC2 앱의 IAM 역할에 `image-uploads/`, `profile-images/`, `court-thumbnails/`에 필요한 읽기·쓰기·삭제 권한을 부여합니다. 임시 키인 `image-uploads/`에는 완료되지 않은 객체를 만료시키는 수명 주기 규칙을 설정합니다. 브라우저가 S3에 연결하므로 버킷 CORS의 `AllowedOrigins`에 실제 일반·운영자 프론트 Origin을, `AllowedMethods`에 `GET`과 `POST`를 넣습니다. [S3 보안 가이드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html) · [S3 CORS 구성](https://docs.aws.amazon.com/AmazonS3/latest/userguide/enabling-cors-examples.html)
 2. DB의 `users.profile_image_key`가 가리키는 기존 볼륨 파일을 `profile-images/{기존 키}`에 복사합니다. 코트 사진도 `court.thumbnail_image_key`에 기록한 이름으로 `court-thumbnails/`에 준비합니다. 기존 키와 복사한 객체를 대조하고, 전환 직전 이미지 변경을 잠시 멈춰 마지막 변경분을 동기화합니다.
-3. 서버 `.env`에 `IMAGE_STORAGE_BACKEND=s3`, `IMAGE_S3_BUCKET`, `IMAGE_S3_REGION`을 설정하고 함께 확인한 일반·운영자 프론트와 배포합니다. 시험 회원의 기존 사진 조회와 새 사진 등록·교체·삭제, 운영자 사진 등록과 회원 코트 사진 조회가 통과하면 이미지 변경을 재개합니다.
+3. 서버 `.env`에 `PROFILE_IMAGE_STORAGE=s3`, `S3_BUCKET`, `AWS_REGION`을 설정하고 함께 확인한 일반·운영자 프론트와 배포합니다. 시험 회원의 기존 사진 조회와 새 사진 등록·교체·삭제, 운영자 사진 등록과 회원 코트 사진 조회가 통과하면 이미지 변경을 재개합니다.
 4. 앱 컨테이너의 IAM 역할로 임시 객체 읽기와 정리가 되는지 확인합니다. S3 모드의 조회 URL은 브라우저가 S3에 요청하므로 서명 만료와 CORS, S3의 오류 응답에 따른 프론트 대체 이미지 동작도 확인합니다. [S3 GetObject 권한](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
 
 #### Presigned API 검증
 
+업로드와 조회의 만료 시간은 각각 `S3_PRESIGNED_UPLOAD_EXPIRY`(기본 300초)와 `S3_PRESIGNED_DOWNLOAD_EXPIRY`(기본 600초)로 설정합니다.
+
 - 프로필 사진은 `POST /api/v1/users/me/profile-image/uploads`, 코트 대표 사진은 운영자 세션의 `POST /api/v1/admin/courts/{courtId}/thumbnail/uploads`에서 발급합니다. 요청 데이터는 파일명, MIME 타입과 바이트 크기입니다.
 - 발급 응답의 `url`과 서명 폼 필드를 사용해 브라우저가 S3에 파일을 POST합니다. 성공 후 각 발급 경로 뒤에 `/{uploadId}/complete`를 붙여 인증 호출합니다. 백엔드는 업로드한 이미지에 크기·실제 형식·픽셀 제한을 적용하고, 리사이즈와 촬영 메타데이터 제거를 한 뒤 최종 키를 DB에 반영합니다.
 - S3 모드의 조회는 기존 이미지 경로 뒤에 `/url`을 붙여 인증 호출하고, 결과의 만료형 URL을 브라우저가 사용합니다. 프로필 업로드의 파일시스템 응답은 `mode=FILESYSTEM`입니다.
-- 로컬 S3 호환 서버를 쓰는 경우 `IMAGE_S3_ENDPOINT`에 브라우저와 백엔드가 함께 접근할 수 있는 주소를 설정합니다. 로컬 검증에는 호환 서버에서 설정한 테스트 전용 자격증명을 사용합니다.
+- 로컬 S3 호환 서버를 쓰는 경우 `S3_ENDPOINT`에 브라우저와 백엔드가 함께 접근할 수 있는 주소를 설정합니다. 로컬 검증에는 호환 서버에서 설정한 테스트 전용 자격증명을 사용합니다.
 
-전환 확인이 끝날 때까지 기존 볼륨을 보존합니다. 새 사진 쓰기를 재개한 뒤 파일시스템으로 복구한다면, 현재 DB 키에 해당하는 S3 객체를 볼륨에 동기화한 후 `IMAGE_STORAGE_BACKEND=filesystem`으로 돌립니다.
+전환 확인이 끝날 때까지 기존 볼륨을 보존합니다. 새 사진 쓰기를 재개한 뒤 파일시스템으로 복구한다면, 현재 DB 키에 해당하는 S3 객체를 볼륨에 동기화한 후 `PROFILE_IMAGE_STORAGE=filesystem`으로 돌립니다.
 
 ### Nginx와 HTTPS
 

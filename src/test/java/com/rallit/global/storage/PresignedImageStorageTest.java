@@ -6,11 +6,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.rallit.global.config.S3PresignedProperties;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
@@ -40,7 +40,7 @@ class PresignedImageStorageTest {
   private static final String STAGING_KEY = "image-uploads/" + UUID;
   private static final Region REGION = Region.AP_NORTHEAST_2;
   private static final Instant NOW = Instant.parse("2026-11-17T12:34:56Z");
-  private static final Duration TTL = Duration.ofMinutes(5);
+  private static final S3PresignedProperties EXPIRY = new S3PresignedProperties(300, 600);
   private static final StaticCredentialsProvider SESSION_CREDENTIALS = StaticCredentialsProvider.create(
       AwsSessionCredentials.create("example-access", "example-secret", "example-session-token"));
   private static final GetObjectRequest STAGED_REQUEST =
@@ -54,7 +54,7 @@ class PresignedImageStorageTest {
   private final JsonMapper json = JsonMapper.builder().build();
   private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
   private final PresignedImageStorage storage =
-      new PresignedImageStorage(client, presigner, SESSION_CREDENTIALS, json, clock, BUCKET, REGION.id(), "");
+      new PresignedImageStorage(client, presigner, SESSION_CREDENTIALS, json, clock, EXPIRY, BUCKET, REGION.id(), "");
 
   @AfterEach
   void closePresigner() {
@@ -63,11 +63,11 @@ class PresignedImageStorageTest {
 
   @Test
   void signsAnExactUploadPolicyWithSizeLimitAndTemporaryCredentials() throws IOException {
-    var upload = storage.signUpload(STAGING_KEY, MediaType.IMAGE_PNG, TTL, 5_242_880);
+    var upload = storage.signUpload(STAGING_KEY, MediaType.IMAGE_PNG, 5_242_880);
 
     assertThat(URI.create(upload.url()).getHost()).isEqualTo("image-test.s3.ap-northeast-2.amazonaws.com");
     assertThat(URI.create(upload.url()).getScheme()).isEqualTo("https");
-    assertThat(upload.expiresAt()).isEqualTo(NOW.plus(TTL));
+    assertThat(upload.expiresAt()).isEqualTo(NOW.plus(EXPIRY.uploadLifetime()));
     assertThat(upload.fields()).containsEntry("key", STAGING_KEY)
         .containsEntry("Content-Type", "image/png")
         .containsEntry("x-amz-algorithm", "AWS4-HMAC-SHA256")
@@ -100,28 +100,32 @@ class PresignedImageStorageTest {
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build()) {
       var localStorage = new PresignedImageStorage(
-          client, localPresigner, credentials, json, clock, BUCKET, REGION.id(), endpoint.toString());
+          client, localPresigner, credentials, json, clock, new S3PresignedProperties(90, 180),
+          BUCKET, REGION.id(), endpoint.toString());
 
-      var upload = localStorage.signUpload(STAGING_KEY, MediaType.IMAGE_JPEG, TTL, 100);
-      var read = localStorage.signRead("court-thumbnails/", UUID + ".jpg", TTL);
+      var upload = localStorage.signUpload(STAGING_KEY, MediaType.IMAGE_JPEG, 100);
+      var read = localStorage.signRead("court-thumbnails/", UUID + ".jpg");
 
       assertThat(upload.url()).isEqualTo("http://localhost:9000/image-test");
       assertThat(upload.fields()).doesNotContainKey("x-amz-security-token");
+      assertThat(upload.expiresAt()).isEqualTo(NOW.plusSeconds(90));
       assertThat(read.url()).startsWith("http://localhost:9000/image-test/court-thumbnails/" + UUID + ".jpg?");
+      assertThat(URI.create(read.url()).getRawQuery()).contains("X-Amz-Expires=180");
     }
   }
 
   @Test
   void signsABrowserReadForTheNamespacedFinalKey() throws IOException {
-    var read = storage.signRead("profile-images/", UUID + ".png", TTL);
+    var read = storage.signRead("profile-images/", UUID + ".png");
     var url = URI.create(read.url());
 
     assertThat(url.getScheme()).isEqualTo("https");
     assertThat(url.getHost()).isEqualTo("image-test.s3.ap-northeast-2.amazonaws.com");
     assertThat(url.getPath()).isEqualTo("/profile-images/" + UUID + ".png");
-    assertThat(url.getRawQuery()).contains("X-Amz-Signature=", "X-Amz-Expires=300", "X-Amz-Security-Token=");
-    assertThat(read.expiresAt()).isBetween(Instant.now().plus(TTL).minusSeconds(10), Instant.now().plus(TTL));
-    assertThatThrownBy(() -> storage.signRead("profile-images/", "../other.png", TTL))
+    assertThat(url.getRawQuery()).contains("X-Amz-Signature=", "X-Amz-Expires=600", "X-Amz-Security-Token=");
+    var latest = Instant.now().plus(EXPIRY.downloadLifetime());
+    assertThat(read.expiresAt()).isBetween(latest.minusSeconds(10), latest);
+    assertThatThrownBy(() -> storage.signRead("profile-images/", "../other.png"))
         .isInstanceOf(IOException.class);
   }
 

@@ -9,7 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = "rallit.image-storage.backend", havingValue = "filesystem", matchIfMissing = true)
+@ConditionalOnProperty(name = "rallit.profile-image.storage", havingValue = "filesystem", matchIfMissing = true)
 public class FileSystemProfileImageStorage extends FileSystemImageStorage implements ProfileImageStorage {
   public FileSystemProfileImageStorage(@Value("${rallit.profile-image.storage-path}") String directory) {
     super(directory);

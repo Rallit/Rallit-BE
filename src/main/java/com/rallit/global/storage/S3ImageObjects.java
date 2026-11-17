@@ -19,13 +19,13 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Component
-@ConditionalOnProperty(name = "rallit.image-storage.backend", havingValue = "s3")
+@ConditionalOnProperty(name = "rallit.profile-image.storage", havingValue = "s3")
 public class S3ImageObjects {
   private final S3Client client;
   private final String bucket;
 
-  public S3ImageObjects(S3Client client, @Value("${rallit.image-storage.s3.bucket}") String bucket) {
-    Assert.hasText(bucket, "rallit.image-storage.s3.bucket is required for S3 image storage");
+  public S3ImageObjects(S3Client client, @Value("${rallit.s3.bucket}") String bucket) {
+    Assert.hasText(bucket, "rallit.s3.bucket is required for S3 image storage");
     this.client = client;
     this.bucket = bucket;
   }

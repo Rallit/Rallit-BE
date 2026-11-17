@@ -28,14 +28,16 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 rallit:
-  image-storage:
-    backend: ${IMAGE_STORAGE_BACKEND:filesystem}
-    s3:
-      bucket: ${IMAGE_S3_BUCKET:}
-      region: ${IMAGE_S3_REGION:}
-      endpoint: ${IMAGE_S3_ENDPOINT:}
   profile-image:
+    storage: ${PROFILE_IMAGE_STORAGE:filesystem}
     storage-path: ${PROFILE_IMAGE_STORAGE_PATH:./build/profile-images}
+  s3:
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:ap-northeast-2}
+    presigned:
+      upload-expiry-seconds: ${S3_PRESIGNED_UPLOAD_EXPIRY:300}
+      download-expiry-seconds: ${S3_PRESIGNED_DOWNLOAD_EXPIRY:600}
+    endpoint: ${S3_ENDPOINT:}
   court-thumbnail:
     storage-path: ${COURT_THUMBNAIL_STORAGE_PATH:./build/court-thumbnails}
   auth:
