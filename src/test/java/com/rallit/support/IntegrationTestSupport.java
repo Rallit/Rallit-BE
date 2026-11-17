@@ -26,6 +26,7 @@ public abstract class IntegrationTestSupport {
 
   @DynamicPropertySource
   static void properties(DynamicPropertyRegistry r) {
+    r.add("rallit.s3.bucket", () -> "image-test");
     r.add("spring.datasource.url", PG::getJdbcUrl);
     r.add("spring.datasource.username", PG::getUsername);
     r.add("spring.datasource.password", PG::getPassword);

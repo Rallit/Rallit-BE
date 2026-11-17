@@ -11,8 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,26 +31,31 @@ import com.rallit.support.EntityFixtures;
 import com.rallit.support.IntegrationTestSupport;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManager;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -67,8 +72,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
     "RALLIT_ENV_FILE=.env.test-disabled",
-    "rallit.profile-image.storage=s3",
-    "rallit.s3.bucket=image-test",
     "rallit.s3.region=ap-northeast-2",
     "rallit.s3.presigned.upload-expiry-seconds=123",
     "rallit.s3.presigned.download-expiry-seconds=456"
@@ -107,29 +110,35 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
     });
   }
 
-  @Test
-  void finalizesTheDirectUploadAndIssuesASignedReadWithoutProxyingBytes() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"png", "jpeg"})
+  void finalizesTheDirectUploadAndIssuesASignedReadWithoutProxyingBytes(String format) throws Exception {
     assertThat(presignedProperties.uploadExpirySeconds()).isEqualTo(123);
     assertThat(presignedProperties.downloadExpirySeconds()).isEqualTo(456);
     var user = member(LoginTarget.SERVICE);
-    byte[] original = ProfileImageIntegrationTest.withPngExif(png(48, 24),
-        ProfileImageIntegrationTest.rotatedExifWithGps());
-    var upload = issue(UPLOAD_PATH, user, original);
+    String mediaType = "image/" + format;
+    byte[] pixels = orientationFixture(format);
+    byte[] exif = rotatedExifWithGps();
+    byte[] original = format.equals("jpeg") ? withJpegExif(pixels, exif) : withPngExif(pixels, exif);
+    assertThat(ImageMetadataReader.readMetadata(new ByteArrayInputStream(original))
+        .getFirstDirectoryOfType(GpsDirectory.class)).isNotNull();
+    var upload = issue(UPLOAD_PATH, user, original, mediaType, "photo." + format);
     assertThat(users.findById(user.id()).orElseThrow().getProfileImageKey()).isNull();
     verify(client, never()).putObject(any(PutObjectRequest.class), any(RequestBody.class));
 
-    stage(upload, original);
+    stage(upload, original, mediaType);
     complete(UPLOAD_PATH, upload, user)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.profileImageUrl").value(user.profilePath()));
 
     String key = profileKey(user);
+    assertThat(key).endsWith(format.equals("jpeg") ? ".jpg" : ".png");
     var put = ArgumentCaptor.forClass(PutObjectRequest.class);
     var body = ArgumentCaptor.forClass(RequestBody.class);
     verify(client).putObject(put.capture(), body.capture());
     assertThat(put.getValue().bucket()).isEqualTo("image-test");
     assertThat(put.getValue().key()).isEqualTo("profile-images/" + key);
-    assertThat(put.getValue().contentType()).isEqualTo("image/png");
+    assertThat(put.getValue().contentType()).isEqualTo(mediaType);
     byte[] stored;
     try (var stream = body.getValue().contentStreamProvider().newStream()) {
       stored = stream.readAllBytes();
@@ -138,6 +147,8 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
     var image = ImageIO.read(new ByteArrayInputStream(stored));
     assertThat(image.getWidth()).isEqualTo(24);
     assertThat(image.getHeight()).isEqualTo(24);
+    assertThat(new Color(image.getRGB(12, 6)).getRed()).isGreaterThan(220);
+    assertThat(new Color(image.getRGB(12, 18)).getBlue()).isGreaterThan(220);
     assertThat(ImageMetadataReader.readMetadata(new ByteArrayInputStream(stored))
         .getFirstDirectoryOfType(GpsDirectory.class)).isNull();
     verify(presigned).deleteUpload(upload.stagingKey());
@@ -148,11 +159,9 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.result.url").value(read.url()))
         .andExpect(jsonPath("$.result.expiresAt").value(read.expiresAt().toString()));
     mvc.perform(get(user.profilePath()).header("Authorization", user.bearer()))
-        .andExpect(status().isNotFound());
-    mvc.perform(multipart(HttpMethod.PUT, WRITE_PATH)
-            .file(new MockMultipartFile("file", "old.png", "image/png", original))
-            .header("Authorization", user.bearer()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isForbidden());
+    mvc.perform(put(WRITE_PATH).header("Authorization", user.bearer()))
+        .andExpect(status().isForbidden());
     verify(client, never()).getObject(any(GetObjectRequest.class));
 
     mvc.perform(delete(WRITE_PATH).header("Authorization", user.bearer()))
@@ -254,6 +263,9 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
     mvc.perform(post(writePath)).andExpect(status().isForbidden());
     mvc.perform(post(writePath).header("Origin", ADMIN_ORIGIN)).andExpect(status().isUnauthorized());
     initiate(writePath, waiting, png.length).andExpect(status().isUnauthorized());
+    mvc.perform(get(readPath + "/url").header("Authorization", viewer))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("COURT_THUMBNAIL_NOT_FOUND"));
     var upload = issue(writePath, admin, png);
     stage(upload, png);
     complete("/api/v1/admin/courts/" + otherCourt + "/thumbnail/uploads", upload, admin)
@@ -279,7 +291,9 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
         .andExpect(status().isForbidden());
     mvc.perform(get(readPath + "/url").header("Authorization", viewer))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.result.url").value(signed.url()));
+        .andExpect(jsonPath("$.result.url").value(signed.url()))
+        .andExpect(jsonPath("$.result.expiresAt").value(signed.expiresAt().toString()));
+    mvc.perform(get(readPath).header("Authorization", viewer)).andExpect(status().isForbidden());
     verify(client, never()).getObject(any(GetObjectRequest.class));
   }
 
@@ -294,14 +308,24 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
   }
 
   private ResultActions initiate(String path, Member user, long size) throws Exception {
+    return initiate(path, user, size, "image/png", "photo.png");
+  }
+
+  private ResultActions initiate(String path, Member user, long size, String contentType, String filename)
+      throws Exception {
     return mvc.perform(post(path).header("Authorization", user.bearer())
         .header("Origin", originFor(path))
         .contentType(MediaType.APPLICATION_JSON)
-        .content(json.writeValueAsString(Map.of("fileName", "photo.png", "contentType", "image/png", "size", size))));
+        .content(json.writeValueAsString(Map.of("fileName", filename, "contentType", contentType, "size", size))));
   }
 
   private Upload issue(String path, Member user, byte[] png) throws Exception {
-    var response = initiate(path, user, png.length)
+    return issue(path, user, png, "image/png", "photo.png");
+  }
+
+  private Upload issue(String path, Member user, byte[] contents, String contentType, String filename)
+      throws Exception {
+    var response = initiate(path, user, contents.length, contentType, filename)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.result.mode").value("S3"))
         .andExpect(jsonPath("$.result.url").value(UPLOAD_URL))
@@ -313,8 +337,12 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
   }
 
   private void stage(Upload upload, byte[] png) throws IOException {
+    stage(upload, png, "image/png");
+  }
+
+  private void stage(Upload upload, byte[] contents, String contentType) throws IOException {
     when(presigned.readUpload(upload.stagingKey(), MAX_BYTES))
-        .thenReturn(Optional.of(new PresignedImageStorage.StagedImage(png, "image/png")));
+        .thenReturn(Optional.of(new PresignedImageStorage.StagedImage(contents, contentType)));
   }
 
   private Upload saveProfile(Member user, byte[] bytes) throws Exception {
@@ -335,7 +363,7 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
 
   private String profileKey(Member user) {
     var key = users.findById(user.id()).orElseThrow().getProfileImageKey();
-    assertThat(key).matches("[0-9a-f-]+\\.png");
+    assertThat(key).matches("[0-9a-f-]+\\.(jpg|png)");
     return key;
   }
 
@@ -362,6 +390,57 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
     var out = new ByteArrayOutputStream();
     ImageIO.write(new BufferedImage(width, height, BufferedImage.TYPE_BYTE_BINARY), "png", out);
     return out.toByteArray();
+  }
+
+  private byte[] orientationFixture(String format) throws IOException {
+    var image = new BufferedImage(48, 24, BufferedImage.TYPE_INT_RGB);
+    var graphics = image.createGraphics();
+    try {
+      graphics.setColor(Color.RED);
+      graphics.fillRect(0, 0, 24, 24);
+      graphics.setColor(Color.BLUE);
+      graphics.fillRect(24, 0, 24, 24);
+    } finally {
+      graphics.dispose();
+    }
+    var out = new ByteArrayOutputStream();
+    ImageIO.write(image, format, out);
+    return out.toByteArray();
+  }
+
+  private byte[] rotatedExifWithGps() {
+    // Little-endian TIFF with IFD0 orientation 6 and a GPS IFD containing latitude.
+    var tiff = ByteBuffer.allocate(92).order(ByteOrder.LITTLE_ENDIAN);
+    tiff.putShort((short) 0x4949).putShort((short) 42).putInt(8);
+    tiff.putShort((short) 2);
+    tiff.putShort((short) 0x0112).putShort((short) 3).putInt(1).putInt(6);
+    tiff.putShort((short) 0x8825).putShort((short) 4).putInt(1).putInt(38).putInt(0);
+    tiff.putShort((short) 2);
+    tiff.putShort((short) 1).putShort((short) 2).putInt(2).putInt('N');
+    tiff.putShort((short) 2).putShort((short) 5).putInt(3).putInt(68).putInt(0);
+    tiff.putInt(37).putInt(1).putInt(30).putInt(1).putInt(0).putInt(1);
+    return tiff.array();
+  }
+
+  private byte[] withJpegExif(byte[] jpeg, byte[] tiff) {
+    byte[] preamble = "Exif\0\0".getBytes(StandardCharsets.US_ASCII);
+    return ByteBuffer.allocate(jpeg.length + 4 + preamble.length + tiff.length)
+        .put(jpeg, 0, 2)
+        .putShort((short) 0xffe1).putShort((short) (2 + preamble.length + tiff.length))
+        .put(preamble).put(tiff)
+        .put(jpeg, 2, jpeg.length - 2).array();
+  }
+
+  private byte[] withPngExif(byte[] png, byte[] tiff) {
+    byte[] type = "eXIf".getBytes(StandardCharsets.US_ASCII);
+    var crc = new CRC32();
+    crc.update(type);
+    crc.update(tiff);
+    int afterHeader = 33;
+    return ByteBuffer.allocate(png.length + 12 + tiff.length)
+        .put(png, 0, afterHeader)
+        .putInt(tiff.length).put(type).put(tiff).putInt((int) crc.getValue())
+        .put(png, afterHeader, png.length - afterHeader).array();
   }
 
   private record Member(long id, String bearer) {

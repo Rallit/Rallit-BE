@@ -238,21 +238,16 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/nickname-availability")
                 .authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/users/{userId}/profile-image")
-                .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users/{userId}/profile-image/url")
                 .authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/users/me/profile-image/uploads",
                     "/api/v1/users/me/profile-image/uploads/{uploadId}/complete")
                 .authenticated()
-                .requestMatchers(HttpMethod.PUT, "/api/v1/users/me/profile-image")
-                .authenticated()
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/profile-image")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
                 .authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/courts/{courtId}/thumbnail",
-                    "/api/v1/courts/{courtId}/thumbnail/url")
+                .requestMatchers(HttpMethod.GET, "/api/v1/courts/{courtId}/thumbnail/url")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}",
                     "/api/v1/matches/recommendations")

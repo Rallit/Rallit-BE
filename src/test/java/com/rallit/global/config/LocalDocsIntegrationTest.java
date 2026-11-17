@@ -51,17 +51,19 @@ class LocalDocsIntegrationTest extends IntegrationTestSupport {
   }
 
   @Test
-  void swaggerDocumentsTheCourtThumbnailAsAnAuthenticatedBinaryResponse() throws Exception {
-    String thumbnail = "$.paths['/api/v1/courts/{courtId}/thumbnail'].get";
+  void swaggerExposesOnlyThePresignedPhotoUploadAndReadPaths() throws Exception {
+    String thumbnail = "$.paths['/api/v1/courts/{courtId}/thumbnail/url'].get";
     mvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.paths['/api/v1/courts/{courtId}/thumbnail']").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{userId}/profile-image']").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/users/me/profile-image'].put").doesNotExist())
+        .andExpect(jsonPath("$.paths['/api/v1/users/me/profile-image/uploads'].post").exists())
+        .andExpect(jsonPath("$.paths['/api/v1/users/{userId}/profile-image/url'].get").exists())
         .andExpect(jsonPath(thumbnail + ".tags[0]").value("코트"))
-        .andExpect(jsonPath(thumbnail + ".operationId").value("getCourtThumbnail"))
+        .andExpect(jsonPath(thumbnail + ".operationId").value("getCourtThumbnailUrl"))
         .andExpect(jsonPath(thumbnail + ".security[0].bearerAuth").exists())
-        .andExpect(jsonPath(thumbnail + ".responses['200'].content['image/jpeg'].schema.format").value("binary"))
-        .andExpect(jsonPath(thumbnail + ".responses['200'].content['image/png'].schema.format").value("binary"))
-        .andExpect(jsonPath(thumbnail + ".responses['404'].content['application/json']").exists())
-        .andExpect(jsonPath(thumbnail + ".responses['503'].content['application/json']").exists());
+        .andExpect(jsonPath("$.components.schemas.ImageLinkResponse.properties.expiresAt.format").value("date-time"));
   }
 
   @Test

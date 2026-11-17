@@ -1,96 +1,45 @@
 package com.rallit.domain.user.service;
 
 import com.rallit.domain.image.ImageKeyUpdate;
-import com.rallit.domain.user.dto.ProfileImageResponse;
+import com.rallit.domain.image.ImageUploadPurpose;
 import com.rallit.domain.user.entity.User;
 import com.rallit.domain.user.enums.UserStatus;
 import com.rallit.domain.user.repository.UserRepository;
-import com.rallit.domain.user.storage.ProfileImageStorage;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
-import com.rallit.global.storage.ImageKey;
-import java.io.ByteArrayInputStream;
+import com.rallit.global.storage.S3ImageObjects;
 import java.io.IOException;
-import java.util.Optional;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ProfileImageService {
   private final UserRepository users;
-  private final ProfileImageStorage storage;
-  private final ProfileImageNormalizer normalizer;
+  private final S3ImageObjects objects;
   private final PlatformTransactionManager transactions;
-
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public ProfileImageResponse upload(Long userId, MultipartFile file) {
-    var image = normalizer.normalize(file);
-    String key = UUID.randomUUID() + image.extension();
-    byte[] contents = image.contents();
-    try {
-      storage.write(key, new ByteArrayInputStream(contents), contents.length, ImageKey.mediaType(key));
-    } catch (IOException failure) {
-      throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
-    }
-
-    replaceImageKey(userId, key);
-    return new ProfileImageResponse(ProfileImageResponse.urlFor(userId));
-  }
-
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public void delete(Long userId) {
-    replaceImageKey(userId, null);
-  }
-
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public Image get(Long userId) {
-    try {
-      return readImageWithReplacementRetry(userId)
-          .orElseThrow(() -> new GeneralException(ErrorStatus._NOT_FOUND));
-    } catch (IOException failure) {
-      throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
-    }
-  }
-
-  private Optional<Image> readImageWithReplacementRetry(Long userId) throws IOException {
-    String key = imageKey(userId);
-    var image = readImage(key);
-    if (image.isPresent()) return image;
-
-    // A concurrent replacement may have deleted the old file after we read its key.
-    String latestKey = imageKey(userId);
-    return latestKey.equals(key) ? Optional.empty() : readImage(latestKey);
-  }
 
   public String imageKey(Long userId) {
     return users.findProfileImageKey(userId, UserStatus.WITHDRAWN)
         .orElseThrow(() -> new GeneralException(ErrorStatus._NOT_FOUND));
   }
 
-  private Optional<Image> readImage(String key) throws IOException {
-    return storage.read(key).map(contents -> new Image(contents, ImageKey.mediaType(key)));
-  }
-
-  private void replaceImageKey(Long userId, String key) {
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void delete(Long userId) {
     var update = new ImageKeyUpdate();
     try {
       new TransactionTemplate(transactions).executeWithoutResult(status -> {
         update.register();
-        update.replaced(lockUser(userId).replaceProfileImage(key));
+        update.replaced(lockUser(userId).replaceProfileImage(null));
       });
     } finally {
-      deleteQuietly(update.unreferencedKey(key));
+      deleteQuietly(update.unreferencedKey(null));
     }
   }
 
@@ -102,11 +51,9 @@ public class ProfileImageService {
   private void deleteQuietly(String key) {
     if (key == null) return;
     try {
-      storage.delete(key);
+      objects.delete(ImageUploadPurpose.PROFILE.getPrefix(), key);
     } catch (IOException failure) {
       log.warn("Failed to remove an unreferenced profile image", failure);
     }
   }
-
-  public record Image(Resource contents, MediaType mediaType) {}
 }

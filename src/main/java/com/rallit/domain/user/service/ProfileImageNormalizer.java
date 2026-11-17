@@ -29,7 +29,6 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import javax.imageio.stream.MemoryCacheImageOutputStream;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 
 @Component
 public class ProfileImageNormalizer {
@@ -42,26 +41,18 @@ public class ProfileImageNormalizer {
   private static final int PNG_END_CHUNK_TYPE = 0x49454e44; // IEND
   private final Semaphore normalizationSlots = new Semaphore(MAX_CONCURRENT_NORMALIZATIONS);
 
-  NormalizedImage normalize(MultipartFile file) {
-    return normalize(file.getSize(), file.getOriginalFilename(), file::getBytes, ImageUploadPurpose.PROFILE);
-  }
-
   public NormalizedImage normalizeUpload(byte[] contents, String filename, ImageUploadPurpose purpose) {
-    return normalize(contents.length, filename, () -> contents, purpose);
-  }
-
-  private NormalizedImage normalize(long size, String filename, ImageSource source, ImageUploadPurpose purpose) {
-    if (size > MAX_BYTES) {
+    if (contents.length > MAX_BYTES) {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE);
     }
-    if (size <= 0 || filename == null) {
+    if (contents.length == 0 || filename == null) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
     }
     if (!normalizationSlots.tryAcquire()) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
     }
     try {
-      return normalize(source.read(), filename.toLowerCase(Locale.ROOT), purpose);
+      return normalize(contents, filename.toLowerCase(Locale.ROOT), purpose);
     } catch (IOException | ImageProcessingException | IllegalArgumentException failure) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
     } finally {
@@ -238,11 +229,6 @@ public class ProfileImageNormalizer {
       int cropHeight = Math.min(height, Math.max(1, Math.round((float) width * target.height / target.width)));
       return new ImageSize(cropWidth, cropHeight);
     }
-  }
-
-  @FunctionalInterface
-  private interface ImageSource {
-    byte[] read() throws IOException;
   }
 
   public record NormalizedImage(String extension, byte[] contents) {}

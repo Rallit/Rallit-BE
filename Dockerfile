@@ -4,7 +4,6 @@ ENV MALLOC_ARENA_MAX=2
 ENV GLIBC_TUNABLES=glibc.malloc.mmap_threshold=131072
 WORKDIR /app
 COPY build/libs/app.jar app.jar
-RUN mkdir -p /app/profile-images /app/court-thumbnails && chown 1000:1000 /app/profile-images
 USER 1000:1000
 EXPOSE 8080
 # Use the first JIT tier to leave memory for native work in the API container.
