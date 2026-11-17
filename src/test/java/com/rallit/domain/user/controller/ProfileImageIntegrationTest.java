@@ -148,9 +148,9 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
         .getFirstDirectoryOfType(GpsDirectory.class)).isNull();
     var rotated = ImageIO.read(new ByteArrayInputStream(served));
     assertThat(rotated.getWidth()).isEqualTo(24);
-    assertThat(rotated.getHeight()).isEqualTo(48);
-    assertThat(new Color(rotated.getRGB(12, 12)).getRed()).isGreaterThan(220);
-    assertThat(new Color(rotated.getRGB(12, 36)).getBlue()).isGreaterThan(220);
+    assertThat(rotated.getHeight()).isEqualTo(24);
+    assertThat(new Color(rotated.getRGB(12, 6)).getRed()).isGreaterThan(220);
+    assertThat(new Color(rotated.getRGB(12, 18)).getBlue()).isGreaterThan(220);
     mvc.perform(delete(PATH).header("Authorization", owner.bearer())).andExpect(status().isNoContent());
   }
 

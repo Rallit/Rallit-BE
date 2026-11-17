@@ -135,7 +135,9 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
       stored = stream.readAllBytes();
     }
     assertThat(body.getValue().optionalContentLength()).contains((long) stored.length);
-    assertThat(ImageIO.read(new ByteArrayInputStream(stored)).getWidth()).isEqualTo(24);
+    var image = ImageIO.read(new ByteArrayInputStream(stored));
+    assertThat(image.getWidth()).isEqualTo(24);
+    assertThat(image.getHeight()).isEqualTo(24);
     assertThat(ImageMetadataReader.readMetadata(new ByteArrayInputStream(stored))
         .getFirstDirectoryOfType(GpsDirectory.class)).isNull();
     verify(presigned).deleteUpload(upload.stagingKey());
@@ -248,7 +250,7 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
     long otherCourt = courts.saveAndFlush(EntityFixtures.court()).getId();
     String readPath = "/api/v1/courts/" + court + "/thumbnail";
     String writePath = "/api/v1/admin/courts/" + court + "/thumbnail/uploads";
-    byte[] png = png(2, 2);
+    byte[] png = png(1441, 900);
     mvc.perform(post(writePath)).andExpect(status().isForbidden());
     mvc.perform(post(writePath).header("Origin", ADMIN_ORIGIN)).andExpect(status().isUnauthorized());
     initiate(writePath, waiting, png.length).andExpect(status().isUnauthorized());
@@ -261,8 +263,17 @@ class S3ProfileImageIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.result.thumbnailUrl").value(readPath));
 
     String key = courts.findById(court).orElseThrow().getThumbnailImageKey();
-    verify(client).putObject(org.mockito.ArgumentMatchers.<PutObjectRequest>argThat(
-        request -> request.key().equals("court-thumbnails/" + key)), any(RequestBody.class));
+    var put = ArgumentCaptor.forClass(PutObjectRequest.class);
+    var body = ArgumentCaptor.forClass(RequestBody.class);
+    verify(client).putObject(put.capture(), body.capture());
+    assertThat(put.getValue().key()).isEqualTo("court-thumbnails/" + key);
+    assertThat(key).endsWith(".jpg");
+    assertThat(put.getValue().contentType()).isEqualTo("image/jpeg");
+    try (var stream = body.getValue().contentStreamProvider().newStream()) {
+      var stored = ImageIO.read(stream);
+      assertThat(stored.getWidth()).isEqualTo(1440);
+      assertThat(stored.getHeight()).isEqualTo(810);
+    }
     var signed = signRead("court-thumbnails/", key);
     mvc.perform(get(readPath + "/url").header("Authorization", waiting.bearer()))
         .andExpect(status().isForbidden());

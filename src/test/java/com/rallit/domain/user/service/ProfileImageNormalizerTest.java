@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 
+import com.rallit.domain.image.ImageUploadPurpose;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -17,6 +19,7 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockMultipartFile;
 
 class ProfileImageNormalizerTest {
@@ -30,6 +33,39 @@ class ProfileImageNormalizerTest {
     assertThatThrownBy(() -> normalizer.normalize(file))
         .isInstanceOf(GeneralException.class)
         .hasMessageContaining("4,096");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"321, 321, 320", "321, 639, 320", "640, 321, 320", "63, 48, 48"})
+  void cropsAndResizesProfilesWithoutUpscaling(int width, int height, int expected) throws IOException {
+    var normalized = normalizer.normalize(png(width, height));
+
+    var image = ImageIO.read(new ByteArrayInputStream(normalized.contents()));
+    assertThat(image.getWidth()).isEqualTo(expected);
+    assertThat(image.getHeight()).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void choosesCourtFormatByPixelTransparencyWithoutUpscaling(boolean transparent) throws IOException {
+    var source = new BufferedImage(32, 18, BufferedImage.TYPE_INT_ARGB);
+    var graphics = source.createGraphics();
+    try {
+      graphics.fillRect(0, 0, 32, 18);
+    } finally {
+      graphics.dispose();
+    }
+    if (transparent) source.setRGB(16, 9, 0);
+    var bytes = new ByteArrayOutputStream();
+    ImageIO.write(source, "png", bytes);
+
+    var normalized = normalizer.normalizeUpload(bytes.toByteArray(), "court.png", ImageUploadPurpose.COURT);
+
+    assertThat(normalized.extension()).isEqualTo(transparent ? ".png" : ".jpg");
+    var image = ImageIO.read(new ByteArrayInputStream(normalized.contents()));
+    assertThat(image.getWidth()).isEqualTo(32);
+    assertThat(image.getHeight()).isEqualTo(18);
+    assertThat(image.getRGB(16, 9) >>> 24).isEqualTo(transparent ? 0 : 255);
   }
 
   @Test

@@ -130,7 +130,7 @@ public class ImageUploadService {
       throw new GeneralException(ImageUploadErrorStatus.IMAGE_UPLOAD_INVALID_FILE);
     }
     String filename = MediaType.IMAGE_PNG_VALUE.equals(ticket.getContentType()) ? "upload.png" : "upload.jpg";
-    return normalizer.normalizeUpload(staged.contents(), filename);
+    return normalizer.normalizeUpload(staged.contents(), filename, ticket.getPurpose());
   }
 
   private static void validateFileName(ImageUploadRequest request) {

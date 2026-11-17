@@ -6,12 +6,15 @@ import com.drew.lang.ByteArrayReader;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifReader;
+import com.rallit.domain.image.ImageUploadPurpose;
 import com.rallit.domain.user.exception.UserErrorStatus;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import java.awt.AlphaComposite;
+import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -19,9 +22,12 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Semaphore;
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
+import javax.imageio.ImageWriteParam;
 import javax.imageio.stream.MemoryCacheImageInputStream;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,21 +36,21 @@ public class ProfileImageNormalizer {
   public static final int MAX_BYTES = 5 * 1024 * 1024;
   private static final int MAX_DIMENSION = 4_096;
   private static final long MAX_PIXELS = 12_500_000L;
-  private static final int OUTPUT_MAX_DIMENSION = 1_024;
+  private static final float JPEG_QUALITY = 0.82f;
   private static final int MAX_CONCURRENT_NORMALIZATIONS = 1;
   private static final int PNG_EXIF_CHUNK_TYPE = 0x65584966; // eXIf
   private static final int PNG_END_CHUNK_TYPE = 0x49454e44; // IEND
   private final Semaphore normalizationSlots = new Semaphore(MAX_CONCURRENT_NORMALIZATIONS);
 
   NormalizedImage normalize(MultipartFile file) {
-    return normalize(file.getSize(), file.getOriginalFilename(), file::getBytes);
+    return normalize(file.getSize(), file.getOriginalFilename(), file::getBytes, ImageUploadPurpose.PROFILE);
   }
 
-  public NormalizedImage normalizeUpload(byte[] contents, String filename) {
-    return normalize(contents.length, filename, () -> contents);
+  public NormalizedImage normalizeUpload(byte[] contents, String filename, ImageUploadPurpose purpose) {
+    return normalize(contents.length, filename, () -> contents, purpose);
   }
 
-  private NormalizedImage normalize(long size, String filename, ImageSource source) {
+  private NormalizedImage normalize(long size, String filename, ImageSource source, ImageUploadPurpose purpose) {
     if (size > MAX_BYTES) {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE);
     }
@@ -55,7 +61,7 @@ public class ProfileImageNormalizer {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
     }
     try {
-      return normalize(source.read(), filename.toLowerCase(Locale.ROOT));
+      return normalize(source.read(), filename.toLowerCase(Locale.ROOT), purpose);
     } catch (IOException | ImageProcessingException | IllegalArgumentException failure) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
     } finally {
@@ -63,7 +69,7 @@ public class ProfileImageNormalizer {
     }
   }
 
-  private NormalizedImage normalize(byte[] original, String filename)
+  private NormalizedImage normalize(byte[] original, String filename, ImageUploadPurpose purpose)
       throws IOException, ImageProcessingException {
     try (var input = new MemoryCacheImageInputStream(new ByteArrayInputStream(original))) {
       var readers = ImageIO.getImageReaders(input);
@@ -74,21 +80,21 @@ public class ProfileImageNormalizer {
       try {
         reader.setInput(input, true, true);
         String format = validatedFormat(reader.getFormatName(), filename);
-        var pixels = readPixels(reader);
+        var source = validatedSize(reader);
         int orientation = readOrientation(original, format);
-        var oriented = orient(pixels, orientation, format.equals("jpeg"));
-        var output = new ByteArrayOutputStream();
-        if (!ImageIO.write(oriented, format, output)) {
-          throw new IOException("No profile image writer for " + format);
-        }
-        return new NormalizedImage(format.equals("jpeg") ? ".jpg" : ".png", output.toByteArray());
+        var target = new ImageSize(purpose.getOutputWidth(), purpose.getOutputHeight());
+        var crop = source.oriented(orientation).cropTo(target);
+        var outputSize = new ImageSize(Math.min(crop.width(), target.width()), Math.min(crop.height(), target.height()));
+        var pixels = readPixels(reader, crop, outputSize);
+        var image = render(pixels, orientation, outputSize, format.equals("png") && pixels.getColorModel().hasAlpha());
+        return encode(image, format, purpose);
       } finally {
         reader.dispose();
       }
     }
   }
 
-  private BufferedImage readPixels(ImageReader reader) throws IOException {
+  private ImageSize validatedSize(ImageReader reader) throws IOException {
     reader.addIIOReadWarningListener((source, warning) -> {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
     });
@@ -101,8 +107,13 @@ public class ProfileImageNormalizer {
     if (width > MAX_DIMENSION || height > MAX_DIMENSION || (long) width * height > MAX_PIXELS) {
       throw new GeneralException(UserErrorStatus.PROFILE_IMAGE_DIMENSIONS_TOO_LARGE);
     }
+    return new ImageSize(width, height);
+  }
+
+  private BufferedImage readPixels(ImageReader reader, ImageSize crop, ImageSize output) throws IOException {
     var parameters = reader.getDefaultReadParam();
-    int step = Math.ceilDiv(Math.max(width, height), OUTPUT_MAX_DIMENSION);
+    // Decode enough pixels in the crop to reach the target without scaling up.
+    int step = Math.min(crop.width() / output.width(), crop.height() / output.height());
     parameters.setSourceSubsampling(step, step, 0, 0);
     return reader.read(0, parameters);
   }
@@ -142,14 +153,16 @@ public class ProfileImageNormalizer {
     return metadata;
   }
 
-  private BufferedImage orient(BufferedImage source, int orientation, boolean jpeg) {
+  private BufferedImage render(BufferedImage source, int orientation, ImageSize outputSize, boolean hasAlpha) {
     int width = source.getWidth();
     int height = source.getHeight();
-    boolean swapDimensions = orientation >= 5;
-    int type = !jpeg && source.getColorModel().hasAlpha()
-        ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
-    var output = new BufferedImage(swapDimensions ? height : width, swapDimensions ? width : height, type);
-    var transform = switch (orientation) {
+    var oriented = new ImageSize(width, height).oriented(orientation);
+    double scale = Math.max((double) outputSize.width() / oriented.width(),
+        (double) outputSize.height() / oriented.height());
+    var transform = AffineTransform.getTranslateInstance((outputSize.width() - oriented.width() * scale) / 2,
+        (outputSize.height() - oriented.height() * scale) / 2);
+    transform.scale(scale, scale);
+    transform.concatenate(switch (orientation) {
       case 2 -> new AffineTransform(-1, 0, 0, 1, width, 0);
       case 3 -> new AffineTransform(-1, 0, 0, -1, width, height);
       case 4 -> new AffineTransform(1, 0, 0, -1, 0, height);
@@ -158,15 +171,73 @@ public class ProfileImageNormalizer {
       case 7 -> new AffineTransform(0, -1, -1, 0, height, width);
       case 8 -> new AffineTransform(0, -1, 1, 0, 0, width);
       default -> new AffineTransform();
-    };
+    });
+
+    int type = hasAlpha ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
+    var output = new BufferedImage(outputSize.width(), outputSize.height(), type);
     var graphics = output.createGraphics();
     try {
       graphics.setComposite(AlphaComposite.Src);
+      graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
       graphics.drawImage(source, transform, null);
     } finally {
       graphics.dispose();
     }
     return output;
+  }
+
+  private NormalizedImage encode(BufferedImage image, String inputFormat, ImageUploadPurpose purpose) throws IOException {
+    var output = new ByteArrayOutputStream();
+    if (inputFormat.equals("png") && (purpose == ImageUploadPurpose.PROFILE || hasTransparentPixels(image))) {
+      if (!ImageIO.write(image, "png", output)) {
+        throw new IOException("No PNG image writer");
+      }
+      return new NormalizedImage(".png", output.toByteArray());
+    }
+
+    var writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+    try (var stream = new MemoryCacheImageOutputStream(output)) {
+      writer.setOutput(stream);
+      var parameters = writer.getDefaultWriteParam();
+      parameters.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+      parameters.setCompressionQuality(JPEG_QUALITY);
+      var rgb = image.getColorModel().hasAlpha() ? toRgb(image) : image;
+      writer.write(null, new IIOImage(rgb, null, null), parameters);
+    } finally {
+      writer.dispose();
+    }
+    return new NormalizedImage(".jpg", output.toByteArray());
+  }
+
+  private boolean hasTransparentPixels(BufferedImage image) {
+    if (!image.getColorModel().hasAlpha()) return false;
+    for (int pixel : ((DataBufferInt) image.getRaster().getDataBuffer()).getData()) {
+      if (pixel >>> 24 != 255) return true;
+    }
+    return false;
+  }
+
+  private BufferedImage toRgb(BufferedImage image) {
+    var rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+    var graphics = rgb.createGraphics();
+    try {
+      graphics.drawImage(image, 0, 0, null);
+    } finally {
+      graphics.dispose();
+    }
+    return rgb;
+  }
+
+  private record ImageSize(int width, int height) {
+    ImageSize oriented(int orientation) {
+      return orientation >= 5 ? new ImageSize(height, width) : this;
+    }
+
+    ImageSize cropTo(ImageSize target) {
+      int cropWidth = Math.min(width, Math.max(1, Math.round((float) height * target.width / target.height)));
+      int cropHeight = Math.min(height, Math.max(1, Math.round((float) width * target.height / target.width)));
+      return new ImageSize(cropWidth, cropHeight);
+    }
   }
 
   @FunctionalInterface
