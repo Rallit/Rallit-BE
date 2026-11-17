@@ -32,6 +32,12 @@ class DeploymentScriptTest extends DeploymentTestSupport {
 #!/bin/sh
 printf '%s|%s\n' "$APP_IMAGE" "$*" >> /work/docker-calls
 case "$*" in
+  'compose config --environment')
+    case "$RALLIT_TEST_SCENARIO" in
+      missing-s3-bucket) ;;
+      blank-s3-bucket) printf 'S3_BUCKET=  \n' ;;
+      *) printf 'S3_BUCKET=rallit-deployment-test\n' ;;
+    esac ;;
   'compose config --services') printf 'app\nredis\ndb\n' ;;
   *'up '*redis)
     [ "$RALLIT_TEST_SCENARIO" != redis-failure ] || exit 1
@@ -71,6 +77,17 @@ exit 0
 
   private List<String> calls() throws Exception {
     return Files.readAllLines(temporary.resolve("docker-calls"));
+  }
+
+  @Test
+  void missingOrBlankS3BucketStopsDeploymentBeforePullOrReplacement() throws Exception {
+    for (String scenario : List.of("missing-s3-bucket", "blank-s3-bucket")) {
+      var result = deploy(scenario);
+      assertThat(result.exitCode()).as(result.output()).isNotZero();
+      assertThat(result.output()).contains("S3_BUCKET");
+      assertThat(calls()).noneMatch(call -> call.contains("compose pull") || call.contains("compose up"));
+      assertThat(Files.readString(temporary.resolve("deploy-history.log"))).isEqualTo(HISTORY);
+    }
   }
 
   @Test
