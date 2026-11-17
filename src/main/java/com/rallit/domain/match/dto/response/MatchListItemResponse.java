@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+import com.rallit.domain.court.dto.CourtThumbnailResponse;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
@@ -23,7 +24,7 @@ public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<
 	public static MatchListItemResponse from(Match match, long occupiedSeats, ZoneId zone) {
 		var slot = match.getCourtSlot();
 		var court = slot.getCourt();
-		String thumbnailUrl = court.getThumbnailImageKey() == null ? null : "/api/v1/courts/" + court.getId() + "/thumbnail";
+		String thumbnailUrl = court.getThumbnailImageKey() == null ? null : CourtThumbnailResponse.urlFor(court.getId());
 		return new MatchListItemResponse(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
 				slot.getStartsAt().atZone(zone).toOffsetDateTime(), slot.getEndsAt().atZone(zone).toOffsetDateTime(),
 				court.getName(), thumbnailUrl, match.getParticipationFee(), match.getMinNtrp(), match.getMaxNtrp(),

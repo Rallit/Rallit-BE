@@ -21,8 +21,7 @@ public class CourtThumbnailService {
 	private final CourtThumbnailStorage storage;
 
 	public Thumbnail get(Long courtId) {
-		String key = courts.findById(courtId).map(Court::getThumbnailImageKey)
-				.orElseThrow(() -> new GeneralException(CourtErrorStatus.COURT_THUMBNAIL_NOT_FOUND));
+		String key = imageKey(courtId);
 		try {
 			var contents = storage.read(key)
 					.orElseThrow(() -> new GeneralException(CourtErrorStatus.COURT_THUMBNAIL_NOT_FOUND));
@@ -30,6 +29,11 @@ public class CourtThumbnailService {
 		} catch (IOException failure) {
 			throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
 		}
+	}
+
+	public String imageKey(Long courtId) {
+		return courts.findById(courtId).map(Court::getThumbnailImageKey)
+				.orElseThrow(() -> new GeneralException(CourtErrorStatus.COURT_THUMBNAIL_NOT_FOUND));
 	}
 
 	public record Thumbnail(Resource contents, MediaType mediaType) {

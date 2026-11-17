@@ -52,6 +52,9 @@ class CourtThumbnailIntegrationTest extends IntegrationTestSupport {
           .andExpect(status().isOk())
           .andExpect(content().contentType("image/png"))
           .andExpect(content().bytes(Files.readAllBytes(path)));
+      mvc.perform(get(PATH + "/url", courtId).header("Authorization", activeMember()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.result.url").value(PATH.replace("{courtId}", Long.toString(courtId))));
     } finally {
       Files.deleteIfExists(path);
     }

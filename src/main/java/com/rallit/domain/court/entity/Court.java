@@ -69,4 +69,10 @@ public class Court extends BaseEntity {
 		this.facilityNotes = facilityNotes;
 		this.thumbnailImageKey = thumbnailImageKey;
 	}
+
+	public String replaceThumbnail(String key) {
+		String previous = thumbnailImageKey;
+		thumbnailImageKey = key;
+		return previous;
+	}
 }

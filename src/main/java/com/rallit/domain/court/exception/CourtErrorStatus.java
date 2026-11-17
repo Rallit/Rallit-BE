@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 
 @RequiredArgsConstructor
 public enum CourtErrorStatus implements BaseErrorCode {
+	COURT_NOT_FOUND(HttpStatus.NOT_FOUND, "코트를 찾을 수 없습니다."),
 	COURT_ONBOARDING_REQUIRED(HttpStatus.FORBIDDEN, "온보딩을 완료해야 코트 사진을 조회할 수 있습니다."),
 	COURT_THUMBNAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "코트 대표 사진을 찾을 수 없습니다.");
 

@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,6 +101,16 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
     mvc.perform(get("/api/v1/users/me").header("Authorization", owner.bearer()))
         .andExpect(jsonPath("$.result.profileImageUrl").value(nullValue()));
     mvc.perform(get(url).header("Authorization", viewer.bearer())).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void announcesTheFilesystemModeToTheNewUploadClient() throws Exception {
+    String bearer = login().bearer();
+    mvc.perform(post(PATH + "/uploads").header("Authorization", bearer)
+            .contentType("application/json")
+            .content("{\"fileName\":\"example.png\",\"contentType\":\"image/png\",\"size\":150}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.result.mode").value("FILESYSTEM"));
   }
 
   @ParameterizedTest
@@ -232,7 +243,7 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
     return bytes.toByteArray();
   }
 
-  private byte[] rotatedExifWithGps() {
+  static byte[] rotatedExifWithGps() {
     // Little-endian TIFF with IFD0 orientation 6 and a GPS IFD containing latitude.
     var tiff = ByteBuffer.allocate(92).order(ByteOrder.LITTLE_ENDIAN);
     tiff.putShort((short) 0x4949).putShort((short) 42).putInt(8);
@@ -255,7 +266,7 @@ class ProfileImageIntegrationTest extends IntegrationTestSupport {
         .put(jpeg, 2, jpeg.length - 2).array();
   }
 
-  private byte[] withPngExif(byte[] png, byte[] tiff) {
+  static byte[] withPngExif(byte[] png, byte[] tiff) {
     byte[] type = "eXIf".getBytes(StandardCharsets.US_ASCII);
     var crc = new CRC32();
     crc.update(type);

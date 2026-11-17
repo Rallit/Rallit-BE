@@ -26,8 +26,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 @Component
-class ProfileImageNormalizer {
-  private static final long MAX_BYTES = 5L * 1024 * 1024;
+public class ProfileImageNormalizer {
+  public static final int MAX_BYTES = 5 * 1024 * 1024;
   private static final int MAX_DIMENSION = 4_096;
   private static final long MAX_PIXELS = 12_500_000L;
   private static final int OUTPUT_MAX_DIMENSION = 1_024;
@@ -37,18 +37,25 @@ class ProfileImageNormalizer {
   private final Semaphore normalizationSlots = new Semaphore(MAX_CONCURRENT_NORMALIZATIONS);
 
   NormalizedImage normalize(MultipartFile file) {
-    if (file.getSize() > MAX_BYTES) {
+    return normalize(file.getSize(), file.getOriginalFilename(), file::getBytes);
+  }
+
+  public NormalizedImage normalizeUpload(byte[] contents, String filename) {
+    return normalize(contents.length, filename, () -> contents);
+  }
+
+  private NormalizedImage normalize(long size, String filename, ImageSource source) {
+    if (size > MAX_BYTES) {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE);
     }
-    String filename = file.getOriginalFilename();
-    if (file.isEmpty() || filename == null) {
+    if (size <= 0 || filename == null) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE);
     }
     if (!normalizationSlots.tryAcquire()) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE);
     }
     try {
-      return normalize(file.getBytes(), filename.toLowerCase(Locale.ROOT));
+      return normalize(source.read(), filename.toLowerCase(Locale.ROOT));
     } catch (IOException | ImageProcessingException | IllegalArgumentException failure) {
       throw new GeneralException(UserErrorStatus.INVALID_PROFILE_IMAGE, failure);
     } finally {
@@ -162,5 +169,10 @@ class ProfileImageNormalizer {
     return output;
   }
 
-  record NormalizedImage(String extension, byte[] contents) {}
+  @FunctionalInterface
+  private interface ImageSource {
+    byte[] read() throws IOException;
+  }
+
+  public record NormalizedImage(String extension, byte[] contents) {}
 }

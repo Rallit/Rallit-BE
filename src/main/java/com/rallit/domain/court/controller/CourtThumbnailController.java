@@ -1,7 +1,11 @@
 package com.rallit.domain.court.controller;
 
+import com.rallit.domain.court.dto.CourtThumbnailResponse;
 import com.rallit.domain.court.exception.CourtErrorStatus;
 import com.rallit.domain.court.service.CourtThumbnailService;
+import com.rallit.domain.image.ImageLinkResponse;
+import com.rallit.domain.image.ImageLinkService;
+import com.rallit.domain.image.ImageUploadPurpose;
 import com.rallit.global.apiPayload.ApiResponse;
 import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.security.authentication.UserDetails;
@@ -28,9 +32,10 @@ import org.springframework.web.bind.annotation.RestController;
 @SecurityRequirement(name = "bearerAuth")
 public class CourtThumbnailController {
 	private final CourtThumbnailService thumbnails;
+	private final ImageLinkService links;
 
 	@GetMapping(value = "/{courtId}/thumbnail", produces = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE})
-	@Operation(summary = "코트 대표 사진 조회", description = "온보딩을 완료한 회원에게 코트 대표 사진을 반환합니다.")
+	@Operation(summary = "코트 대표 사진 파일 조회", description = "파일시스템 모드에서 코트 대표 사진을 반환합니다.")
 	@ApiResponses({
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "코트 대표 사진",
 					content = {
@@ -54,10 +59,24 @@ public class CourtThumbnailController {
 	})
 	public ResponseEntity<Resource> getCourtThumbnail(
 			@AuthenticationPrincipal UserDetails principal, @PathVariable Long courtId) {
+		requireOnboarding(principal);
+		links.requireFilesystem();
+		var thumbnail = thumbnails.get(courtId);
+		return ResponseEntity.ok().contentType(thumbnail.mediaType()).body(thumbnail.contents());
+	}
+
+	@GetMapping("/{courtId}/thumbnail/url")
+	@Operation(summary = "코트 대표 사진 URL 조회", description = "온보딩을 완료한 회원에게 이미지 URL과 만료 시각을 반환합니다.")
+	public ResponseEntity<ApiResponse<ImageLinkResponse>> getCourtThumbnailUrl(
+			@AuthenticationPrincipal UserDetails principal, @PathVariable Long courtId) {
+		requireOnboarding(principal);
+		return ResponseEntity.ok(ApiResponse.onSuccess(links.link(ImageUploadPurpose.COURT,
+				thumbnails.imageKey(courtId), CourtThumbnailResponse.urlFor(courtId))));
+	}
+
+	private void requireOnboarding(UserDetails principal) {
 		if (!principal.onboardingCompleted()) {
 			throw new GeneralException(CourtErrorStatus.COURT_ONBOARDING_REQUIRED);
 		}
-		var thumbnail = thumbnails.get(courtId);
-		return ResponseEntity.ok().contentType(thumbnail.mediaType()).body(thumbnail.contents());
 	}
 }
