@@ -326,7 +326,8 @@ class PresignedImageIntegrationTest extends IntegrationTestSupport {
   private Upload issue(String path, Member user, byte[] contents, String contentType, String filename)
       throws Exception {
     var response = initiate(path, user, contents.length, contentType, filename)
-        .andExpect(status().isOk())
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.code").value("COMMON201"))
         .andExpect(jsonPath("$.result.mode").value("S3"))
         .andExpect(jsonPath("$.result.url").value(UPLOAD_URL))
         .andReturn().getResponse();

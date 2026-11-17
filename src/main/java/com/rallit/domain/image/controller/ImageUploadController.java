@@ -7,6 +7,7 @@ import com.rallit.domain.image.enums.ImageUploadPurpose;
 import com.rallit.domain.image.service.ImageUploadService;
 import com.rallit.domain.user.dto.ProfileImageResponse;
 import com.rallit.global.apiPayload.ApiResponse;
+import com.rallit.global.apiPayload.code.status.SuccessStatus;
 import com.rallit.global.security.authentication.UserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,11 +35,12 @@ public class ImageUploadController {
   @PostMapping("/users/me/profile-image/uploads")
   @Operation(summary = "프로필 사진 업로드 발급",
       description = "S3에 사진을 올릴 URL과 서명 폼을 반환합니다.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", useReturnTypeSchema = true)
   public ResponseEntity<ApiResponse<ImageUploadResponse>> initiateProfile(
       @AuthenticationPrincipal UserDetails principal, @Valid @RequestBody ImageUploadRequest request) {
     Long userId = principal.userId();
     var result = uploads.initiate(userId, userId, ImageUploadPurpose.PROFILE, request);
-    return ResponseEntity.ok(ApiResponse.onSuccess(result));
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(SuccessStatus._CREATED, result));
   }
 
   @PostMapping("/users/me/profile-image/uploads/{uploadId}/complete")
@@ -51,11 +54,12 @@ public class ImageUploadController {
 
   @PostMapping("/admin/courts/{courtId}/thumbnail/uploads")
   @Operation(summary = "코트 대표 사진 업로드 발급", description = "운영자 세션으로 S3 업로드 폼을 발급합니다.")
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", useReturnTypeSchema = true)
   public ResponseEntity<ApiResponse<ImageUploadResponse>> initiateCourt(
       @AuthenticationPrincipal UserDetails principal, @PathVariable Long courtId,
       @Valid @RequestBody ImageUploadRequest request) {
-    return ResponseEntity.ok(ApiResponse.onSuccess(
-        uploads.initiate(principal.userId(), courtId, ImageUploadPurpose.COURT, request)));
+    var result = uploads.initiate(principal.userId(), courtId, ImageUploadPurpose.COURT, request);
+    return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(SuccessStatus._CREATED, result));
   }
 
   @PostMapping("/admin/courts/{courtId}/thumbnail/uploads/{uploadId}/complete")
