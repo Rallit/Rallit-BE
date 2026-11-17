@@ -7,7 +7,7 @@
 | 필드 | 내용 |
 | --- | --- |
 | `id`, `nickname`, `role`, `onboardingCompleted` | 기존 내 정보 필드. 가입 대기 회원의 `nickname`은 랠릿이 생성한 기본값이다. |
-| `profileImageUrl` | 직접 업로드한 프로필 사진의 조회 주소. `null`이면 프론트가 랠릿 기본 이미지를 표시한다. |
+| `profileImageUrl` | 등록한 프로필 사진의 상대 경로. 끝에 `/url`을 붙여 서명 URL을 발급받는다. 값이 `null`이면 랠릿 기본 이미지를 표시한다. |
 | `socialDisplayName` | 가입 상태와 관계없이 반환하는 본인의 소셜 표시 이름. 저장된 이름이 없으면 `null`이다. |
 | `profile` | 온보딩 완료 후 저장된 프로필과 선호 조건. 구력은 `tennisStartedOn`과 `experienceYears`로 반환한다. |
 
@@ -47,12 +47,18 @@
 
 ## 프로필 사진
 
-`PUT /api/v1/users/me/profile-image`는 `multipart/form-data`의 `file` 한 장을 받아 업로드 성공 시 표시할 URL을 반환한다. JPG·JPEG·PNG를 파일당 최대 5MB까지 허용한다. 초기 파일은 EC2의 Docker 볼륨에 저장한다.
+### 등록과 교체
 
-원본은 가로·세로 각각 4,096px, 총 1,250만 픽셀까지 허용한다. 파일 크기 초과는 `413`, 원본 해상도 초과와 형식·디코딩 오류는 `400`을 반환한다. 앱 인스턴스가 사진을 처리 중이면 새 요청에 `503`을 반환하며 잠시 후 다시 시도할 수 있다.
+1. Bearer 인증으로 `POST /api/v1/users/me/profile-image/uploads`에 `fileName`, `contentType`, `size`(바이트)를 보낸다. `201 COMMON201`의 `result`에서 `mode`(`S3`), `uploadId`, S3 `url`, 서명 폼 `fields`, `expiresAt`을 받는다.
+2. 브라우저가 S3 `url`에 `multipart/form-data`로 서명 필드와 `file`을 전송한다. 파일 필드는 마지막에 붙인다.
+3. S3 업로드가 성공하면 Bearer 인증으로 `POST /api/v1/users/me/profile-image/uploads/{uploadId}/complete`를 호출한다. 최종 저장과 프로필 반영이 끝나면 `200 COMMON200`과 `result.profileImageUrl`을 반환한다.
 
-서버는 EXIF 방향을 적용하고 촬영 메타데이터를 제거한 사진을 저장한다. 저장되는 사진은 긴 변이 최대 1,024px이다.
+JPG·JPEG·PNG를 최대 5MiB까지 받는다. 원본은 각 변 4,096px, 총 1,250만 픽셀까지 허용한다. EXIF 방향을 보정하고 촬영 메타데이터를 제거한 뒤 최대 320×320 정사각형으로 저장한다.
+
+파일 크기 초과는 `413`, 원본 해상도 초과와 형식·디코딩 오류는 `400`을 반환한다. 완료 요청에서 미업로드는 `409 IMAGE_UPLOAD_NOT_READY`, 티켓 만료는 `410 IMAGE_UPLOAD_EXPIRED`, 저장소 장애나 동시 처리 한도 초과는 `503`으로 응답한다.
+
+### 조회와 삭제
+
+`profileImageUrl`은 `/api/v1/users/{userId}/profile-image` 형식이다. 브라우저는 이 값의 끝에 `/url`을 붙인 `GET /api/v1/users/{userId}/profile-image/url`을 Bearer 인증으로 호출한다. 응답의 `result.url`은 S3에서 사진을 읽는 데 사용하고 `result.expiresAt`은 서명 만료 시각이다.
 
 `DELETE /api/v1/users/me/profile-image`는 본인이 올린 사진을 제거하고 `204 No Content`를 반환한다. 이후 내 정보의 `profileImageUrl`은 `null`이다. 이미 사진이 없는 경우에도 성공으로 처리한다.
-
-`profileImageUrl`은 `/api/v1/users/{userId}/profile-image` 형식의 API 상대 경로다. 프론트는 백엔드 기본 주소에 이 경로를 붙여 `GET`을 보내고 `Authorization: Bearer <accessToken>`을 사용한다. 성공 응답은 `image/jpeg` 또는 `image/png` 바이트다. 새 파일로 교체한 뒤에는 같은 경로로 다시 조회할 수 있다.
