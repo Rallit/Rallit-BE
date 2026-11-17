@@ -80,9 +80,7 @@ public class ImageUploadService {
       }
       var normalized = normalize(upload, staged.orElseThrow());
       String finalKey = UUID.randomUUID() + normalized.extension();
-      byte[] contents = normalized.contents();
-      objects.write(purpose.getPrefix(), finalKey, new ByteArrayInputStream(contents), contents.length,
-          ImageKey.mediaType(finalKey));
+      writeFinalObject(purpose, finalKey, normalized.contents());
 
       finish(ownerId, targetId, purpose, uploadId, finalKey);
       deleteStagingObject(stagedKey);
@@ -90,6 +88,17 @@ public class ImageUploadService {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE, oversized);
     } catch (IOException failure) {
       throw new GeneralException(ErrorStatus._SERVICE_UNAVAILABLE, failure);
+    }
+  }
+
+  private void writeFinalObject(ImageUploadPurpose purpose, String finalKey, byte[] contents) throws IOException {
+    try {
+      objects.write(purpose.getPrefix(), finalKey, new ByteArrayInputStream(contents), contents.length,
+          ImageKey.mediaType(finalKey));
+    } catch (IOException failure) {
+      // S3 may have written the object before the response was lost.
+      deleteFinalObject(purpose, finalKey);
+      throw failure;
     }
   }
 

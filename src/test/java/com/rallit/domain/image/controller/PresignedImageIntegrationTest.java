@@ -62,12 +62,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {
@@ -224,6 +226,37 @@ class PresignedImageIntegrationTest extends IntegrationTestSupport {
     assertThat(profileKey(user)).isEqualTo(current);
     verify(client, times(2)).putObject(any(PutObjectRequest.class), any(RequestBody.class));
     verify(presigned).readUpload(first.stagingKey(), MAX_BYTES);
+  }
+
+  @Test
+  void cleansUpAnAmbiguousS3WriteFailureAndAllowsCompletionToBeRetried() throws Exception {
+    var user = member(LoginTarget.SERVICE);
+    byte[] png = png(2, 2);
+    saveProfile(user, png);
+    String previous = profileKey(user);
+
+    var replacement = issue(UPLOAD_PATH, user, png);
+    stage(replacement, png);
+    when(client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+        .thenThrow(SdkClientException.builder().message("S3 write response was lost").build())
+        .thenReturn(PutObjectResponse.builder().build());
+
+    complete(UPLOAD_PATH, replacement, user)
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("COMMON503"));
+
+    var writes = ArgumentCaptor.forClass(PutObjectRequest.class);
+    verify(client, times(2)).putObject(writes.capture(), any(RequestBody.class));
+    String failedKey = writes.getValue().key();
+    verify(client).deleteObject(deleteRequest(failedKey));
+    verify(client, never()).deleteObject(deleteRequest("profile-images/" + previous));
+    verify(presigned, never()).deleteUpload(replacement.stagingKey());
+    assertThat(profileKey(user)).isEqualTo(previous);
+
+    complete(UPLOAD_PATH, replacement, user).andExpect(status().isOk());
+    assertThat("profile-images/" + profileKey(user)).isNotIn("profile-images/" + previous, failedKey);
+    verify(client).deleteObject(deleteRequest("profile-images/" + previous));
+    verify(presigned).deleteUpload(replacement.stagingKey());
   }
 
   @Test
