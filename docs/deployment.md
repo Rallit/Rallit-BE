@@ -99,6 +99,7 @@ chmod 600 .env
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth 클라이언트 ID, 비밀 키 및 BE 콜백 주소를 모두 입력 |
 | `FRONTEND_CALLBACK_URL`, `ADMIN_FRONTEND_CALLBACK_URL` | 배포된 일반·운영자 FE의 로그인 완료 주소 |
 | `SERVICE_ORIGINS`, `ADMIN_ORIGINS` | 배포된 FE의 정확한 Origin. 여러 개면 쉼표로 구분 |
+| `PROFILE_IMAGE_STORAGE`, `AWS_REGION`, `S3_BUCKET`, `S3_PRESIGNED_*` | 이미지 저장소 설정. [5장](#5-s3-이미지-저장소) 참고 |
 
 `SERVICE_ORIGINS`와 `ADMIN_ORIGINS`는 `temp`와 `prod` 모두에서 반영됩니다. 서비스·운영자 목적에 맞는 Origin만 각각 허용합니다. 로그인 완료 콜백은 별도 검증을 거치며, Secure 설정에서는 일반 FE는 `rallit.co.kr`, 운영자 FE는 `admin.rallit.co.kr`의 HTTPS(기본 포트 또는 443) 주소만 허용합니다. 다른 테스트 도메인을 콜백으로 넣으면 앱이 시작되지 않습니다.
 
@@ -176,3 +177,53 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 복구는 app 이미지만 되돌리며 `compose.yml`, `deploy.sh`, 서버 환경변수와 Redis 설정은 새 버전을 유지합니다. Flyway가 이미 적용한 DB 스키마도 롤백되지 않습니다. Redis 볼륨은 삭제하지 않습니다. 복구 후 헬스체크뿐 아니라 이전 이미지의 스키마 호환성과 로그인·재발급 동작도 확인합니다.
 
 배포에 성공하면 최근 성공 이미지 3개만 남기고 같은 저장소의 나머지 태그를 삭제합니다. 정리에 실패하면 경고만 남기고, 볼륨은 건드리지 않습니다. 디스크가 이미 가득 차서 이미지 Pull이 실패하면 정리까지 진행되지 않으므로 직접 공간을 확보합니다.
+
+## 5. S3 이미지 저장소
+
+프로필 사진은 현재 `profile-images` Docker 볼륨에 저장합니다. 아래 설정은 Presigned URL 기반 S3 저장소(#45)를 위한 준비 단계이며 앱은 아직 이 값을 사용하지 않습니다. S3 값이 없어도 기본 `filesystem` 모드로 기동합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
+
+### 사전 준비
+
+| 항목 | 내용 |
+| --- | --- |
+| 버킷 | 서울 리전, 퍼블릭 액세스 차단. `profile-images/`, `court-thumbnails/` 접두사 사용 |
+| IAM 역할 | 위 접두사에 필요한 객체 권한만 부여한 역할을 EC2 인스턴스에 연결 |
+| CORS | 브라우저가 Presigned URL로 S3에 직접 `PUT`·`GET`하므로 `SERVICE_ORIGINS`와 같은 Origin과 업로드 요청의 `Content-Type` 헤더를 허용 |
+
+### 환경변수
+
+| 이름 | 기본값 | 설정 키 | 설명 |
+| --- | --- | --- | --- |
+| `PROFILE_IMAGE_STORAGE` | `filesystem` | `rallit.profile-image.storage` | 프로필 사진 저장 방식. `filesystem` 또는 `s3`(#45 구현 후) |
+| `AWS_REGION` | `ap-northeast-2` | `rallit.s3.region` | 버킷 리전 |
+| `S3_BUCKET` | 없음 | `rallit.s3.bucket` | 버킷 이름. 서버 `.env`로만 주입 |
+| `S3_PRESIGNED_UPLOAD_EXPIRY` | `300` | `rallit.s3.presigned.upload-expiry-seconds` | 업로드 URL 만료(초) |
+| `S3_PRESIGNED_DOWNLOAD_EXPIRY` | `600` | `rallit.s3.presigned.download-expiry-seconds` | 조회 URL 만료(초) |
+
+```dotenv
+PROFILE_IMAGE_STORAGE=filesystem
+AWS_REGION=ap-northeast-2
+S3_BUCKET=<버킷 이름>
+S3_PRESIGNED_UPLOAD_EXPIRY=300
+S3_PRESIGNED_DOWNLOAD_EXPIRY=600
+```
+
+### 인증
+
+AWS SDK의 기본 인증 체인으로 EC2 IAM 역할의 임시 자격 증명을 사용합니다. 기본 체인은 환경변수 자격 증명을 인스턴스 역할보다 먼저 사용하므로 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 서버 `.env`나 코드에 추가하지 않습니다.
+
+app은 Docker 브리지 네트워크에서 실행되므로 컨테이너에서 인스턴스 메타데이터(IMDSv2)에 접근할 수 있도록 메타데이터 옵션의 PUT 응답 홉 제한을 2 이상으로 둡니다. 아래 명령이 역할 이름을 출력하면 정상입니다. 자격 증명 값 자체는 조회하거나 기록하지 않습니다.
+
+```bash
+docker compose exec -T app sh -c 'token=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60") && curl -fsS -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/iam/security-credentials/'
+```
+
+### S3 전환
+
+1. Presigned URL API가 배포되고 기존 볼륨 이미지를 옮기기 전까지 `PROFILE_IMAGE_STORAGE=filesystem`을 유지하고 `profile-images` 볼륨을 삭제하지 않습니다.
+2. 볼륨 파일을 `profile-images/{기존 키}`로 복사하고, 전환 직전 변경분을 다시 동기화한 뒤 DB의 `profile_image_key`마다 객체가 있는지 확인합니다.
+3. 실제 버킷에서 업로드·조회·삭제를 확인한 뒤 `PROFILE_IMAGE_STORAGE=s3`로 바꾸고 다시 배포합니다.
+
+### AWS 계정 이전
+
+DB에는 URL이 아닌 객체 키를 저장하므로 DB는 변경하지 않습니다. 새 계정에 버킷·CORS·IAM 역할을 같은 구성으로 만들고 기존 객체를 같은 키로 복사한 뒤, 서버 `.env`의 `S3_BUCKET`과 필요하면 `AWS_REGION`을 바꿔 다시 배포합니다. EC2도 옮기면 새 인스턴스에 IAM 역할과 메타데이터 옵션을 다시 설정합니다.
