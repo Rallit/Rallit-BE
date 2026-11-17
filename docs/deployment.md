@@ -198,7 +198,6 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 | `S3_BUCKET` | 필수 | `rallit.s3.bucket` | 버킷 이름. 서버 `.env`로 주입 |
 | `S3_PRESIGNED_UPLOAD_EXPIRY` | `300` | `rallit.s3.presigned.upload-expiry-seconds` | 업로드 URL 만료(초) |
 | `S3_PRESIGNED_DOWNLOAD_EXPIRY` | `600` | `rallit.s3.presigned.download-expiry-seconds` | 조회 URL 만료(초) |
-| `S3_ENDPOINT` | 없음 | `rallit.s3.endpoint` | 로컬 S3 호환 서버 주소 |
 
 ```dotenv
 AWS_REGION=ap-northeast-2
@@ -243,11 +242,10 @@ UPDATE users SET profile_image_key = NULL WHERE profile_image_key IS NOT NULL;
 - 프로필 사진은 `POST /api/v1/users/me/profile-image/uploads`, 코트 대표 사진은 운영자 세션의 `POST /api/v1/admin/courts/{courtId}/thumbnail/uploads`에서 발급합니다. 요청 데이터는 파일명, MIME 타입과 바이트 크기입니다.
 - 발급 응답의 `url`과 서명 폼 필드를 사용해 브라우저가 S3에 파일을 POST합니다. 성공 후 각 발급 경로 뒤에 `/{uploadId}/complete`를 붙여 인증 호출합니다. 백엔드는 업로드한 이미지에 크기·실제 형식·픽셀 제한을 적용하고, 리사이즈와 촬영 메타데이터 제거를 한 뒤 최종 키를 DB에 반영합니다.
 - 조회는 응답에 담긴 이미지 경로 뒤에 `/url`을 붙여 인증 호출하고, 결과의 만료형 URL을 브라우저가 사용합니다.
-- 로컬 S3 호환 서버를 쓰는 경우 `S3_ENDPOINT`에 브라우저와 백엔드가 함께 접근할 수 있는 주소를 설정합니다. 로컬 검증에는 호환 서버에서 설정한 테스트 전용 자격증명을 사용합니다.
 
 ### 로컬 MinIO 검증
 
-MinIO에서 테스트 버킷을 생성하고 백엔드 실행 환경에 `S3_BUCKET`, `S3_ENDPOINT`와 로컬 테스트용 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 전달합니다. `S3_ENDPOINT`에는 백엔드와 브라우저가 같은 주소로 접근할 수 있는 URL을 지정합니다. 사진은 운영과 같은 발급 → MinIO POST → 완료 호출로 연결합니다.
+MinIO에서 테스트 버킷을 생성하고 로컬 백엔드 실행 환경에 `S3_BUCKET`, `S3_ENDPOINT`와 테스트용 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 전달합니다. `S3_ENDPOINT`에는 백엔드와 브라우저가 같은 주소로 접근할 수 있는 URL을 지정합니다. 사진은 운영과 같은 발급 → MinIO POST → 완료 호출로 연결합니다.
 
 온보딩 완료 회원 세션으로 `GET /api/v1/courts/{courtId}/thumbnail/url`이 반환한 서명 URL을 사용해 코트 사진을 조회합니다. 매치 카드에는 `courtThumbnailUrl`, 상세에는 `court.thumbnailUrl`이 포함됩니다. 사진이 없으면 공통 이미지를 표시합니다.
 
