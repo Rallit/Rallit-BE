@@ -1,5 +1,7 @@
 package com.rallit.domain.match.controller;
 
+import com.rallit.domain.match.controller.swagger.MatchDiscoveryExamples;
+import com.rallit.domain.match.controller.swagger.MatchReadErrorResponses;
 import com.rallit.domain.match.dto.response.MatchRecommendationResponse;
 import com.rallit.domain.match.service.MatchRecommendationService;
 import com.rallit.global.apiPayload.ApiResponse;

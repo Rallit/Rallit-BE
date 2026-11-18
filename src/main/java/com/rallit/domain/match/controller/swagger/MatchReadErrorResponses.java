@@ -1,4 +1,4 @@
-package com.rallit.domain.match.controller;
+package com.rallit.domain.match.controller.swagger;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -31,5 +31,5 @@ import org.springframework.http.MediaType;
 						schema = @Schema(implementation = ApiResponse.class),
 						examples = @ExampleObject(name = "세션 저장소 장애", value = MatchDiscoveryExamples.SERVICE_UNAVAILABLE)))
 })
-@interface MatchReadErrorResponses {
+public @interface MatchReadErrorResponses {
 }

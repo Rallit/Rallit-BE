@@ -3,6 +3,8 @@ package com.rallit.domain.match.controller;
 import java.net.URI;
 import java.util.List;
 
+import com.rallit.domain.match.controller.swagger.MatchDiscoveryExamples;
+import com.rallit.domain.match.controller.swagger.MatchReadErrorResponses;
 import com.rallit.domain.match.dto.request.MatchSearchRequest;
 import com.rallit.domain.match.dto.response.MatchRequestCreatedResponse;
 import com.rallit.domain.match.dto.response.MatchRequestResponse;
