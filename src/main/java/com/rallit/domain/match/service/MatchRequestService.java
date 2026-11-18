@@ -100,7 +100,7 @@ public class MatchRequestService {
 		if (dates.getFirst().isBefore(today) || !dates.getLast().isBefore(today.plusDays(SELECTABLE_DAYS))) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE);
 		}
-		if (dates.getFirst().equals(today) && !today.atTime(startTime).isAfter(now)) {
+		if (dates.size() == 1 && dates.getFirst().equals(today) && !today.atTime(startTime).isAfter(now)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME);
 		}
 	}

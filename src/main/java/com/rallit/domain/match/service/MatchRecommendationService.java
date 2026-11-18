@@ -83,7 +83,11 @@ public class MatchRecommendationService {
 		if (selectedAreas.size() != areaCodes.size()) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_AREA);
 		}
-		var candidates = findSearchCandidates(user, request, windows);
+		var now = now();
+		if (windows.size() > 1) {
+			windows.values().removeIf(window -> !window.to().isAfter(now));
+		}
+		var candidates = findSearchCandidates(user, request, windows, now);
 		var results = MatchSearchRules.group(candidates, areaCodes, selectedAreas, windows);
 		var exact = page(results.exact(), exactPage, size);
 		var similar = page(results.similar(), similarPage, size);
@@ -111,16 +115,19 @@ public class MatchRecommendationService {
 	}
 
 	private List<Match> findSearchCandidates(User user, MatchSearchRequest request,
-			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows) {
+			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows, LocalDateTime now) {
 		if (!Ntrp.isSupported(request.minNtrp()) || !Ntrp.isSupported(request.maxNtrp())
 				|| request.minNtrp().compareTo(request.maxNtrp()) > 0) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_NTRP);
+		}
+		if (windows.isEmpty()) {
+			return List.of();
 		}
 		var types = matchTypes(request.matchTypes());
 		var firstWindow = windows.firstEntry().getValue();
 		var lastWindow = windows.lastEntry().getValue();
 		var endMinute = Duration.between(firstWindow.dayStart(), firstWindow.expandedTo()).toMinutes();
-		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
+		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now,
 				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
 				firstWindow.expandedFrom().toLocalTime(), endMinute, types, user.getId(), user.getGender(),
 				MatchApplicationStatus.ACTIVE, request.sameGenderOnly(), request.minNtrp(), request.maxNtrp());
