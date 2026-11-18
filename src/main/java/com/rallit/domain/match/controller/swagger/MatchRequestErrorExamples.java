@@ -1,5 +1,6 @@
-package com.rallit.domain.match.controller;
+package com.rallit.domain.match.controller.swagger;
 
+import com.rallit.domain.match.controller.MatchRequestController;
 import com.rallit.domain.match.exception.MatchErrorStatus;
 import com.rallit.global.apiPayload.ApiResponse;
 import io.swagger.v3.oas.models.examples.Example;

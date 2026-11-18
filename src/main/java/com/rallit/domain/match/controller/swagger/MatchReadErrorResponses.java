@@ -31,5 +31,5 @@ import org.springframework.http.MediaType;
 						schema = @Schema(implementation = ApiResponse.class),
 						examples = @ExampleObject(name = "세션 저장소 장애", value = MatchDiscoveryExamples.SERVICE_UNAVAILABLE)))
 })
-public @interface MatchReadErrorResponses {
+@interface MatchReadErrorResponses {
 }

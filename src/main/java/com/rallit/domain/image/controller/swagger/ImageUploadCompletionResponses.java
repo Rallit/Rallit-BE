@@ -1,4 +1,4 @@
-package com.rallit.domain.image.controller;
+package com.rallit.domain.image.controller.swagger;
 
 import com.rallit.global.apiPayload.ApiResponse;
 import io.swagger.v3.oas.annotations.media.Content;

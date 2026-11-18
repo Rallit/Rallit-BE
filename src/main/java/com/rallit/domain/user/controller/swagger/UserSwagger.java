@@ -1,0 +1,93 @@
+package com.rallit.domain.user.controller.swagger;
+
+import static com.rallit.domain.user.entity.OnboardingProfile.NICKNAME_PATTERN;
+
+import com.rallit.domain.user.dto.NicknameAvailabilityResponse;
+import com.rallit.domain.user.dto.OnboardingRequest;
+import com.rallit.domain.user.dto.UserResponse;
+import com.rallit.global.apiPayload.ApiResponse;
+import com.rallit.global.security.authentication.UserDetails;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+@Tag(name = "회원")
+@SecurityRequirement(name = "bearerAuth")
+public interface UserSwagger {
+
+  @Operation(
+      summary = "내 회원 정보 조회",
+      description = "`result.onboardingCompleted`가 `false`이면 온보딩 화면으로 이동합니다.")
+  ResponseEntity<ApiResponse<UserResponse>> me(
+      UserDetails principal);
+
+  @Operation(
+      summary = "온보딩 완료",
+      description = """
+          - 내 기본 닉네임을 사용할 수 있습니다. 중복 여부는 영문 대소문자를 구분하지 않습니다.
+          - `sameGenderOnly`가 `true`이면 `MIXED_DOUBLES`를 함께 선택할 수 없습니다.
+          - `tennisStartedOn`은 `yyyy-MM` 형식이며 1900-01부터 현재 연월(서울 기준)까지 보낼 수 있습니다.
+          """,
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          required = true,
+          content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+              examples = @ExampleObject(name = "가입 완료 예시", value = """
+                  {
+                    "nickname": "날쌘발리127",
+                    "gender": "FEMALE",
+                    "ageGroup": "TWENTIES",
+                    "tennisStartedOn": "2024-11",
+                    "ntrp": "4.0+",
+                    "sameGenderOnly": false,
+                    "preferredMatchTypes": ["DOUBLES", "RALLY"],
+                    "activityAreaCodes": ["11440"],
+                    "preferredTimeSlots": ["WEEKEND_MORNING"]
+                  }
+                  """))),
+      responses = {
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "200", description = "가입 완료 또는 동일 내용 재제출",
+              useReturnTypeSchema = true),
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "400", description = "필수값 누락, 형식 오류 또는 유효하지 않은 선택",
+              content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                  schema = @Schema(implementation = ApiResponse.class))),
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "409", description = "닉네임 중복 또는 완료 후 다른 내용 제출",
+              content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                  schema = @Schema(implementation = ApiResponse.class),
+                  examples = {
+                      @ExampleObject(name = "닉네임 중복", value = """
+                          {
+                            "isSuccess": false,
+                            "code": "NICKNAME_CONFLICT",
+                            "message": "이미 사용 중인 닉네임입니다."
+                          }
+                          """),
+                      @ExampleObject(name = "완료 후 다른 내용 제출", value = """
+                          {
+                            "isSuccess": false,
+                            "code": "COMMON409",
+                            "message": "이미 온보딩을 완료했습니다."
+                          }
+                          """)
+                  }))
+      })
+  ResponseEntity<ApiResponse<UserResponse>> completeOnboarding(
+      UserDetails principal,
+      @Valid OnboardingRequest request);
+
+  @Operation(
+      summary = "닉네임 사용 가능 여부 조회",
+      description = "`result.available`이 `true`이면 사용할 수 있습니다. 내 기본 닉네임도 사용 가능합니다.")
+  ResponseEntity<ApiResponse<NicknameAvailabilityResponse>> checkNickname(
+      UserDetails principal,
+      @Pattern(regexp = NICKNAME_PATTERN) String nickname);
+}
