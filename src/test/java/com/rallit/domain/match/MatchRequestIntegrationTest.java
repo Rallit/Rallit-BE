@@ -220,15 +220,85 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void rejectsPastStartTimeWhenTodayIsSelectedButAcceptsTheSameTimeForTomorrow() throws Exception {
+	void rejectsPastStartTimeWhenOnlyTodayIsSelected() throws Exception {
 		var today = LocalDate.now(clock);
-		var tomorrow = today.plusDays(1);
 		at(today.atTime(15, 0));
 		String auth = bearer(member());
 
-		mvc.perform(create(auth, today, tomorrow))
+		mvc.perform(create(auth, today))
 				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MATCH_REQUEST_PAST_START_TIME"));
-		mvc.perform(create(auth, tomorrow)).andExpect(status().isCreated());
+		mvc.perform(create(auth, today.plusDays(1))).andExpect(status().isCreated());
+	}
+
+	@Test
+	void preservesMixedDatesAndSearchesOnlyMatchesStillOpenForApplications() throws Exception {
+		var today = LocalDate.now(clock);
+		var tomorrow = today.plusDays(1);
+		at(today.atTime(15, 30));
+		recruitMatch(today.atTime(14, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		recruitMatch(today.atTime(16, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		long todayExact = recruitMatch(today.atTime(17, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		long todaySimilar = recruitMatch(today.atTime(18, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		long tomorrowExact = recruitMatch(tomorrow.atTime(13, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		long tomorrowSimilar = recruitMatch(tomorrow.atTime(12, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		String auth = bearer(member());
+
+		var response = mvc.perform(create(auth, "13:00", "19:00", today, tomorrow))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.result.exactMatchCount").value(2))
+				.andExpect(jsonPath("$.result.hasResults").value(true))
+				.andReturn().getResponse();
+		long id = requestId(response.getContentAsString());
+		entityManager.flush();
+		entityManager.clear();
+
+		mvc.perform(get(PATH + "/{id}", id).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.conditions.dates.length()").value(2))
+				.andExpect(jsonPath("$.result.conditions.dates[0]").value(today.toString()))
+				.andExpect(jsonPath("$.result.conditions.dates[1]").value(tomorrow.toString()))
+				.andExpect(jsonPath("$.result.conditions.startTimeFrom").value("13:00"))
+				.andExpect(jsonPath("$.result.conditions.startTimeTo").value("19:00"));
+		mvc.perform(get(PATH + "/{id}/results", id).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(2))
+				.andExpect(jsonPath("$.result.exactMatches.items[0].match.matchId").value(todayExact))
+				.andExpect(jsonPath("$.result.exactMatches.items[1].match.matchId").value(tomorrowExact))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(2))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(todaySimilar))
+				.andExpect(jsonPath("$.result.similarMatches.items[1].match.matchId").value(tomorrowSimilar))
+				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"));
+	}
+
+	@Test
+	void continuesSearchingFutureDatesAfterTodaysTimeWindowEnds() throws Exception {
+		var today = LocalDate.now(clock);
+		var tomorrow = today.plusDays(1);
+		at(today.atTime(19, 0));
+		recruitMatch(today.atTime(17, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		long tomorrowSimilar = recruitMatch(tomorrow.atTime(12, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
+		var owner = member();
+		String auth = bearer(owner);
+
+		var response = mvc.perform(create(auth, "13:00", "19:00", today, tomorrow))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.result.exactMatchCount").value(0))
+				.andExpect(jsonPath("$.result.hasResults").value(true))
+				.andReturn().getResponse();
+		long id = requestId(response.getContentAsString());
+		mvc.perform(get(PATH + "/{id}/results", id).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.hasResults").value(true))
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(1))
+				.andExpect(jsonPath("$.result.similarMatches.items[0].match.matchId").value(tomorrowSimilar));
+
+		at(tomorrow.atTime(19, 0));
+		mvc.perform(get(PATH + "/{id}/results", id).header("Authorization", bearer(owner)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.hasResults").value(false))
+				.andExpect(jsonPath("$.result.exactMatches.totalElements").value(0))
+				.andExpect(jsonPath("$.result.similarMatches.totalElements").value(0));
 	}
 
 	@Test
@@ -394,12 +464,16 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private MockHttpServletRequestBuilder create(String auth, LocalDate... dates) {
+		return create(auth, "14:00", "17:00", dates);
+	}
+
+	private MockHttpServletRequestBuilder create(String auth, String from, String to, LocalDate... dates) {
 		String dateJson = Arrays.stream(dates).map(date -> "\"" + date + "\"")
 				.collect(Collectors.joining(",", "[", "]"));
 		return post(PATH).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content("""
-				{"dates":%s,"areaCodes":["11440"],"startTimeFrom":"14:00","startTimeTo":"17:00",
+				{"dates":%s,"areaCodes":["11440"],"startTimeFrom":"%s","startTimeTo":"%s",
 				 "matchTypes":["SINGLES"],"minNtrp":1.0,"maxNtrp":4.0,"sameGenderOnly":false}
-				""".formatted(dateJson));
+				""".formatted(dateJson, from, to));
 	}
 
 	private User member() {
@@ -414,6 +488,11 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private long recruitMatch(LocalDate date, String areaCode, String latitude, String longitude, MatchType type) {
+		return recruitMatch(date.atTime(14, 0), areaCode, latitude, longitude, type);
+	}
+
+	private long recruitMatch(LocalDateTime startsAt, String areaCode, String latitude, String longitude,
+			MatchType type) {
 		var host = member();
 		var area = entityManager.createQuery("select a from Area a where a.code = :areaCode", Area.class)
 				.setParameter("areaCode", areaCode)
@@ -421,11 +500,11 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		var court = Court.builder().area(area).name("테스트 테니스장").address("서울특별시")
 				.latitude(new BigDecimal(latitude)).longitude(new BigDecimal(longitude)).build();
 		entityManager.persist(court);
-		var slot = EntityFixtures.courtSlot(court, host, "1", date.atTime(14, 0));
+		var slot = EntityFixtures.courtSlot(court, host, "1", startsAt);
 		entityManager.persist(slot);
 		var match = Match.builder().courtSlot(slot).host(host).matchTypes(Set.of(type))
 				.maleRecruitCount(1).femaleRecruitCount(1).participationFee(10000)
-				.recruitmentDeadline(date.atTime(13, 0)).build();
+				.recruitmentDeadline(startsAt.minusHours(1)).build();
 		entityManager.persist(match);
 		entityManager.flush();
 		jdbc.update("update court_slot set status = 'APPROVED' where id = ?", slot.getId());
