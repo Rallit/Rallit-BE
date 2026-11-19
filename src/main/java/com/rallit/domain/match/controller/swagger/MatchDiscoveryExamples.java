@@ -1,4 +1,4 @@
-package com.rallit.domain.match.controller;
+package com.rallit.domain.match.controller.swagger;
 
 final class MatchDiscoveryExamples {
 	private MatchDiscoveryExamples() {

@@ -1,4 +1,4 @@
-package com.rallit.domain.match.controller;
+package com.rallit.domain.match.controller.swagger;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
