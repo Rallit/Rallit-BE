@@ -1,4 +1,4 @@
-name: Deploy Temp
+name: Deploy Develop
 
 on:
   workflow_dispatch:
