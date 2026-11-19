@@ -214,7 +214,7 @@ public class SecurityConfig {
 
   private void configureServiceAuthorization(HttpSecurity http, Environment environment)
       throws Exception {
-    if (environment.acceptsProfiles(Profiles.of("(local | temp) & !prod"))) {
+    if (environment.acceptsProfiles(Profiles.of("local | prod"))) {
       http.authorizeHttpRequests(
           a ->
               a.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
