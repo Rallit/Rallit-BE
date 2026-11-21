@@ -1,8 +1,8 @@
 package com.rallit.domain.match.service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -22,6 +22,7 @@ import com.rallit.domain.user.enums.PreferredMatchType;
 import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.global.config.TimeConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -62,7 +63,8 @@ public class MatchRequestService {
 			if (requests.countByOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(userId, now) >= MAX_ACTIVE_REQUESTS) {
 				throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_LIMIT_REACHED);
 			}
-			return requests.save(new MatchRequest(owner, conditions, dates.getLast().plusDays(1).atStartOfDay()));
+			return requests.save(new MatchRequest(owner, conditions,
+					dates.getLast().plusDays(1).atStartOfDay(TimeConfig.SERVICE_ZONE).toInstant()));
 		});
 		return new MatchRequestCreatedResponse(toResponse(saved), preview.exactMatches().totalElements(),
 				preview.hasResults());
@@ -95,17 +97,18 @@ public class MatchRequestService {
 		activeRequest(userId, requestId, now).delete(now);
 	}
 
-	private static void validateSchedule(List<LocalDate> dates, LocalTime startTime, LocalDateTime now) {
-		var today = now.toLocalDate();
+	private static void validateSchedule(List<LocalDate> dates, LocalTime startTime, Instant now) {
+		var today = LocalDate.ofInstant(now, TimeConfig.SERVICE_ZONE);
 		if (dates.getFirst().isBefore(today) || !dates.getLast().isBefore(today.plusDays(SELECTABLE_DAYS))) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_INVALID_DATE);
 		}
-		if (dates.size() == 1 && dates.getFirst().equals(today) && !today.atTime(startTime).isAfter(now)) {
+		if (dates.size() == 1 && dates.getFirst().equals(today)
+				&& !today.atTime(startTime).atZone(TimeConfig.SERVICE_ZONE).toInstant().isAfter(now)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_REQUEST_PAST_START_TIME);
 		}
 	}
 
-	private MatchRequest activeRequest(Long userId, Long requestId, LocalDateTime now) {
+	private MatchRequest activeRequest(Long userId, Long requestId, Instant now) {
 		return requests.findByIdAndOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(requestId, userId, now)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_REQUEST_NOT_FOUND));
 	}
@@ -125,10 +128,10 @@ public class MatchRequestService {
 	}
 
 	private MatchRequestResponse toResponse(MatchRequest request) {
-		return MatchRequestResponse.from(request, clock.getZone());
+		return MatchRequestResponse.from(request);
 	}
 
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+	private Instant now() {
+		return clock.instant().truncatedTo(ChronoUnit.MICROS);
 	}
 }

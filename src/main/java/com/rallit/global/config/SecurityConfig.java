@@ -10,8 +10,6 @@ import com.rallit.global.security.authentication.UserDetailsService;
 import com.rallit.global.security.cookie.AuthCookieManager;
 import com.rallit.global.security.jwt.*;
 import com.rallit.global.security.oauth2.*;
-import java.time.Clock;
-import java.time.ZoneId;
 import java.util.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
@@ -34,11 +32,6 @@ import org.springframework.web.cors.*;
 @Configuration
 @EnableConfigurationProperties({AuthProperties.class, GoogleOAuthProperties.class})
 public class SecurityConfig {
-  @Bean
-  Clock clock() {
-    return Clock.system(ZoneId.of("Asia/Seoul"));
-  }
-
   @Bean
   ClientRegistrationRepository clientRegistrations(
       AuthProperties p, GoogleOAuthProperties google, Environment environment) {

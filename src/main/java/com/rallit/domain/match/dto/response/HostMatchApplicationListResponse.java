@@ -1,10 +1,8 @@
 package com.rallit.domain.match.dto.response;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -25,7 +23,7 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 		List<PendingApplicationInfo> pendingApplications, List<ParticipantInfo> participants) {
 
 	public static HostMatchApplicationListResponse of(Match match, List<MatchApplication> activeApplications,
-			ZoneId zone, YearMonth currentMonth) {
+			YearMonth currentMonth) {
 		List<MatchApplication> occupying = activeApplications.stream()
 				.filter(application -> MatchApplicationStatus.SEAT_OCCUPYING.contains(application.getStatus()))
 				.toList();
@@ -36,7 +34,7 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 		List<ParticipantInfo> participants = Stream.concat(
 				Stream.of(ParticipantInfo.host(match.getHost(), currentMonth)),
 				occupying.stream().map(application -> ParticipantInfo.applicant(application, currentMonth))).toList();
-		return new HostMatchApplicationListResponse(MatchInfo.from(match, zone),
+		return new HostMatchApplicationListResponse(MatchInfo.from(match),
 				RecruitmentInfo.of(match, occupying, pendingApplications.size()), pendingApplications, participants);
 	}
 
@@ -44,17 +42,15 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 		return user.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(user.getId());
 	}
 
-	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, OffsetDateTime startsAt,
-			OffsetDateTime endsAt, OffsetDateTime recruitmentDeadline, Integer participationFee, String courtName,
+	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, Instant startsAt,
+			Instant endsAt, Instant recruitmentDeadline, Integer participationFee, String courtName,
 			@Schema(description = "코트 번호", example = "3") String courtNumber) {
 
-		private static MatchInfo from(Match match, ZoneId zone) {
+		private static MatchInfo from(Match match) {
 			CourtSlot courtSlot = match.getCourtSlot();
 			return new MatchInfo(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
-					courtSlot.getStartsAt().atZone(zone).toOffsetDateTime(),
-					courtSlot.getEndsAt().atZone(zone).toOffsetDateTime(),
-					match.getRecruitmentDeadline().atZone(zone).toOffsetDateTime(), match.getParticipationFee(),
-					courtSlot.getCourt().getName(), courtSlot.getCourtNumber());
+					courtSlot.getStartsAt(), courtSlot.getEndsAt(), match.getRecruitmentDeadline(),
+					match.getParticipationFee(), courtSlot.getCourt().getName(), courtSlot.getCourtNumber());
 		}
 	}
 
@@ -100,7 +96,7 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 		}
 	}
 
-	public record PendingApplicationInfo(Long applicationId, LocalDateTime appliedAt, UserInfo applicant) {
+	public record PendingApplicationInfo(Long applicationId, Instant appliedAt, UserInfo applicant) {
 
 		private static PendingApplicationInfo from(MatchApplication application, YearMonth currentMonth) {
 			return new PendingApplicationInfo(application.getId(), application.getCreatedAt(),
@@ -114,8 +110,8 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 			Long applicationId,
 			@Schema(description = "PAYMENT_PENDING 입금 대기 중, CONFIRMED 입금 완료",
 					allowableValues = {"PAYMENT_PENDING", "CONFIRMED"}) MatchApplicationStatus status,
-			LocalDateTime acceptedAt,
-			@Schema(description = "입금 기한") LocalDateTime paymentDueAt,
+			Instant acceptedAt,
+			@Schema(description = "입금 기한") Instant paymentDueAt,
 			UserInfo user) {
 
 		private static ParticipantInfo host(User host, YearMonth currentMonth) {

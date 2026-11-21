@@ -1,6 +1,6 @@
 package com.rallit.domain.court.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.court.enums.CourtSlotStatus;
 import com.rallit.domain.user.entity.User;
@@ -43,10 +43,10 @@ public class CourtSlot extends BaseEntity {
 	private String courtNumber;
 
 	@Column(nullable = false)
-	private LocalDateTime startsAt;
+	private Instant startsAt;
 
 	@Column(nullable = false)
-	private LocalDateTime endsAt;
+	private Instant endsAt;
 
 	@Column(nullable = false)
 	private Integer rentalFee;
@@ -61,10 +61,10 @@ public class CourtSlot extends BaseEntity {
 	@Column(length = 500)
 	private String rejectionReason;
 
-	private LocalDateTime reviewedAt;
+	private Instant reviewedAt;
 
 	@Builder
-	private CourtSlot(Court court, User registrant, String courtNumber, LocalDateTime startsAt, LocalDateTime endsAt,
+	private CourtSlot(Court court, User registrant, String courtNumber, Instant startsAt, Instant endsAt,
 			Integer rentalFee, String evidenceFileKey) {
 		this.court = court;
 		this.registrant = registrant;

@@ -1,6 +1,6 @@
 package com.rallit.domain.settlement.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.settlement.enums.SettlementStatus;
@@ -41,7 +41,7 @@ public class Settlement extends BaseEntity {
 	@Column(nullable = false, length = 30)
 	private SettlementStatus status;
 
-	private LocalDateTime settledAt;
+	private Instant settledAt;
 
 	private Settlement(Match match, Integer amount) {
 		this.match = match;

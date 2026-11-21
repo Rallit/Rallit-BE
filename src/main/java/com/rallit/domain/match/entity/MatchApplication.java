@@ -1,6 +1,6 @@
 package com.rallit.domain.match.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationRejectReason;
@@ -60,15 +60,15 @@ public class MatchApplication extends BaseEntity {
 	private MatchApplicationCancelReason cancelReason;
 
 	@Column(nullable = false)
-	private LocalDateTime refundPolicyAgreedAt;
+	private Instant refundPolicyAgreedAt;
 
-	private LocalDateTime acceptedAt;
+	private Instant acceptedAt;
 
-	private LocalDateTime paymentDueAt;
+	private Instant paymentDueAt;
 
-	private LocalDateTime canceledAt;
+	private Instant canceledAt;
 
-	private MatchApplication(Match match, User applicant, LocalDateTime refundPolicyAgreedAt) {
+	private MatchApplication(Match match, User applicant, Instant refundPolicyAgreedAt) {
 		this.match = match;
 		this.applicant = applicant;
 		this.applicantGender = applicant.getGender();
@@ -76,11 +76,11 @@ public class MatchApplication extends BaseEntity {
 		this.refundPolicyAgreedAt = refundPolicyAgreedAt;
 	}
 
-	public static MatchApplication create(Match match, User applicant, LocalDateTime refundPolicyAgreedAt) {
+	public static MatchApplication create(Match match, User applicant, Instant refundPolicyAgreedAt) {
 		return new MatchApplication(match, applicant, refundPolicyAgreedAt);
 	}
 
-	public void accept(LocalDateTime acceptedAt, LocalDateTime paymentDueAt) {
+	public void accept(Instant acceptedAt, Instant paymentDueAt) {
 		validatePending();
 		this.status = MatchApplicationStatus.PAYMENT_PENDING;
 		this.acceptedAt = acceptedAt;
@@ -93,7 +93,7 @@ public class MatchApplication extends BaseEntity {
 		this.rejectReason = rejectReason;
 	}
 
-	public void cancel(MatchApplicationCancelReason cancelReason, LocalDateTime canceledAt) {
+	public void cancel(MatchApplicationCancelReason cancelReason, Instant canceledAt) {
 		if (status == MatchApplicationStatus.CANCELED) {
 			return;
 		}

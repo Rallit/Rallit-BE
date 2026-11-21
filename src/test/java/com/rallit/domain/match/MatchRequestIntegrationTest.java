@@ -13,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -77,13 +79,12 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@BeforeEach
 	void setUpClock() {
-		when(clock.getZone()).thenReturn(SEOUL);
 		at(LocalDateTime.of(2026, 11, 16, 12, 0));
 	}
 
 	@Test
 	void persistsConditionsAndReopensResultsWhenOnlySimilarMatchesExist() throws Exception {
-		var date = LocalDate.now(clock).plusDays(2);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(2);
 		long similar = recruitMatch(date, "11410", "37.5824", "126.92985", MatchType.SINGLES);
 		String auth = bearer(member());
 
@@ -92,7 +93,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.code").value("COMMON201"))
 				.andExpect(jsonPath("$.result.exactMatchCount").value(0))
 				.andExpect(jsonPath("$.result.hasResults").value(true))
-				.andExpect(jsonPath("$.result.request.expiresAt").value(date.plusDays(2) + "T00:00:00+09:00"))
+				.andExpect(jsonPath("$.result.request.expiresAt").value(date.plusDays(1) + "T15:00:00Z"))
 				.andReturn();
 		long id = requestId(result.getResponse().getContentAsString());
 		String location = result.getResponse().getHeader("Location");
@@ -121,7 +122,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void returnsTheFullExactCountWhenPreviewContainsOneItem() throws Exception {
-		var date = LocalDate.now(clock).plusDays(1);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(1);
 		recruitMatch(date, "11440", "37.560", "126.900", MatchType.SINGLES);
 		recruitMatch(date, "11440", "37.562", "126.904", MatchType.SINGLES);
 
@@ -133,7 +134,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void returnsNoResultsWhenBothSearchSectionsAreEmpty() throws Exception {
-		var date = LocalDate.now(clock).plusDays(1);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(1);
 
 		mvc.perform(create(bearer(member()), date))
 				.andExpect(status().isCreated())
@@ -143,10 +144,10 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void readsExistingJsonbConditionsAndUsesThemToSearchAgain() throws Exception {
-		var date = LocalDate.now(clock).plusDays(1);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(1);
 		long matchId = recruitMatch(date, "11440", "37.560", "126.900", MatchType.WOMENS_DOUBLES);
 		var owner = member();
-		var now = LocalDateTime.now(clock);
+		var now = clock.instant();
 		var savedJson = """
 				{"dates":["%s"],"areaCodes":["11440","11410"],"startTimeFrom":"14:00","startTimeTo":"17:00",
 				 "matchTypes":["DOUBLES"],"minNtrp":1.0,"maxNtrp":4.0,"sameGenderOnly":false}
@@ -154,7 +155,8 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		long id = jdbc.queryForObject("""
 				insert into match_request (owner_id, conditions, expires_at, created_at, updated_at)
 				values (?, cast(? as jsonb), ?, ?, ?) returning id
-				""", Long.class, owner.getId(), savedJson, date.plusDays(1).atStartOfDay(), now, now);
+				""", Long.class, owner.getId(), savedJson,
+				Timestamp.from(date.plusDays(1).atStartOfDay(SEOUL).toInstant()), Timestamp.from(now), Timestamp.from(now));
 		entityManager.clear();
 		String auth = bearer(owner);
 
@@ -174,7 +176,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		entityManager.persist(user);
 		entityManager.flush();
 		String auth = bearer(user);
-		var date = LocalDate.now(clock).plusDays(1);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(1);
 
 		for (var request : List.of(create(auth, date), delete(PATH + "/42").header("Authorization", auth))) {
 			mvc.perform(request)
@@ -186,7 +188,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsSavingMixedDoublesTogetherWithSameGenderOnly() throws Exception {
-		var date = LocalDate.now(clock).plusDays(1);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(1);
 		String auth = bearer(member());
 
 		mvc.perform(post(PATH).header("Authorization", auth).contentType(MediaType.APPLICATION_JSON).content("""
@@ -201,7 +203,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void hidesAnotherMembersRequestAndRemovesDeletedRequestsFromHome() throws Exception {
-		var date = LocalDate.now(clock).plusDays(2);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(2);
 		String owner = bearer(member());
 		String other = bearer(member());
 		long id = savedRequest(owner, date);
@@ -221,7 +223,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsPastStartTimeWhenOnlyTodayIsSelected() throws Exception {
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		at(today.atTime(15, 0));
 		String auth = bearer(member());
 
@@ -232,7 +234,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void preservesMixedDatesAndSearchesOnlyMatchesStillOpenForApplications() throws Exception {
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		var tomorrow = today.plusDays(1);
 		at(today.atTime(15, 30));
 		recruitMatch(today.atTime(14, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
@@ -272,7 +274,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void continuesSearchingFutureDatesAfterTodaysTimeWindowEnds() throws Exception {
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		var tomorrow = today.plusDays(1);
 		at(today.atTime(19, 0));
 		recruitMatch(today.atTime(17, 0), "11440", "37.560", "126.900", MatchType.SINGLES);
@@ -303,7 +305,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsTodayWhenPreviewFinishesAtTheSelectedStartTime() throws Exception {
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		var owner = member();
 		String auth = bearer(owner);
 		doAnswer(invocation -> {
@@ -320,7 +322,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void limitsActiveRequestsAndFreesSpaceExactlyAtSeoulMidnight() throws Exception {
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		var midnight = today.plusDays(1).atStartOfDay();
 		var owner = member();
 		String initialAuth = bearer(owner);
@@ -354,7 +356,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	void searchesBeforeUserLockAndRejectsStartTimePassedWhileWaiting() throws Exception {
 		var tx = new TransactionTemplate(transactionManager);
 		var owner = tx.execute(status -> member());
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		var previewFinished = new CountDownLatch(1);
 		try (var pool = Executors.newSingleThreadExecutor()) {
 			String auth = bearer(owner);
@@ -399,7 +401,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 
 	@Test
 	void rejectsSavingDatesOutsideTheSupportedWindow() throws Exception {
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		String auth = bearer(member());
 		for (var invalid : Set.of(today.minusDays(1), today.plusDays(14))) {
 			mvc.perform(create(auth, invalid))
@@ -411,7 +413,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void requiresBetweenOneAndFourteenDates() throws Exception {
 		var auth = bearer(member());
-		var today = LocalDate.now(clock);
+		var today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		var dates = IntStream.range(0, 15).mapToObj(today::plusDays).toArray(LocalDate[]::new);
 
 		mvc.perform(create(auth)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COMMON400"));
@@ -424,7 +426,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 	void allowsOnlyOneConcurrentCreateWhenTwoRequestsAreAlreadyActive() throws Exception {
 		var tx = new TransactionTemplate(transactionManager);
 		var user = tx.execute(status -> member());
-		var date = LocalDate.now(clock).plusDays(2);
+		var date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(2);
 		try {
 			String auth = bearer(user);
 			savedRequest(auth, date);
@@ -491,8 +493,9 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		return recruitMatch(date.atTime(14, 0), areaCode, latitude, longitude, type);
 	}
 
-	private long recruitMatch(LocalDateTime startsAt, String areaCode, String latitude, String longitude,
+	private long recruitMatch(LocalDateTime seoulStartsAt, String areaCode, String latitude, String longitude,
 			MatchType type) {
+		var startsAt = seoulStartsAt.atZone(SEOUL).toInstant();
 		var host = member();
 		var area = entityManager.createQuery("select a from Area a where a.code = :areaCode", Area.class)
 				.setParameter("areaCode", areaCode)
@@ -504,7 +507,7 @@ class MatchRequestIntegrationTest extends IntegrationTestSupport {
 		entityManager.persist(slot);
 		var match = Match.builder().courtSlot(slot).host(host).matchTypes(Set.of(type))
 				.maleRecruitCount(1).femaleRecruitCount(1).participationFee(10000)
-				.recruitmentDeadline(startsAt.minusHours(1)).build();
+				.recruitmentDeadline(startsAt.minus(Duration.ofHours(1))).build();
 		entityManager.persist(match);
 		entityManager.flush();
 		jdbc.update("update court_slot set status = 'APPROVED' where id = ?", slot.getId());

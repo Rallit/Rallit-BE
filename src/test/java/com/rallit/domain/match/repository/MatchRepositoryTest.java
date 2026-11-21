@@ -4,7 +4,8 @@ import static com.rallit.support.EntityFixtures.MATCH_STARTS_AT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -90,13 +91,33 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void keepsTheSameInstantAfterRoundTripRegardlessOfSessionTimeZone() {
+		jdbcTemplate.execute("SET LOCAL TIME ZONE 'America/Los_Angeles'");
+		CourtSlot courtSlot = courtSlotRepository.saveAndFlush(
+				EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
+		entityManager.clear();
+
+		CourtSlot found = courtSlotRepository.findById(courtSlot.getId()).orElseThrow();
+
+		assertThat(found.getStartsAt()).isEqualTo(Instant.parse("2026-11-14T05:00:00Z"));
+		assertThat(found.getCreatedAt()).isNotNull();
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') FROM court_slot WHERE id = ?",
+				String.class, courtSlot.getId())).isEqualTo("2026-11-14 05:00");
+		assertThat(jdbcTemplate.queryForObject(
+				"SELECT to_char(starts_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') FROM court_slot WHERE id = ?",
+				String.class, courtSlot.getId())).isEqualTo("2026-11-14 14:00");
+	}
+
+	@Test
 	void rejectsOverlappingCourtSlotOnSameCourtNumber() {
 		courtSlotRepository.saveAndFlush(EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
-		courtSlotRepository.saveAndFlush(EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT.plusHours(2)));
+		courtSlotRepository.saveAndFlush(
+				EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT.plus(Duration.ofHours(2))));
 		courtSlotRepository.saveAndFlush(EntityFixtures.courtSlot(court, host, "4", MATCH_STARTS_AT));
 
 		assertThatThrownBy(() -> courtSlotRepository.saveAndFlush(
-				EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT.plusHours(1))))
+				EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT.plus(Duration.ofHours(1)))))
 				.isInstanceOf(DataIntegrityViolationException.class)
 				.hasMessageContaining("ex_court_slot_overlap");
 	}
@@ -138,8 +159,8 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 		jdbcTemplate.update("UPDATE match SET status = 'RECRUITING' WHERE id = ?", match.getId());
 		entityManager.clear();
 
-		assertThat(recruitingMatchIds(MATCH_STARTS_AT.minusMinutes(61))).contains(match.getId());
-		assertThat(recruitingMatchIds(MATCH_STARTS_AT.minusMinutes(59))).doesNotContain(match.getId());
+		assertThat(recruitingMatchIds(MATCH_STARTS_AT.minus(Duration.ofMinutes(61)))).contains(match.getId());
+		assertThat(recruitingMatchIds(MATCH_STARTS_AT.minus(Duration.ofMinutes(59)))).doesNotContain(match.getId());
 	}
 
 	@Test
@@ -152,7 +173,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 				.maleRecruitCount(3)
 				.femaleRecruitCount(3)
 				.participationFee(3000)
-				.recruitmentDeadline(MATCH_STARTS_AT.minusDays(1))
+				.recruitmentDeadline(MATCH_STARTS_AT.minus(Duration.ofDays(1)))
 				.build();
 
 		assertThatThrownBy(() -> matchRepository.saveAndFlush(match))
@@ -170,7 +191,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 				.maleRecruitCount(0)
 				.femaleRecruitCount(0)
 				.participationFee(7000)
-				.recruitmentDeadline(MATCH_STARTS_AT.minusDays(1))
+				.recruitmentDeadline(MATCH_STARTS_AT.minus(Duration.ofDays(1)))
 				.build();
 
 		assertThatThrownBy(() -> matchRepository.saveAndFlush(match))
@@ -233,7 +254,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 		return matchRepository.save(EntityFixtures.match(courtSlot, host));
 	}
 
-	private List<Long> recruitingMatchIds(LocalDateTime now) {
+	private List<Long> recruitingMatchIds(Instant now) {
 		return matchRepository.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, null,
 				null, null, true, EnumSet.allOf(MatchType.class), PageRequest.of(0, 100)).map(Match::getId).getContent();
 	}

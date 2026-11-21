@@ -1,6 +1,6 @@
 package com.rallit.domain.match.repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -9,11 +9,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long> {
 
-	long countByOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(Long ownerId, LocalDateTime now);
+	long countByOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(Long ownerId, Instant now);
 
 	List<MatchRequest> findAllByOwnerIdAndDeletedAtIsNullAndExpiresAtAfterOrderByCreatedAtDescIdDesc(
-			Long ownerId, LocalDateTime now);
+			Long ownerId, Instant now);
 
 	Optional<MatchRequest> findByIdAndOwnerIdAndDeletedAtIsNullAndExpiresAtAfter(
-			Long id, Long ownerId, LocalDateTime now);
+			Long id, Long ownerId, Instant now);
 }

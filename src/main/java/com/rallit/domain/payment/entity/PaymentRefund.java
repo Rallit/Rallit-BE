@@ -1,6 +1,6 @@
 package com.rallit.domain.payment.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.payment.enums.RefundStatus;
 import com.rallit.global.entity.BaseEntity;
@@ -49,9 +49,9 @@ public class PaymentRefund extends BaseEntity {
 	@Column(length = 200)
 	private String transactionKey;
 
-	private LocalDateTime canceledAt;
+	private Instant canceledAt;
 
-	private LocalDateTime lastRequestedAt;
+	private Instant lastRequestedAt;
 
 	private PaymentRefund(Payment payment, String idempotencyKey, Integer amount, String reason) {
 		this.payment = payment;

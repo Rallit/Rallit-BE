@@ -1,7 +1,6 @@
 package com.rallit.global.config;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
@@ -16,6 +15,6 @@ public class JpaConfig {
 
 	@Bean
 	DateTimeProvider auditingDateTimeProvider(Clock clock) {
-		return () -> Optional.of(LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS));
+		return () -> Optional.of(clock.instant().truncatedTo(ChronoUnit.MICROS));
 	}
 }

@@ -1,7 +1,7 @@
 package com.rallit.domain.match.entity;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -74,13 +74,13 @@ public class Match extends BaseEntity {
 	private Integer participationFee;
 
 	@Column(nullable = false)
-	private LocalDateTime recruitmentDeadline;
+	private Instant recruitmentDeadline;
 
-	private LocalDateTime confirmedAt;
+	private Instant confirmedAt;
 
-	private LocalDateTime completedAt;
+	private Instant completedAt;
 
-	private LocalDateTime canceledAt;
+	private Instant canceledAt;
 
 	@Column(length = 500)
 	private String cancelReason;
@@ -101,7 +101,7 @@ public class Match extends BaseEntity {
 	@Builder
 	private Match(CourtSlot courtSlot, User host, Set<MatchType> matchTypes, Integer maleRecruitCount,
 			Integer femaleRecruitCount, BigDecimal minNtrp, BigDecimal maxNtrp, Integer participationFee,
-			LocalDateTime recruitmentDeadline, Set<AgeGroup> preferredAgeGroups, boolean sameGenderOnly) {
+			Instant recruitmentDeadline, Set<AgeGroup> preferredAgeGroups, boolean sameGenderOnly) {
 		validateNtrp(minNtrp);
 		validateNtrp(maxNtrp);
 		this.courtSlot = courtSlot;

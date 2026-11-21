@@ -1,8 +1,8 @@
 package com.rallit.domain.match.service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,6 +16,7 @@ import com.rallit.domain.court.entity.CourtSlot;
 import com.rallit.domain.match.dto.response.MatchSearchResponse.RelaxedCondition;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.region.entity.Area;
+import com.rallit.global.config.TimeConfig;
 
 final class MatchSearchRules {
 
@@ -38,7 +39,8 @@ final class MatchSearchRules {
 		for (Match match : candidates) {
 			var slot = match.getCourtSlot();
 			var court = slot.getCourt();
-			var timeExpansion = windows.get(slot.getStartsAt().toLocalDate()).requiredTimeExpansion(slot);
+			var timeExpansion = windows.get(LocalDate.ofInstant(slot.getStartsAt(), TimeConfig.SERVICE_ZONE))
+					.requiredTimeExpansion(slot);
 			boolean exactTime = timeExpansion.isZero();
 			if (areaCodes.contains(court.getArea().getCode())) {
 				if (exactTime) {
@@ -97,22 +99,23 @@ final class MatchSearchRules {
 		return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(Math.min(1.0, haversine)));
 	}
 
-	record TimeWindow(LocalDateTime from, LocalDateTime to, LocalDateTime dayStart, LocalDateTime dayEnd) {
+	record TimeWindow(Instant from, Instant to, Instant dayStart, Instant dayEnd) {
 
 		static TimeWindow of(LocalDate date, LocalTime start, LocalTime end) {
-			var dayStart = date.atStartOfDay();
-			var dayEnd = date.plusDays(1).atStartOfDay();
-			return new TimeWindow(date.atTime(start),
-					end == null ? dayEnd : date.atTime(end), dayStart, dayEnd);
+			var zone = TimeConfig.SERVICE_ZONE;
+			var dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant();
+			return new TimeWindow(date.atTime(start).atZone(zone).toInstant(),
+					end == null ? dayEnd : date.atTime(end).atZone(zone).toInstant(),
+					date.atStartOfDay(zone).toInstant(), dayEnd);
 		}
 
-		LocalDateTime expandedFrom() {
-			var expanded = from.minusHours(1);
+		Instant expandedFrom() {
+			var expanded = from.minus(Duration.ofHours(1));
 			return expanded.isBefore(dayStart) ? dayStart : expanded;
 		}
 
-		LocalDateTime expandedTo() {
-			var expanded = to.plusHours(1);
+		Instant expandedTo() {
+			var expanded = to.plus(Duration.ofHours(1));
 			return expanded.isAfter(dayEnd) ? dayEnd : expanded;
 		}
 

@@ -1,9 +1,8 @@
 package com.rallit.domain.match.dto.response;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.util.List;
 
 import com.rallit.domain.court.dto.CourtFacilityResponse;
@@ -17,10 +16,10 @@ import com.rallit.global.apiPayload.code.BaseErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes,
-		OffsetDateTime startsAt, OffsetDateTime endsAt, Integer participationFee,
+		Instant startsAt, Instant endsAt, Integer participationFee,
 		@Schema(description = "모집 NTRP 하한. 미설정이면 null", types = {"number", "null"}) BigDecimal minNtrp,
 		@Schema(description = "모집 NTRP 상한. 미설정이면 null", types = {"number", "null"}) BigDecimal maxNtrp,
-		long currentParticipantCount, int capacity, OffsetDateTime recruitmentDeadline,
+		long currentParticipantCount, int capacity, Instant recruitmentDeadline,
 		@Schema(description = "모집 마감과 최종 마감(경기 시작 1시간 전)이 모두 지나지 않았는지 여부") boolean recruitmentOpen,
 		@Schema(description = "조회 시점에 현재 로그인 회원이 신청 가능한지 여부") boolean canApply,
 		@Schema(description = "신청 가능하면 null. 신청 불가 사유는 MATCH_RECRUITMENT_CLOSED, HOST_NOT_ALLOWED, "
@@ -29,15 +28,15 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 		Integer maleRecruitCount, Integer femaleRecruitCount,
 		List<AgeGroup> preferredAgeGroups, CourtInfo court, HostInfo host) {
 
-	public static MatchDetailResponse from(Match match, long occupiedSeats, ZoneId zone, boolean recruitmentOpen,
+	public static MatchDetailResponse from(Match match, long occupiedSeats, boolean recruitmentOpen,
 			BaseErrorCode blockReason, YearMonth currentMonth) {
-		var card = MatchListItemResponse.from(match, occupiedSeats, zone);
+		var card = MatchListItemResponse.from(match, occupiedSeats);
 		var slot = match.getCourtSlot();
 		var court = slot.getCourt();
 		var host = match.getHost();
 		return new MatchDetailResponse(card.matchId(), card.matchStatus(), card.matchTypes(), card.startsAt(), card.endsAt(),
 				card.participationFee(), card.minNtrp(), card.maxNtrp(), card.currentParticipantCount(), card.capacity(),
-				match.getRecruitmentDeadline().atZone(zone).toOffsetDateTime(), recruitmentOpen,
+				match.getRecruitmentDeadline(), recruitmentOpen,
 				blockReason == null, blockReason == null ? null : blockReason.getReason().getCode(),
 				match.getMaleRecruitCount(), match.getFemaleRecruitCount(),
 				match.getPreferredAgeGroups().stream().sorted().toList(),

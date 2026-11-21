@@ -1,8 +1,8 @@
 package com.rallit.domain.user.entity;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
@@ -78,7 +78,7 @@ public class User extends BaseEntity {
 	@Column(nullable = false)
 	private boolean sameGenderOnly;
 
-	private LocalDateTime withdrawnAt;
+	private Instant withdrawnAt;
 
 	@ElementCollection
 	@CollectionTable(name = "user_preferred_match_type", joinColumns = @JoinColumn(name = "user_id"))

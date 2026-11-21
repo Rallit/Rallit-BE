@@ -1,9 +1,7 @@
 package com.rallit.domain.match.dto.response;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -23,15 +21,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MatchApplicationDetailResponse(Long applicationId, MatchApplicationStatus status,
-		LocalDateTime appliedAt, LocalDateTime refundPolicyAgreedAt, LocalDateTime acceptedAt, MatchInfo match,
+		Instant appliedAt, Instant refundPolicyAgreedAt, Instant acceptedAt, MatchInfo match,
 		HostInfo host, PaymentInfo payment, List<ParticipantInfo> participants, CancellationInfo cancellation) {
 
 	public static MatchApplicationDetailResponse of(MatchApplication application,
-			List<MatchApplication> confirmedApplications, ZoneId zone) {
+			List<MatchApplication> confirmedApplications) {
 		Match match = application.getMatch();
 		MatchApplicationStatus status = application.getStatus();
 		return new MatchApplicationDetailResponse(application.getId(), status, application.getCreatedAt(),
-				application.getRefundPolicyAgreedAt(), application.getAcceptedAt(), MatchInfo.from(match, zone),
+				application.getRefundPolicyAgreedAt(), application.getAcceptedAt(), MatchInfo.from(match),
 				HostInfo.from(match.getHost()),
 				status == MatchApplicationStatus.PAYMENT_PENDING ? PaymentInfo.from(application) : null,
 				status == MatchApplicationStatus.CONFIRMED ? participants(match.getHost(), confirmedApplications) : null,
@@ -47,17 +45,15 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 		return user.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(user.getId());
 	}
 
-	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, OffsetDateTime startsAt,
-			OffsetDateTime endsAt, Integer participationFee, OffsetDateTime recruitmentDeadline,
+	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, Instant startsAt,
+			Instant endsAt, Integer participationFee, Instant recruitmentDeadline,
 			Integer maleRecruitCount, Integer femaleRecruitCount, CourtInfo court) {
 
-		private static MatchInfo from(Match match, ZoneId zone) {
+		private static MatchInfo from(Match match) {
 			CourtSlot courtSlot = match.getCourtSlot();
 			return new MatchInfo(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
-					courtSlot.getStartsAt().atZone(zone).toOffsetDateTime(),
-					courtSlot.getEndsAt().atZone(zone).toOffsetDateTime(), match.getParticipationFee(),
-					match.getRecruitmentDeadline().atZone(zone).toOffsetDateTime(),
-					match.getMaleRecruitCount(), match.getFemaleRecruitCount(),
+					courtSlot.getStartsAt(), courtSlot.getEndsAt(), match.getParticipationFee(),
+					match.getRecruitmentDeadline(), match.getMaleRecruitCount(), match.getFemaleRecruitCount(),
 					CourtInfo.from(courtSlot));
 		}
 	}
@@ -83,7 +79,7 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 	}
 
 	@JsonInclude(JsonInclude.Include.NON_NULL)
-	public record PaymentInfo(Integer amount, LocalDateTime paymentDueAt) {
+	public record PaymentInfo(Integer amount, Instant paymentDueAt) {
 
 		private static PaymentInfo from(MatchApplication application) {
 			return new PaymentInfo(application.getMatch().getParticipationFee(), application.getPaymentDueAt());
@@ -108,7 +104,7 @@ public record MatchApplicationDetailResponse(Long applicationId, MatchApplicatio
 	}
 
 	@JsonInclude(JsonInclude.Include.NON_NULL)
-	public record CancellationInfo(MatchApplicationCancelReason reason, LocalDateTime canceledAt) {
+	public record CancellationInfo(MatchApplicationCancelReason reason, Instant canceledAt) {
 
 		private static CancellationInfo from(MatchApplication application) {
 			return new CancellationInfo(application.getCancelReason(), application.getCanceledAt());

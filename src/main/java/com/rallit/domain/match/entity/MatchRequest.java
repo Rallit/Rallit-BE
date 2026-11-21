@@ -1,6 +1,6 @@
 package com.rallit.domain.match.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.user.entity.User;
 import com.rallit.global.entity.BaseEntity;
@@ -38,17 +38,17 @@ public class MatchRequest extends BaseEntity {
 	private MatchRequestConditions conditions;
 
 	@Column(nullable = false, updatable = false)
-	private LocalDateTime expiresAt;
+	private Instant expiresAt;
 
-	private LocalDateTime deletedAt;
+	private Instant deletedAt;
 
-	public MatchRequest(User owner, MatchRequestConditions conditions, LocalDateTime expiresAt) {
+	public MatchRequest(User owner, MatchRequestConditions conditions, Instant expiresAt) {
 		this.owner = owner;
 		this.conditions = conditions;
 		this.expiresAt = expiresAt;
 	}
 
-	public void delete(LocalDateTime now) {
+	public void delete(Instant now) {
 		this.deletedAt = now;
 	}
 }

@@ -1,7 +1,7 @@
 package com.rallit.domain.match.service;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 
 import com.rallit.domain.match.entity.Match;
@@ -24,7 +24,7 @@ class MatchApplicationEligibility {
 
 	private final MatchApplicationRepository applications;
 
-	Optional<BaseErrorCode> blockReason(Match match, User applicant, LocalDateTime now) {
+	Optional<BaseErrorCode> blockReason(Match match, User applicant, Instant now) {
 		if (match.getStatus() != MatchStatus.RECRUITING) {
 			return Optional.of(MatchErrorStatus.MATCH_NOT_RECRUITING);
 		}
@@ -49,11 +49,11 @@ class MatchApplicationEligibility {
 		return Optional.empty();
 	}
 
-	static LocalDateTime finalDeadline(Match match) {
+	static Instant finalDeadline(Match match) {
 		return match.getCourtSlot().getStartsAt().minus(FINAL_DEADLINE_BEFORE_START);
 	}
 
-	static boolean isWithinRecruitmentWindow(Match match, LocalDateTime now) {
+	static boolean isWithinRecruitmentWindow(Match match, Instant now) {
 		return now.isBefore(match.getRecruitmentDeadline()) && now.isBefore(finalDeadline(match));
 	}
 }
