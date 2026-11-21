@@ -1,7 +1,8 @@
 package com.rallit.support;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.YearMonth;
 import java.util.Set;
 
@@ -21,7 +22,7 @@ import jakarta.persistence.EntityManager;
 
 public final class EntityFixtures {
 
-	public static final LocalDateTime MATCH_STARTS_AT = LocalDateTime.of(2026, 11, 14, 14, 0);
+	public static final Instant MATCH_STARTS_AT = Instant.parse("2026-11-14T05:00:00Z");
 
 	public static final YearMonth TENNIS_STARTED_ON = YearMonth.of(2023, 3);
 
@@ -49,13 +50,13 @@ public final class EntityFixtures {
 				.build();
 	}
 
-	public static CourtSlot courtSlot(Court court, User registrant, String courtNumber, LocalDateTime startsAt) {
+	public static CourtSlot courtSlot(Court court, User registrant, String courtNumber, Instant startsAt) {
 		return CourtSlot.builder()
 				.court(court)
 				.registrant(registrant)
 				.courtNumber(courtNumber)
 				.startsAt(startsAt)
-				.endsAt(startsAt.plusHours(2))
+				.endsAt(startsAt.plus(Duration.ofHours(2)))
 				.rentalFee(14000)
 				.evidenceFileKey("court-slot/evidence.png")
 				.build();
@@ -71,12 +72,12 @@ public final class EntityFixtures {
 				.minNtrp(new BigDecimal("2.5"))
 				.maxNtrp(new BigDecimal("3.5"))
 				.participationFee(3500)
-				.recruitmentDeadline(MATCH_STARTS_AT.minusDays(1))
+				.recruitmentDeadline(MATCH_STARTS_AT.minus(Duration.ofDays(1)))
 				.preferredAgeGroups(Set.of(AgeGroup.TWENTIES, AgeGroup.THIRTIES))
 				.build();
 	}
 
 	public static MatchApplication matchApplication(Match match, User applicant) {
-		return MatchApplication.create(match, applicant, MATCH_STARTS_AT.minusDays(3));
+		return MatchApplication.create(match, applicant, MATCH_STARTS_AT.minus(Duration.ofDays(3)));
 	}
 }

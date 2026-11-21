@@ -9,10 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -64,6 +67,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	private static final String JUNG = "11140";
 	private static final String SEODAEMUN = "11410";
 	private static final String YONGSAN = "11170";
+	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
 	@Autowired private MockMvc mvc;
 	@Autowired private ObjectMapper json;
@@ -422,9 +426,9 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 		long entirelyOutside = match(host, original, date, "13:00", "2.5", "4.0", MatchType.SINGLES, false);
 		long partlyOutside = match(host, original, date, "13:15", "2.5", "4.0", MatchType.SINGLES, false);
 		jdbc.update("update court_slot set ends_at = ? where id = (select court_slot_id from match where id = ?)",
-				date.atTime(13, 30), entirelyOutside);
+				Timestamp.from(date.atTime(13, 30).atZone(SEOUL).toInstant()), entirelyOutside);
 		jdbc.update("update court_slot set ends_at = ? where id = (select court_slot_id from match where id = ?)",
-				date.atTime(14, 15), partlyOutside);
+				Timestamp.from(date.atTime(14, 15).atZone(SEOUL).toInstant()), partlyOutside);
 		search(bearer(viewer()), date)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.relaxedConditions[0]").value("TIME"))
@@ -563,7 +567,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 
 	private long match(User host, Court court, LocalDate date, String start, String min, String max,
 			MatchType type, boolean sameGenderOnly) {
-		var startsAt = date.atTime(LocalTime.parse(start));
+		var startsAt = date.atTime(LocalTime.parse(start)).atZone(SEOUL).toInstant();
 		var slot = EntityFixtures.courtSlot(court, host, UUID.randomUUID().toString().substring(0, 8), startsAt);
 		entityManager.persist(slot);
 		var match = Match.builder().courtSlot(slot).host(host).matchTypes(Set.of(type))
@@ -571,7 +575,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.sameGenderOnly(sameGenderOnly)
 				.minNtrp(min == null ? null : new BigDecimal(min))
 				.maxNtrp(max == null ? null : new BigDecimal(max))
-				.participationFee(10000).recruitmentDeadline(startsAt.minusHours(1)).build();
+				.participationFee(10000).recruitmentDeadline(startsAt.minus(1, ChronoUnit.HOURS)).build();
 		entityManager.persist(match);
 		entityManager.flush();
 		jdbc.update("update court_slot set status = 'APPROVED' where id = ?", slot.getId());
@@ -580,7 +584,7 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private LocalDate saturday() {
-		return LocalDate.now(clock).with(TemporalAdjusters.next(DayOfWeek.SATURDAY));
+		return LocalDate.ofInstant(clock.instant(), SEOUL).with(TemporalAdjusters.next(DayOfWeek.SATURDAY));
 	}
 
 	private String bearer(User user) {

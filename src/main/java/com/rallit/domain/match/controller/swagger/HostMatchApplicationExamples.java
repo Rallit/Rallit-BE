@@ -14,9 +14,9 @@ final class HostMatchApplicationExamples {
 			      "matchId": 42,
 			      "status": "RECRUITING",
 			      "matchTypes": ["MIXED_DOUBLES"],
-			      "startsAt": "2026-11-14T14:00:00+09:00",
-			      "endsAt": "2026-11-14T16:00:00+09:00",
-			      "recruitmentDeadline": "2026-11-13T18:00:00+09:00",
+			      "startsAt": "2026-11-14T05:00:00Z",
+			      "endsAt": "2026-11-14T07:00:00Z",
+			      "recruitmentDeadline": "2026-11-13T09:00:00Z",
 			      "participationFee": 3500,
 			      "courtName": "장충테니스장",
 			      "courtNumber": "3"
@@ -31,7 +31,7 @@ final class HostMatchApplicationExamples {
 			    },
 			    "pendingApplications": [{
 			      "applicationId": 103,
-			      "appliedAt": "2026-11-12T10:15:00",
+			      "appliedAt": "2026-11-12T01:15:00Z",
 			      "applicant": {
 			        "userId": 11,
 			        "nickname": "강민서",
@@ -57,8 +57,8 @@ final class HostMatchApplicationExamples {
 			      "host": false,
 			      "applicationId": 101,
 			      "status": "PAYMENT_PENDING",
-			      "acceptedAt": "2026-11-12T11:00:00",
-			      "paymentDueAt": "2026-11-13T11:00:00",
+			      "acceptedAt": "2026-11-12T02:00:00Z",
+			      "paymentDueAt": "2026-11-13T02:00:00Z",
 			      "user": {
 			        "userId": 9,
 			        "nickname": "이윤경",
@@ -81,8 +81,8 @@ final class HostMatchApplicationExamples {
 			  "result": {
 			    "applicationId": 103,
 			    "status": "PAYMENT_PENDING",
-			    "acceptedAt": "2026-11-12T12:00:00",
-			    "paymentDueAt": "2026-11-13T12:00:00"
+			    "acceptedAt": "2026-11-12T03:00:00Z",
+			    "paymentDueAt": "2026-11-13T03:00:00Z"
 			  }
 			}
 			""";

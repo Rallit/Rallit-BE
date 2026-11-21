@@ -15,6 +15,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.code.BaseErrorCode;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.global.config.TimeConfig;
 import java.time.Clock;
 import java.time.YearMonth;
 import java.util.Set;
@@ -66,7 +67,7 @@ public class UserService {
     }
     try {
       OnboardingProfile profile = request.toProfile(Set.copyOf(selectedAreas));
-      profile.requireTennisStartedBy(YearMonth.now(clock));
+      profile.requireTennisStartedBy(YearMonth.from(clock.instant().atZone(TimeConfig.SERVICE_ZONE)));
       return profile;
     } catch (OnboardingProfileValidationException failure) {
       BaseErrorCode error = switch (failure.reason()) {
@@ -91,6 +92,6 @@ public class UserService {
   private UserResponse response(User user) {
     String displayName = accounts.findFirstByUserIdOrderByIdAsc(user.getId())
         .map(SocialAccount::getDisplayName).orElse(null);
-    return UserResponse.from(user, displayName, YearMonth.now(clock));
+    return UserResponse.from(user, displayName, YearMonth.from(clock.instant().atZone(TimeConfig.SERVICE_ZONE)));
   }
 }

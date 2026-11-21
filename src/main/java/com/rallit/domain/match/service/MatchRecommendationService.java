@@ -2,8 +2,8 @@ package com.rallit.domain.match.service;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
@@ -37,6 +37,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.global.config.TimeConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -115,7 +116,7 @@ public class MatchRecommendationService {
 	}
 
 	private List<Match> findSearchCandidates(User user, MatchSearchRequest request,
-			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows, LocalDateTime now) {
+			NavigableMap<LocalDate, MatchSearchRules.TimeWindow> windows, Instant now) {
 		if (!Ntrp.isSupported(request.minNtrp()) || !Ntrp.isSupported(request.maxNtrp())
 				|| request.minNtrp().compareTo(request.maxNtrp()) > 0) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_SEARCH_NTRP);
@@ -127,10 +128,11 @@ public class MatchRecommendationService {
 		var firstWindow = windows.firstEntry().getValue();
 		var lastWindow = windows.lastEntry().getValue();
 		var endMinute = Duration.between(firstWindow.dayStart(), firstWindow.expandedTo()).toMinutes();
+		var startTime = LocalTime.ofInstant(firstWindow.expandedFrom(), TimeConfig.SERVICE_ZONE);
 		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now,
 				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
-				firstWindow.expandedFrom().toLocalTime(), endMinute, types, user.getId(), user.getGender(),
-				MatchApplicationStatus.ACTIVE, request.sameGenderOnly(), request.minNtrp(), request.maxNtrp());
+				startTime, endMinute, types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
+				request.sameGenderOnly(), request.minNtrp(), request.maxNtrp());
 	}
 
 	private static EnumSet<MatchType> matchTypes(Iterable<PreferredMatchType> preferences) {
@@ -176,10 +178,10 @@ public class MatchRecommendationService {
 	}
 
 	private MatchRecommendationResponse view(Match match, Map<Long, Long> counts) {
-		return MatchRecommendationResponse.from(match, counts.getOrDefault(match.getId(), 0L), clock.getZone());
+		return MatchRecommendationResponse.from(match, counts.getOrDefault(match.getId(), 0L));
 	}
 
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+	private Instant now() {
+		return clock.instant().truncatedTo(ChronoUnit.MICROS);
 	}
 }

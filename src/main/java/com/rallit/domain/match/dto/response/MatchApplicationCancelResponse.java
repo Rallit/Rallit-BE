@@ -1,13 +1,13 @@
 package com.rallit.domain.match.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.match.entity.MatchApplication;
 import com.rallit.domain.match.enums.MatchApplicationCancelReason;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 
 public record MatchApplicationCancelResponse(Long applicationId, MatchApplicationStatus status,
-		LocalDateTime canceledAt, MatchApplicationCancelReason cancelReason) {
+		Instant canceledAt, MatchApplicationCancelReason cancelReason) {
 
 	public static MatchApplicationCancelResponse from(MatchApplication application) {
 		return new MatchApplicationCancelResponse(application.getId(), application.getStatus(),

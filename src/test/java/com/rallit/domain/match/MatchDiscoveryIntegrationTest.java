@@ -9,10 +9,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +45,8 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional
 class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 
+	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
 	@Autowired private MockMvc mvc;
 	@Autowired private ObjectMapper json;
 	@Autowired private TokenSessionService sessions;
@@ -54,7 +58,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void listDetailAndApplicationUseTheSameMatchId() throws Exception {
 		String bearer = bearer(activeUser());
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(0));
@@ -66,7 +70,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.code").value("COMMON200"))
 				.andExpect(jsonPath("$.result.items", hasSize(1)))
 				.andExpect(jsonPath("$.result.items[0].currentParticipantCount").value(1))
-				.andExpect(jsonPath("$.result.items[0].startsAt").value(date + "T10:00:00+09:00"))
+				.andExpect(jsonPath("$.result.items[0].startsAt").value(date + "T01:00:00Z"))
 				.andExpect(jsonPath("$.result.page").value(0))
 				.andExpect(jsonPath("$.result.size").value(1))
 				.andExpect(jsonPath("$.result.hasNext").value(true))
@@ -77,13 +81,13 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.matchId").value(matchId))
-				.andExpect(jsonPath("$.result.endsAt").value(date + "T12:00:00+09:00"))
-				.andExpect(jsonPath("$.result.recruitmentDeadline").value(date + "T09:00:00+09:00"))
+				.andExpect(jsonPath("$.result.endsAt").value(date + "T03:00:00Z"))
+				.andExpect(jsonPath("$.result.recruitmentDeadline").value(date + "T00:00:00Z"))
 				.andExpect(jsonPath("$.result.canApply").value(true))
 				.andExpect(jsonPath("$.result.court.address").isString())
 				.andExpect(jsonPath("$.result.court.evidenceFileKey").doesNotExist())
 				.andExpect(jsonPath("$.result.host.experienceYears")
-						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON, YearMonth.now(clock))));
+						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON, YearMonth.from(clock.instant().atZone(SEOUL)))));
 		var application = mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId)
 						.header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"refundPolicyAgreed\":true}"))
@@ -96,13 +100,13 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 						.param("date", date.toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.items[0].matchId").value(matchId))
-				.andExpect(jsonPath("$.result.items[0].startsAt").value(date + "T10:00:00+09:00"))
-				.andExpect(jsonPath("$.result.items[0].endsAt").value(date + "T12:00:00+09:00"));
+				.andExpect(jsonPath("$.result.items[0].startsAt").value(date + "T01:00:00Z"))
+				.andExpect(jsonPath("$.result.items[0].endsAt").value(date + "T03:00:00Z"));
 		mvc.perform(get(application.getHeader("Location")).header("Authorization", bearer))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.match.startsAt").value(date + "T10:00:00+09:00"))
-				.andExpect(jsonPath("$.result.match.endsAt").value(date + "T12:00:00+09:00"))
-				.andExpect(jsonPath("$.result.match.recruitmentDeadline").value(date + "T09:00:00+09:00"));
+				.andExpect(jsonPath("$.result.match.startsAt").value(date + "T01:00:00Z"))
+				.andExpect(jsonPath("$.result.match.endsAt").value(date + "T03:00:00Z"))
+				.andExpect(jsonPath("$.result.match.recruitmentDeadline").value(date + "T00:00:00Z"));
 
 		assertThat(jdbc.queryForObject("select count(*) from match_application where match_id = ? and status = 'PENDING'",
 				Long.class, matchId)).isEqualTo(1L);
@@ -120,7 +124,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void rejectsPagesBeyondFilteredResults() throws Exception {
 		String bearer = bearer(activeUser());
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		createRecruitingMatches(date);
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
@@ -149,7 +153,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void rejectsBlankMatchTypesAndAcceptsRepeatedValues() throws Exception {
 		String bearer = bearer(activeUser());
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		createRecruitingMatches(date);
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
@@ -170,7 +174,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	void filtersApplicantEligibilityBeforeCountingAndPaging() throws Exception {
 		User viewer = activeUser();
 		String bearer = bearer(viewer);
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		var fixtures = createRecruitingMatches(date);
 
 		long singlesId = fixtures.singlesId();
@@ -185,7 +189,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		jdbc.update("""
 				insert into match_application (match_id, applicant_user_id, applicant_gender, status,
 					refund_policy_agreed_at, created_at, updated_at)
-				values (?, ?, 'FEMALE', 'PENDING', localtimestamp, localtimestamp, localtimestamp)
+				values (?, ?, 'FEMALE', 'PENDING', now(), now(), now())
 				""", doublesId, activeUser().getId());
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
@@ -218,7 +222,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	void applicableOnlyChecksTheViewersRecruitmentGenderAndKeepsMatchTypeFilter() throws Exception {
 		String bearer = bearer(users.saveAndFlush(EntityFixtures.user(entityManager,
 				"탐색" + UUID.randomUUID().toString().substring(0, 8), Gender.MALE)));
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		var fixtures = createRecruitingMatches(date);
 
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
@@ -245,7 +249,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void filtersByEntireTimeRangeAndMatchType() throws Exception {
 		String bearer = bearer(activeUser());
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		createRecruitingMatches(date);
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("startTimeFrom", "10:00").param("startTimeTo", "12:00")
@@ -276,7 +280,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.code").value("MATCH_ONBOARDING_REQUIRED"));
 
 		String bearer = bearer(activeUser());
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		long matchId = createRecruitingMatches(date).singlesId();
 		jdbc.update("update court_slot set status = 'PENDING' where id = (select court_slot_id from match where id = ?)",
 				matchId);
@@ -290,7 +294,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void detailKeepsGeneralCourtNotesSeparateFromFacilityNotes() throws Exception {
 		String bearer = bearer(activeUser());
-		var matches = createRecruitingMatches(LocalDate.now(clock).plusDays(7));
+		var matches = createRecruitingMatches(LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7));
 		jdbc.update("update court set facility_notes = ? where id = ?", "입구에서 예약 내역을 보여주세요.",
 				matches.courtId());
 
@@ -307,7 +311,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void detailReturnsEachAvailableCourtFacilityWithItsOwnNote() throws Exception {
 		String bearer = bearer(activeUser());
-		var matches = createRecruitingMatches(LocalDate.now(clock).plusDays(7));
+		var matches = createRecruitingMatches(LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7));
 		jdbc.update("update court set parking_note = ?, shower_note = ? where id = ?",
 				"지하 3층 주차장", "남녀 샤워실 각 1개", matches.courtId());
 
@@ -339,21 +343,21 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	void detailExplainsGenderCapacityAndRecruitmentDeadline() throws Exception {
 		User viewer = activeUser();
 		String bearer = bearer(viewer);
-		LocalDate date = LocalDate.now(clock).plusDays(7);
+		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
 		long matchId = createRecruitingMatches(date).singlesId();
 		User accepted = activeUser();
 		jdbc.update("""
 				insert into match_application (match_id, applicant_user_id, applicant_gender, status,
 					refund_policy_agreed_at, created_at, updated_at)
-				values (?, ?, 'FEMALE', 'PAYMENT_PENDING', localtimestamp, localtimestamp, localtimestamp)
+				values (?, ?, 'FEMALE', 'PAYMENT_PENDING', now(), now(), now())
 				""", matchId, accepted.getId());
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.currentParticipantCount").value(2))
 				.andExpect(jsonPath("$.result.applicationBlockReason").value("RECRUITMENT_FULL"));
 
-		jdbc.update("update match set recruitment_deadline = ? where id = ?", date.minusDays(8).atStartOfDay(),
-				matchId);
+		jdbc.update("update match set recruitment_deadline = ? where id = ?",
+				Timestamp.from(date.minusDays(8).atStartOfDay(SEOUL).toInstant()), matchId);
 		entityManager.clear();
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
 				.andExpect(status().isOk())
@@ -382,7 +386,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 
 	private Match createMatch(User host, Court court, LocalDate date, int hour, MatchType type,
 			int maleRecruitCount, int femaleRecruitCount) {
-		var startsAt = date.atTime(hour, 0);
+		var startsAt = date.atTime(hour, 0).atZone(SEOUL).toInstant();
 		var slot = EntityFixtures.courtSlot(court, host, "1", startsAt);
 		entityManager.persist(slot);
 		var match = Match.builder()
@@ -394,7 +398,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.minNtrp(new BigDecimal("2.5"))
 				.maxNtrp(new BigDecimal("3.5"))
 				.participationFee(3500)
-				.recruitmentDeadline(startsAt.minusHours(1))
+				.recruitmentDeadline(startsAt.minus(1, ChronoUnit.HOURS))
 				.build();
 		entityManager.persist(match);
 		return match;

@@ -1,8 +1,8 @@
 package com.rallit.domain.match.service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -26,6 +26,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.global.config.TimeConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,9 +52,10 @@ public class MatchDiscoveryService {
 		if (startTimeFrom != null && startTimeTo != null && !startTimeFrom.isBefore(startTimeTo)) {
 			throw new GeneralException(MatchErrorStatus.MATCH_INVALID_TIME_RANGE);
 		}
-		var from = date == null ? null : date.atTime(startTimeFrom == null ? LocalTime.MIDNIGHT : startTimeFrom);
-		var before = date == null ? null : date.plusDays(1).atStartOfDay();
-		var endsBy = startTimeTo == null ? null : date.atTime(startTimeTo);
+		var from = date == null ? null : date.atTime(startTimeFrom == null ? LocalTime.MIDNIGHT : startTimeFrom)
+				.atZone(TimeConfig.SERVICE_ZONE).toInstant();
+		var before = date == null ? null : date.plusDays(1).atStartOfDay(TimeConfig.SERVICE_ZONE).toInstant();
+		var endsBy = startTimeTo == null ? null : date.atTime(startTimeTo).atZone(TimeConfig.SERVICE_ZONE).toInstant();
 		boolean allTypes = matchTypes == null || matchTypes.isEmpty();
 		var types = allTypes ? EnumSet.allOf(MatchType.class) : EnumSet.copyOf(matchTypes);
 		var pageable = PageRequest.of(page, size);
@@ -71,7 +73,7 @@ public class MatchDiscoveryService {
 		MatchPageRange.requireInRange(result);
 		var counts = occupiedSeats(result.stream().map(Match::getId).toList());
 		return PageResponse.from(result.map(match -> MatchListItemResponse.from(match,
-				counts.getOrDefault(match.getId(), 0L), clock.getZone())));
+				counts.getOrDefault(match.getId(), 0L))));
 	}
 
 	public MatchDetailResponse detail(Long matchId, Long userId) {
@@ -81,9 +83,9 @@ public class MatchDiscoveryService {
 		var applicant = users.findById(userId).orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
 		var reason = eligibility.blockReason(match, applicant, now);
 		long count = occupiedSeats(List.of(matchId)).getOrDefault(matchId, 0L);
-		return MatchDetailResponse.from(match, count, clock.getZone(),
+		return MatchDetailResponse.from(match, count,
 				MatchApplicationEligibility.isWithinRecruitmentWindow(match, now), reason.orElse(null),
-				YearMonth.from(now));
+				YearMonth.from(now.atZone(TimeConfig.SERVICE_ZONE)));
 	}
 
 	private Map<Long, Long> occupiedSeats(List<Long> ids) {
@@ -94,7 +96,7 @@ public class MatchDiscoveryService {
 				.collect(Collectors.toMap(MatchApplicationCount::getMatchId, MatchApplicationCount::getCount));
 	}
 
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+	private Instant now() {
+		return clock.instant().truncatedTo(ChronoUnit.MICROS);
 	}
 }

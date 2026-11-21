@@ -1,6 +1,6 @@
 package com.rallit.domain.notification.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.notification.enums.NotificationType;
@@ -53,7 +53,7 @@ public class Notification extends BaseEntity {
 	@Column(unique = true, length = 200)
 	private String dedupeKey;
 
-	private LocalDateTime readAt;
+	private Instant readAt;
 
 	@Builder
 	private Notification(User recipient, Match match, NotificationType type, String title, String body,

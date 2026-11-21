@@ -13,9 +13,12 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +73,8 @@ import tools.jackson.databind.ObjectMapper;
 class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 
 	private static final String AGREED = "{\"refundPolicyAgreed\":true}";
+
+	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
 	@Autowired
 	private MockMvc mvc;
@@ -132,7 +137,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	void applyCreatesPendingApplicationWithServerTimes() throws Exception {
 		Match match = recruitingMatch(activeUser(Gender.MALE));
 		User applicant = activeUser(Gender.FEMALE);
-		LocalDateTime before = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MILLIS);
+		Instant before = clock.instant().truncatedTo(ChronoUnit.MILLIS);
 
 		long applicationId = id(apply(applicant, match.getId(), AGREED)
 				.andExpect(status().isCreated())
@@ -146,7 +151,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		assertThat(row.get("status")).isEqualTo("PENDING");
 		assertThat(row.get("applicant_user_id")).isEqualTo(applicant.getId());
 		assertThat(row.get("applicant_gender")).isEqualTo("FEMALE");
-		assertThat(((java.sql.Timestamp) row.get("refund_policy_agreed_at")).toLocalDateTime())
+		assertThat(((Timestamp) row.get("refund_policy_agreed_at")).toInstant())
 				.isAfterOrEqualTo(before);
 		assertThat(row.get("canceled_at")).isNull();
 	}
@@ -246,10 +251,10 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	void rejectsMatchThatIsNotRecruitingOrPastDeadline() throws Exception {
 		User host = activeUser(Gender.MALE);
 		User applicant = activeUser(Gender.FEMALE);
-		Match pendingApproval = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now(clock).plusDays(1));
-		Match closed = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now(clock).minusMinutes(1));
+		Match pendingApproval = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, clock.instant().plus(1, ChronoUnit.DAYS));
+		Match closed = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, clock.instant().minus(1, ChronoUnit.MINUTES));
 		recruit(closed);
-		Match started = recruitingMatch(host, LocalDateTime.now(clock).minusMinutes(1));
+		Match started = recruitingMatch(host, clock.instant().minus(1, ChronoUnit.MINUTES));
 
 		apply(applicant, pendingApproval.getId(), AGREED)
 				.andExpect(status().isConflict())
@@ -268,8 +273,8 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void acceptsApplicationsOnlyUntilOneHourBeforeMatchStart() throws Exception {
 		User host = activeUser(Gender.MALE);
-		Match beforeFinalDeadline = recruitingMatch(host, LocalDateTime.now(clock).plusMinutes(61));
-		Match afterFinalDeadline = recruitingMatch(host, LocalDateTime.now(clock).plusMinutes(59));
+		Match beforeFinalDeadline = recruitingMatch(host, clock.instant().plus(61, ChronoUnit.MINUTES));
+		Match afterFinalDeadline = recruitingMatch(host, clock.instant().plus(59, ChronoUnit.MINUTES));
 
 		apply(activeUser(Gender.FEMALE), beforeFinalDeadline.getId(), AGREED).andExpect(status().isCreated());
 		apply(activeUser(Gender.FEMALE), afterFinalDeadline.getId(), AGREED)
@@ -306,7 +311,7 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void validatesGenderRecruitmentButNotNtrpOrAgePreference() throws Exception {
 		Match womensDoubles = match(activeUser(Gender.FEMALE), Set.of(MatchType.WOMENS_DOUBLES), 0, 3,
-				LocalDateTime.now(clock).plusDays(1));
+				clock.instant().plus(1, ChronoUnit.DAYS));
 		recruit(womensDoubles);
 		User female = saveUser(onboarded(Gender.FEMALE, new BigDecimal("4.0"), AgeGroup.FIFTIES));
 
@@ -337,14 +342,14 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void listsMyActiveApplicationsFromTodayInMatchTimeOrderWithParticipantCounts() throws Exception {
 		User host = activeUser(Gender.MALE);
-		LocalDate today = LocalDate.now(clock);
+		LocalDate today = LocalDate.ofInstant(clock.instant(), SEOUL);
 		Match yesterday = recruitingMatch(host);
 		Match earlyToday = recruitingMatch(host);
 		Match tomorrow = match(host, Set.of(MatchType.MENS_DOUBLES, MatchType.RALLY), 1, 2,
-				LocalDateTime.now(clock).plusDays(1), today.plusDays(1).atTime(10, 0));
+				clock.instant().plus(1, ChronoUnit.DAYS), seoul(today.plusDays(1).atTime(10, 0)));
 		recruit(tomorrow);
-		Match canceledTomorrow = recruitingMatch(host, today.plusDays(1).atTime(14, 0));
-		Match nextWeek = recruitingMatch(host, today.plusDays(7).atTime(9, 0));
+		Match canceledTomorrow = recruitingMatch(host, seoul(today.plusDays(1).atTime(14, 0)));
+		Match nextWeek = recruitingMatch(host, seoul(today.plusDays(7).atTime(9, 0)));
 		User applicant = activeUser(Gender.FEMALE);
 		long yesterdayId = id(apply(applicant, yesterday.getId(), AGREED));
 		long earlyTodayId = id(apply(applicant, earlyToday.getId(), AGREED));
@@ -358,8 +363,8 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		jdbcTemplate.update("UPDATE match_application SET status = 'CONFIRMED' WHERE id IN (?, ?)", confirmedOtherId,
 				nextWeekId);
 		cancel(applicant, canceledId, null).andExpect(status().isOk());
-		reschedule(yesterday, today.minusDays(1).atTime(10, 0));
-		reschedule(earlyToday, today.atStartOfDay());
+		reschedule(yesterday, seoul(today.minusDays(1).atTime(10, 0)));
+		reschedule(earlyToday, today.atStartOfDay(SEOUL).toInstant());
 
 		myApplications(applicant)
 				.andExpect(status().isOk())
@@ -685,23 +690,23 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private Match recruitingMatch(User host) {
-		return recruitingMatch(host, LocalDateTime.now(clock).plusDays(3).truncatedTo(ChronoUnit.HOURS));
+		return recruitingMatch(host, clock.instant().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS));
 	}
 
-	private Match recruitingMatch(User host, LocalDateTime startsAt) {
-		Match match = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, LocalDateTime.now(clock).plusDays(1), startsAt);
+	private Match recruitingMatch(User host, Instant startsAt) {
+		Match match = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, clock.instant().plus(1, ChronoUnit.DAYS), startsAt);
 		recruit(match);
 		return match;
 	}
 
 	private Match match(User host, Set<MatchType> matchTypes, int maleRecruitCount, int femaleRecruitCount,
-			LocalDateTime recruitmentDeadline) {
+			Instant recruitmentDeadline) {
 		return match(host, matchTypes, maleRecruitCount, femaleRecruitCount, recruitmentDeadline,
-				LocalDateTime.now(clock).plusDays(3).truncatedTo(ChronoUnit.HOURS));
+				clock.instant().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS));
 	}
 
 	private Match match(User host, Set<MatchType> matchTypes, int maleRecruitCount, int femaleRecruitCount,
-			LocalDateTime recruitmentDeadline, LocalDateTime startsAt) {
+			Instant recruitmentDeadline, Instant startsAt) {
 		Court court = courtRepository.save(EntityFixtures.court());
 		courtIds.add(court.getId());
 		CourtSlot courtSlot = courtSlotRepository.save(EntityFixtures.courtSlot(court, host, "1", startsAt));
@@ -721,9 +726,13 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 		return match;
 	}
 
-	private void reschedule(Match match, LocalDateTime startsAt) {
-		jdbcTemplate.update("UPDATE court_slot SET starts_at = ?, ends_at = ? WHERE id = ?", startsAt,
-				startsAt.plusHours(2), match.getCourtSlot().getId());
+	private void reschedule(Match match, Instant startsAt) {
+		jdbcTemplate.update("UPDATE court_slot SET starts_at = ?, ends_at = ? WHERE id = ?", Timestamp.from(startsAt),
+				Timestamp.from(startsAt.plus(2, ChronoUnit.HOURS)), match.getCourtSlot().getId());
+	}
+
+	private static Instant seoul(LocalDateTime dateTime) {
+		return dateTime.atZone(SEOUL).toInstant();
 	}
 
 	private void recruit(Match match) {

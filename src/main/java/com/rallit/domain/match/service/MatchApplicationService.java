@@ -2,8 +2,8 @@ package com.rallit.domain.match.service;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -36,6 +36,7 @@ import com.rallit.domain.user.repository.UserRepository;
 import com.rallit.global.apiPayload.PageResponse;
 import com.rallit.global.apiPayload.code.status.ErrorStatus;
 import com.rallit.global.apiPayload.exception.GeneralException;
+import com.rallit.global.config.TimeConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -64,7 +65,7 @@ public class MatchApplicationService {
 		}
 		Match match = matchRepository.findById(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
-		LocalDateTime now = now();
+		Instant now = now();
 		eligibility.blockReason(match, applicant, now).ifPresent(reason -> {
 			throw new GeneralException(reason);
 		});
@@ -83,8 +84,9 @@ public class MatchApplicationService {
 	@Transactional(readOnly = true)
 	public PageResponse<MyMatchApplicationListItemResponse> getMyScheduledApplications(Long userId, LocalDate date, int page,
 			int size) {
-		LocalDateTime from = (date == null ? LocalDate.now(clock) : date).atStartOfDay();
-		LocalDateTime to = date == null ? null : from.plusDays(1);
+		LocalDate day = date == null ? LocalDate.ofInstant(clock.instant(), TimeConfig.SERVICE_ZONE) : date;
+		Instant from = day.atStartOfDay(TimeConfig.SERVICE_ZONE).toInstant();
+		Instant to = date == null ? null : day.plusDays(1).atStartOfDay(TimeConfig.SERVICE_ZONE).toInstant();
 		return listResponse(matchApplicationRepository.findScheduledByApplicantId(userId,
 				MatchApplicationStatus.ACTIVE, from, to, PageRequest.of(page, size)));
 	}
@@ -103,7 +105,7 @@ public class MatchApplicationService {
 				? matchApplicationRepository.findAllWithApplicantByMatchIdAndStatusIn(application.getMatch().getId(),
 						List.of(MatchApplicationStatus.CONFIRMED))
 				: List.of();
-		return MatchApplicationDetailResponse.of(application, confirmedApplications, clock.getZone());
+		return MatchApplicationDetailResponse.of(application, confirmedApplications);
 	}
 
 	@Transactional
@@ -125,7 +127,8 @@ public class MatchApplicationService {
 		validateHost(match.getHost().getId(), userId);
 		return HostMatchApplicationListResponse.of(match,
 				matchApplicationRepository.findAllWithApplicantByMatchIdAndStatusIn(matchId,
-						MatchApplicationStatus.ACTIVE), clock.getZone(), YearMonth.now(clock));
+						MatchApplicationStatus.ACTIVE),
+				YearMonth.from(clock.instant().atZone(TimeConfig.SERVICE_ZONE)));
 	}
 
 	@Transactional
@@ -134,7 +137,7 @@ public class MatchApplicationService {
 		Match match = matchRepository.findByIdForUpdate(matchId)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
 		MatchApplication application = findPendingApplicationForUpdate(matchId, applicationId);
-		LocalDateTime now = now();
+		Instant now = now();
 		validateRecruiting(match, now);
 		int recruitCount = application.getApplicantGender() == Gender.MALE
 				? match.getMaleRecruitCount() : match.getFemaleRecruitCount();
@@ -173,12 +176,12 @@ public class MatchApplicationService {
 		return application;
 	}
 
-	private LocalDateTime paymentDueAt(LocalDateTime acceptedAt, LocalDateTime finalDeadline) {
-		LocalDateTime dueAt = acceptedAt.plus(PAYMENT_DUE_DURATION);
+	private Instant paymentDueAt(Instant acceptedAt, Instant finalDeadline) {
+		Instant dueAt = acceptedAt.plus(PAYMENT_DUE_DURATION);
 		return dueAt.isBefore(finalDeadline) ? dueAt : finalDeadline;
 	}
 
-	private void validateRecruiting(Match match, LocalDateTime now) {
+	private void validateRecruiting(Match match, Instant now) {
 		if (match.getStatus() != MatchStatus.RECRUITING) {
 			throw new GeneralException(MatchErrorStatus.MATCH_NOT_RECRUITING);
 		}
@@ -190,7 +193,7 @@ public class MatchApplicationService {
 	private PageResponse<MyMatchApplicationListItemResponse> listResponse(Page<MatchApplication> applications) {
 		Map<Long, Long> counts = occupiedSeatCounts(applications.getContent());
 		return PageResponse.from(applications.map(
-				application -> MyMatchApplicationListItemResponse.of(application, counts, clock.getZone())));
+				application -> MyMatchApplicationListItemResponse.of(application, counts)));
 	}
 
 	private Map<Long, Long> occupiedSeatCounts(List<MatchApplication> applications) {
@@ -204,7 +207,7 @@ public class MatchApplicationService {
 				.collect(Collectors.toMap(MatchApplicationCount::getMatchId, MatchApplicationCount::getCount));
 	}
 
-	private LocalDateTime now() {
-		return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+	private Instant now() {
+		return clock.instant().truncatedTo(ChronoUnit.MICROS);
 	}
 }

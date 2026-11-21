@@ -21,6 +21,7 @@ import com.rallit.domain.user.service.UserRegistrationService;
 import com.rallit.support.IntegrationTestSupport;
 import java.time.Clock;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 class OnboardingIntegrationTest extends IntegrationTestSupport {
   private static final String PATH = "/api/v1/users/me/onboarding";
+  private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
   private static final String PAYLOAD = """
       {
         "nickname": "%s",
@@ -78,7 +80,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
         .andExpect(jsonPath("$.result.profile.ntrp").value("4.0+"))
         .andExpect(jsonPath("$.result.profile.tennisStartedOn").value("2024-11"))
         .andExpect(jsonPath("$.result.profile.experienceYears")
-            .value((int) ChronoUnit.YEARS.between(YearMonth.of(2024, 11), YearMonth.now(clock))))
+            .value((int) ChronoUnit.YEARS.between(YearMonth.of(2024, 11), currentMonth())))
         .andExpect(jsonPath("$.result.profile.sameGenderOnly").value(false))
         .andExpect(jsonPath("$.result.profile.activityAreaCodes[0]").value("11410"));
     submit(member, body.replace("\"11440\", \"11410\"", "\"11410\", \"11440\", \"11440\""))
@@ -107,7 +109,7 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
     submit(member, body.replace("2024-11", "1899-12"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("테니스 시작 시기를 확인해 주세요."));
-    submit(member, body.replace("2024-11", YearMonth.now(clock).plusMonths(1).toString()))
+    submit(member, body.replace("2024-11", currentMonth().plusMonths(1).toString()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("테니스 시작 시기를 확인해 주세요."));
     submit(member, body.replace("11440", "99999")).andExpect(status().isBadRequest());
@@ -221,4 +223,8 @@ class OnboardingIntegrationTest extends IntegrationTestSupport {
   }
 
   private record Member(long id, String nickname, String bearer) {}
+
+  private YearMonth currentMonth() {
+    return YearMonth.from(clock.instant().atZone(SEOUL));
+  }
 }

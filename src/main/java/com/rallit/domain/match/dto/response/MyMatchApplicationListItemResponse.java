@@ -1,8 +1,6 @@
 package com.rallit.domain.match.dto.response;
 
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -15,12 +13,11 @@ import com.rallit.domain.match.enums.MatchStatus;
 import com.rallit.domain.match.enums.MatchType;
 
 public record MyMatchApplicationListItemResponse(Long applicationId, MatchApplicationStatus applicationStatus,
-		LocalDateTime appliedAt, Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes, OffsetDateTime startsAt,
-		OffsetDateTime endsAt, String courtName, String courtAddress, String courtNumber,
+		Instant appliedAt, Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes, Instant startsAt,
+		Instant endsAt, String courtName, String courtAddress, String courtNumber,
 		Integer participationFee, int currentParticipantCount, int capacity) {
 
-	public static MyMatchApplicationListItemResponse of(MatchApplication application, Map<Long, Long> occupiedSeatCounts,
-			ZoneId zone) {
+	public static MyMatchApplicationListItemResponse of(MatchApplication application, Map<Long, Long> occupiedSeatCounts) {
 		Match match = application.getMatch();
 		CourtSlot courtSlot = match.getCourtSlot();
 		Court court = courtSlot.getCourt();
@@ -28,8 +25,7 @@ public record MyMatchApplicationListItemResponse(Long applicationId, MatchApplic
 		int capacity = 1 + match.getMaleRecruitCount() + match.getFemaleRecruitCount();
 		return new MyMatchApplicationListItemResponse(application.getId(), application.getStatus(), application.getCreatedAt(),
 				match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
-				courtSlot.getStartsAt().atZone(zone).toOffsetDateTime(),
-				courtSlot.getEndsAt().atZone(zone).toOffsetDateTime(), court.getName(), court.getAddress(),
+				courtSlot.getStartsAt(), courtSlot.getEndsAt(), court.getName(), court.getAddress(),
 				courtSlot.getCourtNumber(), match.getParticipationFee(), currentParticipantCount, capacity);
 	}
 }

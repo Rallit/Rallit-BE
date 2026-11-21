@@ -29,7 +29,9 @@ public class SwaggerConfig {
 				.info(new Info()
 						.title("Rallit API")
 						.description("토큰 재발급과 로그아웃에는 Refresh 쿠키, JSON 요청과 "
-								+ "`X-Requested-With: XMLHttpRequest` 헤더가 필요합니다.")
+								+ "`X-Requested-With: XMLHttpRequest` 헤더가 필요합니다. "
+								+ "응답 시각은 UTC ISO 8601(`2026-11-18T05:00:00Z`)이며, "
+								+ "날짜와 시간 입력은 서울 기준입니다.")
 						.version("0.0.1"))
 				.tags(List.of(
 						new Tag().name(AUTH_TAG).description("소셜 로그인, 토큰 재발급, 로그아웃"),

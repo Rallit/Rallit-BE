@@ -14,8 +14,9 @@ import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.jayway.jsonpath.JsonPath;
 import com.rallit.domain.auth.model.LoginTarget;
 import com.rallit.domain.auth.service.TokenSessionService;
 import com.rallit.domain.court.entity.Court;
@@ -65,6 +67,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest(properties = "RALLIT_ENV_FILE=.env.test-disabled")
 @AutoConfigureMockMvc
 class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
+
+	private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
 	@Autowired
 	private MockMvc mvc;
@@ -146,7 +150,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.match.courtName").value("장충테니스장"))
 				.andExpect(jsonPath("$.result.match.courtNumber").value("1"))
 				.andExpect(jsonPath("$.result.match.courtSlotStatus").doesNotExist())
-				.andExpect(jsonPath("$.result.match.startsAt").value(org.hamcrest.Matchers.endsWith("+09:00")))
+				.andExpect(jsonPath("$.result.match.startsAt").value(match.getCourtSlot().getStartsAt().toString()))
 				.andExpect(jsonPath("$.result.recruitment.capacity").value(4))
 				.andExpect(jsonPath("$.result.recruitment.currentParticipantCount").value(3))
 				.andExpect(jsonPath("$.result.recruitment.pendingCount").value(2))
@@ -159,7 +163,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.recruitment.recruitmentFilled").value(false))
 				.andExpect(jsonPath("$.result.pendingApplications.length()").value(2))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicationId").value(pendingMaleId))
-				.andExpect(jsonPath("$.result.pendingApplications[0].appliedAt").isString())
+				.andExpect(jsonPath("$.result.pendingApplications[0].appliedAt").value(org.hamcrest.Matchers.endsWith("Z")))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.userId").value(pendingMale.getId()))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.nickname")
 						.value(pendingMale.getNickname()))
@@ -167,7 +171,8 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.ntrp").value(3.0))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.ageGroup").value("TWENTIES"))
 				.andExpect(jsonPath("$.result.pendingApplications[0].applicant.experienceYears")
-						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON, YearMonth.now(clock))))
+						.value((int) ChronoUnit.YEARS.between(EntityFixtures.TENNIS_STARTED_ON,
+								YearMonth.from(clock.instant().atZone(SEOUL)))))
 				.andExpect(jsonPath("$.result.pendingApplications[1].applicationId").value(pendingFemaleId))
 				.andExpect(jsonPath("$.result.participants.length()").value(3))
 				.andExpect(jsonPath("$.result.participants[0].host").value(true))
@@ -203,35 +208,37 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host, 1, 2);
 		long applicationId = apply(activeUser(Gender.FEMALE), match);
-		LocalDateTime before = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
+		Instant before = clock.instant().truncatedTo(ChronoUnit.MICROS);
 
-		accept(host, match, applicationId)
+		String body = accept(host, match, applicationId)
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.applicationId").value(applicationId))
 				.andExpect(jsonPath("$.result.status").value("PAYMENT_PENDING"))
-				.andExpect(jsonPath("$.result.acceptedAt").isString())
-				.andExpect(jsonPath("$.result.paymentDueAt").isString());
+				.andReturn().getResponse().getContentAsString();
 
 		Map<String, Object> row = applicationRow(applicationId);
-		LocalDateTime acceptedAt = ((Timestamp) row.get("accepted_at")).toLocalDateTime();
+		Instant acceptedAt = ((Timestamp) row.get("accepted_at")).toInstant();
+		Instant paymentDueAt = ((Timestamp) row.get("payment_due_at")).toInstant();
 		assertThat(row.get("status")).isEqualTo("PAYMENT_PENDING");
-		assertThat(acceptedAt).isAfterOrEqualTo(before).isBeforeOrEqualTo(LocalDateTime.now(clock));
-		assertThat(((Timestamp) row.get("payment_due_at")).toLocalDateTime()).isEqualTo(acceptedAt.plusHours(24));
+		assertThat(acceptedAt).isAfterOrEqualTo(before).isBeforeOrEqualTo(clock.instant());
+		assertThat(paymentDueAt).isEqualTo(acceptedAt.plus(24, ChronoUnit.HOURS));
+		assertThat(Instant.parse(JsonPath.read(body, "$.result.acceptedAt"))).isEqualTo(acceptedAt);
+		assertThat(Instant.parse(JsonPath.read(body, "$.result.paymentDueAt"))).isEqualTo(paymentDueAt);
 		assertThat(matchStatus(match)).isEqualTo("RECRUITING");
 	}
 
 	@Test
 	void paymentDueAtDoesNotPassFinalDeadlineOneHourBeforeMatchStart() throws Exception {
 		User host = activeUser(Gender.MALE);
-		LocalDateTime startsAt = LocalDateTime.now(clock).plusHours(10).truncatedTo(ChronoUnit.SECONDS);
-		Match match = match(host, 1, 2, LocalDateTime.now(clock).plusHours(5), startsAt);
+		Instant startsAt = clock.instant().plus(10, ChronoUnit.HOURS).truncatedTo(ChronoUnit.SECONDS);
+		Match match = match(host, 1, 2, clock.instant().plus(5, ChronoUnit.HOURS), startsAt);
 		recruit(match);
 		long applicationId = apply(activeUser(Gender.FEMALE), match);
 
 		accept(host, match, applicationId).andExpect(status().isOk());
 
-		assertThat(((Timestamp) applicationRow(applicationId).get("payment_due_at")).toLocalDateTime())
-				.isEqualTo(startsAt.minusHours(1));
+		assertThat(((Timestamp) applicationRow(applicationId).get("payment_due_at")).toInstant())
+				.isEqualTo(startsAt.minus(1, ChronoUnit.HOURS));
 	}
 
 	@Test
@@ -382,13 +389,13 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void acceptRequiresRecruitingMatchBeforeDeadline() throws Exception {
 		User host = activeUser(Gender.MALE);
-		Match pendingApproval = match(host, 1, 2, LocalDateTime.now(clock).plusDays(1),
-				LocalDateTime.now(clock).plusDays(3));
+		Match pendingApproval = match(host, 1, 2, clock.instant().plus(1, ChronoUnit.DAYS),
+				clock.instant().plus(3, ChronoUnit.DAYS));
 		Match closed = recruitingMatch(host, 1, 2);
 		long pendingApprovalApplicationId = insertPendingApplication(pendingApproval, activeUser(Gender.FEMALE));
 		long closedApplicationId = apply(activeUser(Gender.FEMALE), closed);
 		jdbcTemplate.update("UPDATE match SET recruitment_deadline = ? WHERE id = ?",
-				LocalDateTime.now(clock).minusMinutes(1), closed.getId());
+				Timestamp.from(clock.instant().minus(1, ChronoUnit.MINUTES)), closed.getId());
 
 		accept(host, pendingApproval, pendingApprovalApplicationId)
 				.andExpect(status().isConflict())
@@ -410,11 +417,11 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 		User host = activeUser(Gender.MALE);
 		Match match = recruitingMatch(host, 1, 2);
 		long applicationId = apply(activeUser(Gender.FEMALE), match);
-		LocalDateTime startsAt = LocalDateTime.now(clock).plusMinutes(59);
+		Instant startsAt = clock.instant().plus(59, ChronoUnit.MINUTES);
 		jdbcTemplate.update("""
 				UPDATE court_slot SET starts_at = ?, ends_at = ?
 				WHERE id = (SELECT court_slot_id FROM match WHERE id = ?)
-				""", startsAt, startsAt.plusHours(2), match.getId());
+				""", Timestamp.from(startsAt), Timestamp.from(startsAt.plus(2, ChronoUnit.HOURS)), match.getId());
 
 		accept(host, match, applicationId)
 				.andExpect(status().isConflict())
@@ -605,8 +612,9 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 		Match match = recruitingMatch(host, 1, 2);
 		User applicant = activeUser(Gender.FEMALE);
 		long applicationId = apply(applicant, match);
-		LocalDateTime deadline = LocalDateTime.now(clock).plusSeconds(2);
-		jdbcTemplate.update("UPDATE match SET recruitment_deadline = ? WHERE id = ?", deadline, match.getId());
+		Instant deadline = clock.instant().plus(2, ChronoUnit.SECONDS);
+		jdbcTemplate.update("UPDATE match SET recruitment_deadline = ? WHERE id = ?", Timestamp.from(deadline),
+				match.getId());
 		CountDownLatch canceled = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
 
@@ -621,7 +629,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 		Future<Throwable> accepting = executor.submit(
 				() -> catchThrowable(() -> matchApplicationService.accept(host.getId(), match.getId(), applicationId)));
 		awaitBlockedOnLock();
-		Thread.sleep(Math.max(0, Duration.between(LocalDateTime.now(clock), deadline).toMillis()) + 50);
+		Thread.sleep(Math.max(0, Duration.between(clock.instant(), deadline).toMillis()) + 50);
 		release.countDown();
 		holder.get(30, TimeUnit.SECONDS);
 
@@ -671,14 +679,14 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	private Match recruitingMatch(User host, int maleRecruitCount, int femaleRecruitCount) {
-		Match match = match(host, maleRecruitCount, femaleRecruitCount, LocalDateTime.now(clock).plusDays(1),
-				LocalDateTime.now(clock).plusDays(3).truncatedTo(ChronoUnit.HOURS));
+		Match match = match(host, maleRecruitCount, femaleRecruitCount, clock.instant().plus(1, ChronoUnit.DAYS),
+				clock.instant().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS));
 		recruit(match);
 		return match;
 	}
 
-	private Match match(User host, int maleRecruitCount, int femaleRecruitCount, LocalDateTime recruitmentDeadline,
-			LocalDateTime startsAt) {
+	private Match match(User host, int maleRecruitCount, int femaleRecruitCount, Instant recruitmentDeadline,
+			Instant startsAt) {
 		Court court = courtRepository.save(EntityFixtures.court());
 		courtIds.add(court.getId());
 		CourtSlot courtSlot = courtSlotRepository.save(EntityFixtures.courtSlot(court, host, "1", startsAt));

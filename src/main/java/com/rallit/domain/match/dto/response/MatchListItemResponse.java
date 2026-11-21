@@ -1,8 +1,7 @@
 package com.rallit.domain.match.dto.response;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.time.Instant;
 import java.util.List;
 
 import com.rallit.domain.court.dto.CourtThumbnailResponse;
@@ -12,7 +11,7 @@ import com.rallit.domain.match.enums.MatchType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<MatchType> matchTypes,
-		OffsetDateTime startsAt, OffsetDateTime endsAt, String courtName,
+		Instant startsAt, Instant endsAt, String courtName,
 		@Schema(description = CourtThumbnailResponse.URL_DESCRIPTION + " 등록된 사진이 없으면 null입니다.",
 				types = {"string", "null"}) String courtThumbnailUrl,
 		Integer participationFee,
@@ -21,12 +20,12 @@ public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<
 		@Schema(description = "호스트와 결제 대기·참가 확정 인원을 합한 수") long currentParticipantCount,
 		@Schema(description = "호스트 1명과 남녀 모집 정원을 합한 수") int capacity) {
 
-	public static MatchListItemResponse from(Match match, long occupiedSeats, ZoneId zone) {
+	public static MatchListItemResponse from(Match match, long occupiedSeats) {
 		var slot = match.getCourtSlot();
 		var court = slot.getCourt();
 		String thumbnailUrl = court.getThumbnailImageKey() == null ? null : CourtThumbnailResponse.urlFor(court.getId());
 		return new MatchListItemResponse(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
-				slot.getStartsAt().atZone(zone).toOffsetDateTime(), slot.getEndsAt().atZone(zone).toOffsetDateTime(),
+				slot.getStartsAt(), slot.getEndsAt(),
 				court.getName(), thumbnailUrl, match.getParticipationFee(), match.getMinNtrp(), match.getMaxNtrp(),
 				1 + occupiedSeats, 1 + match.getMaleRecruitCount() + match.getFemaleRecruitCount());
 	}

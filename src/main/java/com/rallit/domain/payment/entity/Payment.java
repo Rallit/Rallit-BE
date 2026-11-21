@@ -1,6 +1,6 @@
 package com.rallit.domain.payment.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import com.rallit.domain.match.entity.MatchApplication;
@@ -54,9 +54,9 @@ public class Payment extends BaseEntity {
 	@Column(length = 50)
 	private String method;
 
-	private LocalDateTime approvedAt;
+	private Instant approvedAt;
 
-	private LocalDateTime processingStartedAt;
+	private Instant processingStartedAt;
 
 	private Payment(MatchApplication matchApplication, Integer amount) {
 		this.matchApplication = matchApplication;

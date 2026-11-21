@@ -1,6 +1,6 @@
 package com.rallit.domain.match.repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -34,18 +34,18 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 			join fetch m.courtSlot s
 			join fetch s.court
 			where a.applicant.id = :applicantId and a.status in :statuses
-			and s.startsAt >= :from and (cast(:to as LocalDateTime) is null or s.startsAt < :to)
+			and s.startsAt >= :from and (cast(:to as Instant) is null or s.startsAt < :to)
 			order by s.startsAt, a.id
 			""", countQuery = """
 			select count(a) from MatchApplication a
 			join a.match m
 			join m.courtSlot s
 			where a.applicant.id = :applicantId and a.status in :statuses
-			and s.startsAt >= :from and (cast(:to as LocalDateTime) is null or s.startsAt < :to)
+			and s.startsAt >= :from and (cast(:to as Instant) is null or s.startsAt < :to)
 			""")
 	Page<MatchApplication> findScheduledByApplicantId(@Param("applicantId") Long applicantId,
-			@Param("statuses") Collection<MatchApplicationStatus> statuses, @Param("from") LocalDateTime from,
-			@Param("to") LocalDateTime to, Pageable pageable);
+			@Param("statuses") Collection<MatchApplicationStatus> statuses, @Param("from") Instant from,
+			@Param("to") Instant to, Pageable pageable);
 
 	@Query(value = """
 			select a from MatchApplication a
