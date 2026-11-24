@@ -127,4 +127,10 @@ public class Match extends BaseEntity {
 			throw new InvalidMatchNtrpException();
 		}
 	}
+
+	public void cancel(String reason, Instant canceledAt) {
+		this.status = MatchStatus.CANCELED;
+		this.cancelReason = reason;
+		this.canceledAt = canceledAt;
+	}
 }

@@ -1,6 +1,7 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -73,6 +74,7 @@ import tools.jackson.databind.ObjectMapper;
 class MatchCreationIntegrationTest extends IntegrationTestSupport {
 
 	private static final String UPLOAD_URL = "https://image-test.s3.example.test/";
+	private static final String ADMIN_ORIGIN = "https://admin.rallit.co.kr";
 	private static final String EVIDENCE_PREFIX = "reservation-evidence/";
 	private static final int MAX_BYTES = ImageNormalizer.MAX_BYTES;
 
@@ -157,14 +159,18 @@ class MatchCreationIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches").header("Authorization", applicant.bearer()).param("date", date.toString())
 						.param("applicableOnly", "true"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.items[?(@.matchId == " + matchId + ")]").isNotEmpty());
+				.andExpect(jsonPath("$.result.items[?(@.matchId == " + matchId + ")].evidenceVerified").value(false));
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", applicant.bearer()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.canApply").value(true))
-				.andExpect(jsonPath("$.result.capacity").value(4));
+				.andExpect(jsonPath("$.result.capacity").value(4))
+				.andExpect(jsonPath("$.result.evidenceVerified").value(false));
 		apply(applicant, matchId).andExpect(status().isCreated());
 		hostApplications(host, matchId)
 				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.match.evidence.submitted").value(false))
+				.andExpect(jsonPath("$.result.match.evidence.reviewStatus").value("NOT_SUBMITTED"))
+				.andExpect(jsonPath("$.result.match.evidence.verified").value(false))
 				.andExpect(jsonPath("$.result.pendingApplications.length()").value(1));
 	}
 
@@ -206,8 +212,13 @@ class MatchCreationIntegrationTest extends IntegrationTestSupport {
 		Member viewer = member(Gender.FEMALE);
 		var detail = mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", viewer.bearer()))
 				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.evidenceVerified").value(false))
 				.andReturn().getResponse().getContentAsString();
 		assertThat(detail).doesNotContain(key, EVIDENCE_PREFIX);
+		hostApplications(host, matchId)
+				.andExpect(jsonPath("$.result.match.evidence.submitted").value(true))
+				.andExpect(jsonPath("$.result.match.evidence.reviewStatus").value("PENDING"))
+				.andExpect(jsonPath("$.result.match.evidence.reviewedAt", nullValue()));
 	}
 
 	@Test
@@ -424,6 +435,122 @@ class MatchCreationIntegrationTest extends IntegrationTestSupport {
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM court_slot WHERE court_id = ?", Long.class, courtId)).isZero();
 	}
 
+	@Test
+	void approvingEvidenceAddsTheBadgeWithoutChangingRecruitment() throws Exception {
+		Member host = member(Gender.MALE);
+		String admin = admin();
+		long courtId = court();
+		var uploadImage = png(40, 40);
+		var upload = issueEvidence(host, uploadImage);
+		stage(upload, uploadImage);
+		long matchId = matchId(create(host, body(courtId, "14:00", "16:00", upload, recruitment -> { })));
+		long slotId = slotId(matchId);
+		String key = evidenceKey(matchId);
+
+		admin(get("/api/v1/admin/court-slots").param("size", "50"), admin)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items[?(@.courtSlotId == " + slotId + ")].registrant.userId")
+						.value((int) host.id()))
+				.andExpect(jsonPath("$.result.items[?(@.courtSlotId == " + slotId + ")].evidence.reviewStatus")
+						.value("PENDING"));
+		var signed = new PresignedImageStorage.SignedRead(UPLOAD_URL + EVIDENCE_PREFIX + key + "?X-Amz-Signature=test",
+				clock.instant().plus(presignedProperties.downloadLifetime()));
+		when(presigned.signRead(EVIDENCE_PREFIX, key)).thenReturn(signed);
+		admin(get("/api/v1/admin/court-slots/{id}/evidence/url", slotId), admin)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.url").value(signed.url()));
+
+		admin(post("/api/v1/admin/court-slots/{id}/evidence/approve", slotId), admin)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.courtSlotId").value(slotId))
+				.andExpect(jsonPath("$.result.evidence.reviewStatus").value("APPROVED"))
+				.andExpect(jsonPath("$.result.evidence.verified").value(true))
+				.andExpect(jsonPath("$.result.evidence.reviewedAt").isString());
+		assertThat(matchStatus(matchId)).isEqualTo("RECRUITING");
+		Member viewer = member(Gender.FEMALE);
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", viewer.bearer()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.matchStatus").value("RECRUITING"))
+				.andExpect(jsonPath("$.result.evidenceVerified").value(true));
+		hostApplications(host, matchId)
+				.andExpect(jsonPath("$.result.match.status").value("RECRUITING"))
+				.andExpect(jsonPath("$.result.match.evidence.verified").value(true))
+				.andExpect(jsonPath("$.result.match.evidence.reviewedAt").isString());
+
+		admin(post("/api/v1/admin/court-slots/{id}/evidence/approve", slotId), admin)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("EVIDENCE_REVIEW_NOT_PENDING"));
+		rejectEvidence(admin, slotId, "사유").andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("EVIDENCE_REVIEW_NOT_PENDING"));
+	}
+
+	@Test
+	void rejectingEvidenceCancelsTheMatchAndReleasesTheReservedTime() throws Exception {
+		Member host = member(Gender.MALE);
+		String admin = admin();
+		long courtId = court();
+		var uploadImage = png(40, 40);
+		var upload = issueEvidence(host, uploadImage);
+		stage(upload, uploadImage);
+		long matchId = matchId(create(host, body(courtId, "14:00", "16:00", upload, recruitment -> { })));
+		long slotId = slotId(matchId);
+
+		rejectEvidence(admin, slotId, " ").andExpect(status().isBadRequest());
+		rejectEvidence(admin, slotId, " 예약자명이 보이지 않습니다. ")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.evidence.reviewStatus").value("REJECTED"))
+				.andExpect(jsonPath("$.result.evidence.verified").value(false))
+				.andExpect(jsonPath("$.result.evidence.rejectionReason").value("예약자명이 보이지 않습니다."));
+
+		assertThat(jdbc.queryForMap("""
+				SELECT status, cancel_reason, canceled_at IS NOT NULL AS canceled FROM match WHERE id = ?
+				""", matchId)).containsEntry("status", "CANCELED").containsEntry("cancel_reason", "예약자명이 보이지 않습니다.")
+				.containsEntry("canceled", true);
+		Member applicant = member(Gender.FEMALE);
+		mvc.perform(get("/api/v1/matches").header("Authorization", applicant.bearer()).param("date", date.toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.items[?(@.matchId == " + matchId + ")]").isEmpty());
+		apply(applicant, matchId).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("MATCH_NOT_RECRUITING"));
+		hostApplications(host, matchId)
+				.andExpect(jsonPath("$.result.match.status").value("CANCELED"))
+				.andExpect(jsonPath("$.result.match.evidence.reviewStatus").value("REJECTED"))
+				.andExpect(jsonPath("$.result.match.evidence.rejectionReason").value("예약자명이 보이지 않습니다."));
+		create(host, body(courtId, "14:00", "16:00", null, recruitment -> { })).andExpect(status().isCreated());
+	}
+
+	@Test
+	void restrictsEvidenceReviewToAdminsAndSubmittedEvidence() throws Exception {
+		Member host = member(Gender.MALE);
+		long matchId = matchId(create(host, body(court(), "14:00", "16:00", null, recruitment -> { })));
+		long slotId = slotId(matchId);
+		String admin = admin();
+
+		mvc.perform(post("/api/v1/admin/court-slots/{id}/evidence/approve", slotId)).andExpect(status().isForbidden());
+		admin(post("/api/v1/admin/court-slots/{id}/evidence/approve", slotId), host.bearer())
+				.andExpect(status().isUnauthorized());
+		admin(get("/api/v1/admin/court-slots"), host.bearer()).andExpect(status().isUnauthorized());
+		Member demoted = member(Gender.FEMALE);
+		jdbc.update("UPDATE users SET role = 'ADMIN' WHERE id = ?", demoted.id());
+		String demotedAdmin = bearer(demoted.id(), LoginTarget.ADMIN);
+		jdbc.update("UPDATE users SET role = 'USER' WHERE id = ?", demoted.id());
+		admin(get("/api/v1/admin/court-slots"), demotedAdmin).andExpect(status().isForbidden());
+		admin(post("/api/v1/admin/court-slots/{id}/evidence/approve", slotId), demotedAdmin)
+				.andExpect(status().isForbidden());
+
+		admin(get("/api/v1/admin/court-slots/{id}/evidence/url", slotId), admin)
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("EVIDENCE_NOT_SUBMITTED"));
+		admin(post("/api/v1/admin/court-slots/{id}/evidence/approve", slotId), admin)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("EVIDENCE_REVIEW_NOT_PENDING"));
+		admin(post("/api/v1/admin/court-slots/{id}/evidence/approve", Long.MAX_VALUE), admin)
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.code").value("COURT_SLOT_NOT_FOUND"));
+		assertThat(jdbc.queryForObject("SELECT evidence_review_status FROM court_slot WHERE id = ?", String.class,
+				slotId)).isEqualTo("NOT_SUBMITTED");
+	}
+
 	private Map<String, Object> body(long courtId, String start, String end, Upload evidence,
 			Consumer<Map<String, Object>> recruitmentChanges) {
 		var reservation = new LinkedHashMap<String, Object>();
@@ -476,6 +603,16 @@ class MatchCreationIntegrationTest extends IntegrationTestSupport {
 				.header("Authorization", host.bearer()));
 	}
 
+	private ResultActions rejectEvidence(String admin, long slotId, String reason) throws Exception {
+		return admin(post("/api/v1/admin/court-slots/{id}/evidence/reject", slotId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(json.writeValueAsString(Map.of("reason", reason))), admin);
+	}
+
+	private ResultActions admin(MockHttpServletRequestBuilder request, String bearer) throws Exception {
+		return mvc.perform(request.header("Origin", ADMIN_ORIGIN).header("Authorization", bearer));
+	}
+
 	private Upload issueEvidence(Member host, byte[] contents) throws Exception {
 		return issue("/api/v1/host/reservation-evidence/uploads", host, contents);
 	}
@@ -510,6 +647,10 @@ class MatchCreationIntegrationTest extends IntegrationTestSupport {
 		return jdbc.queryForObject("SELECT court_slot_id FROM match WHERE id = ?", Long.class, matchId);
 	}
 
+	private String matchStatus(long matchId) {
+		return jdbc.queryForObject("SELECT status FROM match WHERE id = ?", String.class, matchId);
+	}
+
 	private long court() {
 		Court court = courts.save(EntityFixtures.court());
 		courtIds.add(court.getId());
@@ -521,6 +662,14 @@ class MatchCreationIntegrationTest extends IntegrationTestSupport {
 				gender));
 		userIds.add(user.getId());
 		return new Member(user.getId(), bearer(user.getId(), LoginTarget.SERVICE));
+	}
+
+	private String admin() {
+		var user = users.save(EntityFixtures.user(entityManager, "운영" + UUID.randomUUID().toString().substring(0, 8),
+				Gender.FEMALE));
+		userIds.add(user.getId());
+		jdbc.update("UPDATE users SET role = 'ADMIN' WHERE id = ?", user.getId());
+		return bearer(user.getId(), LoginTarget.ADMIN);
 	}
 
 	private String bearer(long userId, LoginTarget target) {

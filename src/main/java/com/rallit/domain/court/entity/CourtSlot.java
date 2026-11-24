@@ -3,7 +3,9 @@ package com.rallit.domain.court.entity;
 import java.time.Instant;
 
 import com.rallit.domain.court.enums.EvidenceReviewStatus;
+import com.rallit.domain.court.exception.CourtErrorStatus;
 import com.rallit.domain.user.entity.User;
+import com.rallit.global.apiPayload.exception.GeneralException;
 import com.rallit.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -75,5 +77,24 @@ public class CourtSlot extends BaseEntity {
 
 	public boolean isEvidenceVerified() {
 		return evidenceReviewStatus == EvidenceReviewStatus.APPROVED;
+	}
+
+	public void approveEvidence(Instant now) {
+		requirePendingEvidence();
+		this.evidenceReviewStatus = EvidenceReviewStatus.APPROVED;
+		this.reviewedAt = now;
+	}
+
+	public void rejectEvidence(String reason, Instant now) {
+		requirePendingEvidence();
+		this.evidenceReviewStatus = EvidenceReviewStatus.REJECTED;
+		this.rejectionReason = reason;
+		this.reviewedAt = now;
+	}
+
+	private void requirePendingEvidence() {
+		if (evidenceReviewStatus != EvidenceReviewStatus.PENDING) {
+			throw new GeneralException(CourtErrorStatus.EVIDENCE_REVIEW_NOT_PENDING);
+		}
 	}
 }

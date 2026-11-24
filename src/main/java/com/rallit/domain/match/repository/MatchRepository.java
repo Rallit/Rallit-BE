@@ -162,6 +162,10 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 	@Query("select m from Match m where m.id = :id")
 	Optional<Match> findByIdForUpdate(@Param("id") Long id);
 
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select m from Match m where m.courtSlot.id = :courtSlotId")
+	Optional<Match> findByCourtSlotIdForUpdate(@Param("courtSlotId") Long courtSlotId);
+
 	@Query("""
 			select m from Match m
 			join fetch m.host

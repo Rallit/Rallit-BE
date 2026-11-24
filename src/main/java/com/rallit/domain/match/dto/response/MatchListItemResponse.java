@@ -18,7 +18,9 @@ public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<
 		@Schema(description = "모집 NTRP 하한. 미설정이면 null", types = {"number", "null"}) BigDecimal minNtrp,
 		@Schema(description = "모집 NTRP 상한. 미설정이면 null", types = {"number", "null"}) BigDecimal maxNtrp,
 		@Schema(description = "호스트와 결제 대기·참가 확정 인원을 합한 수") long currentParticipantCount,
-		@Schema(description = "호스트 1명과 남녀 모집 정원을 합한 수") int capacity) {
+		@Schema(description = "호스트 1명과 남녀 모집 정원을 합한 수") int capacity,
+		@Schema(description = "운영자가 코트 예약 증빙을 승인했으면 true. 증빙 미제출·검수 대기·반려는 false")
+		boolean evidenceVerified) {
 
 	public static MatchListItemResponse from(Match match, long occupiedSeats) {
 		var slot = match.getCourtSlot();
@@ -27,6 +29,7 @@ public record MatchListItemResponse(Long matchId, MatchStatus matchStatus, List<
 		return new MatchListItemResponse(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
 				slot.getStartsAt(), slot.getEndsAt(),
 				court.getName(), thumbnailUrl, match.getParticipationFee(), match.getMinNtrp(), match.getMaxNtrp(),
-				1 + occupiedSeats, 1 + match.getMaleRecruitCount() + match.getFemaleRecruitCount());
+				1 + occupiedSeats, 1 + match.getMaleRecruitCount() + match.getFemaleRecruitCount(),
+				slot.isEvidenceVerified());
 	}
 }

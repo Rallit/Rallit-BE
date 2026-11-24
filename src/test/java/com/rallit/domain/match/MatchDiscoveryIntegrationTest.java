@@ -1,6 +1,7 @@
 package com.rallit.domain.match;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -288,10 +289,15 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
 						.param("applicableOnly", "true"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.totalElements").value(3));
+				.andExpect(jsonPath("$.result.totalElements").value(3))
+				.andExpect(jsonPath("$.result.items[*].evidenceVerified", contains(false, true, false)));
 		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.result.canApply").value(true));
+				.andExpect(jsonPath("$.result.canApply").value(true))
+				.andExpect(jsonPath("$.result.evidenceVerified").value(false));
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.rallyId()).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.evidenceVerified").value(true));
 
 		jdbc.update("update match set status = 'CANCELED' where id = ?", matches.singlesId());
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
