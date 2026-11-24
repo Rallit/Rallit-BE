@@ -22,7 +22,8 @@ final class MatchDiscoveryExamples {
 			      "minNtrp": 2.5,
 			      "maxNtrp": 3.5,
 			      "currentParticipantCount": 1,
-			      "capacity": 2
+			      "capacity": 2,
+			      "evidenceVerified": true
 			    }],
 			    "page": 0,
 			    "size": 20,
@@ -85,7 +86,8 @@ final class MatchDiscoveryExamples {
 			      "nickname": "랠릿조회데모호스트",
 			      "experienceYears": 2,
 			      "profileImageUrl": null
-			    }
+			    },
+			    "evidenceVerified": true
 			  }
 			}
 			""";

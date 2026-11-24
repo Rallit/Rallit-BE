@@ -143,6 +143,12 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/admin/courts/{courtId}/thumbnail/uploads",
                         "/api/v1/admin/courts/{courtId}/thumbnail/uploads/{uploadId}/complete")
                     .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/court-slots",
+                        "/api/v1/admin/court-slots/{courtSlotId}/evidence/url")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/admin/court-slots/{courtSlotId}/evidence/approve",
+                        "/api/v1/admin/court-slots/{courtSlotId}/evidence/reject")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .denyAll())
         .build();

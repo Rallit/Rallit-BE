@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.rallit.domain.court.dto.ReservationEvidenceResponse;
 import com.rallit.domain.court.entity.CourtSlot;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.entity.MatchApplication;
@@ -44,13 +45,16 @@ public record HostMatchApplicationListResponse(MatchInfo match, RecruitmentInfo 
 
 	public record MatchInfo(Long matchId, MatchStatus status, List<MatchType> matchTypes, Instant startsAt,
 			Instant endsAt, Instant recruitmentDeadline, Integer participationFee, String courtName,
-			@Schema(description = "코트 번호", example = "3") String courtNumber) {
+			@Schema(description = "코트 번호", example = "3") String courtNumber,
+			@Schema(description = "코트 예약 증빙 검수 현황. 원본 증빙 이미지는 포함하지 않습니다.")
+			ReservationEvidenceResponse evidence) {
 
 		private static MatchInfo from(Match match) {
 			CourtSlot courtSlot = match.getCourtSlot();
 			return new MatchInfo(match.getId(), match.getStatus(), match.getMatchTypes().stream().sorted().toList(),
 					courtSlot.getStartsAt(), courtSlot.getEndsAt(), match.getRecruitmentDeadline(),
-					match.getParticipationFee(), courtSlot.getCourt().getName(), courtSlot.getCourtNumber());
+					match.getParticipationFee(), courtSlot.getCourt().getName(), courtSlot.getCourtNumber(),
+					ReservationEvidenceResponse.from(courtSlot));
 		}
 	}
 

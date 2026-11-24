@@ -19,7 +19,14 @@ final class HostMatchApplicationExamples {
 			      "recruitmentDeadline": "2026-11-13T09:00:00Z",
 			      "participationFee": 3500,
 			      "courtName": "장충테니스장",
-			      "courtNumber": "3"
+			      "courtNumber": "3",
+			      "evidence": {
+			        "submitted": true,
+			        "reviewStatus": "PENDING",
+			        "verified": false,
+			        "reviewedAt": null,
+			        "rejectionReason": null
+			      }
 			    },
 			    "recruitment": {
 			      "capacity": 4,

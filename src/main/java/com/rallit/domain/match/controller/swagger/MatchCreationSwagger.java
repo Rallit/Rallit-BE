@@ -56,7 +56,8 @@ public interface MatchCreationSwagger {
 					- 모집 마감은 기존 신청 기한과 같은 경기 시작 1시간 전으로 정합니다.
 					- 예약 날짜는 오늘(서울 기준)부터 14일 뒤까지 선택할 수 있습니다.
 					- 예약 증빙은 선택 사항입니다. 증빙을 첨부하면 `PENDING`, 생략하면 `NOT_SUBMITTED`로 저장하며,
-					  매치는 바로 `RECRUITING` 상태로 모집합니다.
+					  매치는 바로 `RECRUITING` 상태로 모집합니다. 운영자가 증빙을 반려하면 매치는 `CANCELED`가 되고,
+					  호스트는 매치를 새로 개설해야 합니다.
 					- 같은 코트·코트 번호에 겹치는 시간대 예약이 있으면 409를 반환합니다. 중복 요청도 같은 방식으로 막습니다.
 					""")
 	@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", useReturnTypeSchema = true)

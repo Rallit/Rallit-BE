@@ -26,7 +26,9 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 				+ "GENDER_NOT_RECRUITED, RECRUITMENT_FULL, APPLICATION_DUPLICATED 중 하나입니다.",
 				types = {"string", "null"}) String applicationBlockReason,
 		Integer maleRecruitCount, Integer femaleRecruitCount,
-		List<AgeGroup> preferredAgeGroups, CourtInfo court, HostInfo host) {
+		List<AgeGroup> preferredAgeGroups, CourtInfo court, HostInfo host,
+		@Schema(description = "운영자가 코트 예약 증빙을 승인했으면 true. 증빙 미제출·검수 대기·반려는 false")
+		boolean evidenceVerified) {
 
 	public static MatchDetailResponse from(Match match, long occupiedSeats, boolean recruitmentOpen,
 			BaseErrorCode blockReason, YearMonth currentMonth) {
@@ -44,7 +46,8 @@ public record MatchDetailResponse(Long matchId, MatchStatus matchStatus, List<Ma
 						court.getLatitude(), court.getLongitude(), court.isHasParking(), court.isHasShower(),
 						court.getFacilityNotes(), CourtFacilityResponse.from(court), card.courtThumbnailUrl()),
 				new HostInfo(host.getId(), host.getNickname(), host.experienceYears(currentMonth),
-						host.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(host.getId())));
+						host.getProfileImageKey() == null ? null : ProfileImageResponse.urlFor(host.getId())),
+				card.evidenceVerified());
 	}
 
 	public record CourtInfo(Long courtId, String name, String address, String courtNumber, BigDecimal latitude,
