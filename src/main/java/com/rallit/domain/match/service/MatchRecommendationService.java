@@ -15,7 +15,6 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.rallit.domain.court.enums.CourtSlotStatus;
 import com.rallit.domain.match.dto.request.MatchDate;
 import com.rallit.domain.match.dto.request.MatchSearchRequest;
 import com.rallit.domain.match.dto.response.MatchRecommendationResponse;
@@ -66,7 +65,7 @@ public class MatchRecommendationService {
 		if (areaCodes.isEmpty() || timeSlots.isEmpty() || types.isEmpty()) {
 			result = Page.empty(pageable);
 		} else {
-			result = matches.findHomeRecommendations(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
+			result = matches.findHomeRecommendations(MatchStatus.RECRUITING, now(),
 					false, types, userId, user.getGender(), MatchApplicationStatus.ACTIVE, user.isSameGenderOnly(),
 					areaCodes, timeSlots, user.getNtrp(), pageable);
 		}
@@ -129,7 +128,7 @@ public class MatchRecommendationService {
 		var lastWindow = windows.lastEntry().getValue();
 		var endMinute = Duration.between(firstWindow.dayStart(), firstWindow.expandedTo()).toMinutes();
 		var startTime = LocalTime.ofInstant(firstWindow.expandedFrom(), TimeConfig.SERVICE_ZONE);
-		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now,
+		return matches.findSearchCandidates(MatchStatus.RECRUITING, now,
 				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
 				startTime, endMinute, types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
 				request.sameGenderOnly(), request.minNtrp(), request.maxNtrp());

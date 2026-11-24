@@ -21,7 +21,7 @@ public class ImageUpload {
   @Id private UUID id;
   @Column(nullable = false) private Long ownerId;
   @Column(nullable = false) private Long targetId;
-  @Column(nullable = false, length = 16)
+  @Column(nullable = false, length = 30)
   @Enumerated(EnumType.STRING)
   private ImageUploadPurpose purpose;
   @Column(nullable = false, length = 32) private String contentType;

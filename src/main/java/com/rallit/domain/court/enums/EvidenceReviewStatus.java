@@ -1,6 +1,7 @@
 package com.rallit.domain.court.enums;
 
-public enum CourtSlotStatus {
+public enum EvidenceReviewStatus {
+	NOT_SUBMITTED,
 	PENDING,
 	APPROVED,
 	REJECTED

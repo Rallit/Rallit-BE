@@ -184,8 +184,6 @@ class MatchTimeZoneIntegrationTest extends IntegrationTestSupport {
 				.recruitmentDeadline(start.minus(Duration.ofHours(1))).build();
 		entityManager.persist(match);
 		entityManager.flush();
-		jdbc.update("update court_slot set status = 'APPROVED' where id = ?", slot.getId());
-		jdbc.update("update match set status = 'RECRUITING' where id = ?", match.getId());
 		entityManager.clear();
 		return match.getId();
 	}

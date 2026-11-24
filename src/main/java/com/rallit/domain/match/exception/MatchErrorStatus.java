@@ -23,7 +23,15 @@ public enum MatchErrorStatus implements BaseErrorCode {
 	MATCH_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "매칭 요청을 찾을 수 없습니다."),
 	MATCH_REQUEST_LIMIT_REACHED(HttpStatus.CONFLICT, "활성 매칭 요청을 최대 3개까지 저장할 수 있습니다."),
 	MATCH_NOT_RECRUITING(HttpStatus.CONFLICT, "모집 중인 매치가 아닙니다."),
-	MATCH_RECRUITMENT_CLOSED(HttpStatus.CONFLICT, "모집 기한이 지난 매치입니다.");
+	MATCH_RECRUITMENT_CLOSED(HttpStatus.CONFLICT, "모집 기한이 지난 매치입니다."),
+	MATCH_CREATE_ONBOARDING_REQUIRED(MATCH_ONBOARDING_REQUIRED, "온보딩을 완료해야 매치를 개설할 수 있습니다."),
+	MATCH_INVALID_SCHEDULE(HttpStatus.BAD_REQUEST, "예약 종료 시각은 시작 시각보다 늦어야 합니다."),
+	MATCH_RESERVATION_DATE_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "예약 날짜는 오늘부터 14일 뒤까지 선택해 주세요."),
+	MATCH_START_TOO_SOON(HttpStatus.BAD_REQUEST, "경기 시작 1시간 전까지 참가자를 모집할 수 있는 예약만 등록할 수 있습니다."),
+	MATCH_INVALID_RECRUIT_COUNT(HttpStatus.BAD_REQUEST, "호스트를 포함한 전체 인원은 2명 이상 6명 이하로 모집해 주세요."),
+	MATCH_SAME_GENDER_CONFLICT(HttpStatus.BAD_REQUEST,
+			"동성만 모집할 때는 호스트와 같은 성별만 모집할 수 있으며 혼합복식을 선택할 수 없습니다."),
+	MATCH_TYPE_GENDER_CONFLICT(HttpStatus.BAD_REQUEST, "선택한 경기 방식과 호스트를 포함한 성별 구성이 맞지 않습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String message;

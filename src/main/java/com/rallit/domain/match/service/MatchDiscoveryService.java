@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.rallit.domain.court.enums.CourtSlotStatus;
 import com.rallit.domain.match.dto.response.MatchDetailResponse;
 import com.rallit.domain.match.dto.response.MatchListItemResponse;
 import com.rallit.domain.match.entity.Match;
@@ -63,11 +62,11 @@ public class MatchDiscoveryService {
 		Page<Match> result;
 		if (applicableOnly) {
 			var applicant = users.findById(userId).orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
-			result = matches.findApplicableMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
+			result = matches.findApplicableMatches(MatchStatus.RECRUITING, now, from,
 					before, endsBy, allTypes, types, userId, applicant.getGender(), MatchApplicationStatus.ACTIVE,
 					pageable);
 		} else {
-			result = matches.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
+			result = matches.findRecruitingMatches(MatchStatus.RECRUITING, now, from,
 					before, endsBy, allTypes, types, pageable);
 		}
 		MatchPageRange.requireInRange(result);
@@ -78,7 +77,7 @@ public class MatchDiscoveryService {
 
 	public MatchDetailResponse detail(Long matchId, Long userId) {
 		var now = now();
-		var match = matches.findDiscoveryDetail(matchId, CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now)
+		var match = matches.findDiscoveryDetail(matchId, MatchStatus.RECRUITING, now)
 				.orElseThrow(() -> new GeneralException(MatchErrorStatus.MATCH_NOT_FOUND));
 		var applicant = users.findById(userId).orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
 		var reason = eligibility.blockReason(match, applicant, now);

@@ -32,7 +32,7 @@ public interface MatchDiscoverySwagger {
 
 	@Operation(summary = "모집 중 매치 목록",
 			description = """
-					승인된 코트 슬롯의 매치 중 모집 마감과 최종 마감(경기 시작 1시간 전)이 모두 지나지 않은 매치를 조회합니다.
+					모집 중인 매치 중 모집 마감과 최종 마감(경기 시작 1시간 전)이 모두 지나지 않은 매치를 조회합니다.
 
 					- 경기 시작 시각이 빠른 순으로 정렬합니다. 시작 시각이 같으면 매치 ID가 작은 순으로 정렬합니다.
 					- 날짜와 시간 조건은 서울 기준이고, 응답 시각은 UTC(`2026-11-15T05:00:00Z`)입니다.
@@ -107,7 +107,7 @@ public interface MatchDiscoverySwagger {
 							schema = @Schema(implementation = ApiResponse.class),
 							examples = @ExampleObject(name = "잘못된 입력", value = MatchDiscoveryExamples.BAD_REQUEST))),
 			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
-					description = "매치가 없거나 승인 슬롯의 모집 매치가 아니거나 이미 경기가 시작됐습니다.",
+					description = "매치가 없거나 모집 중인 매치가 아니거나 이미 경기가 시작됐습니다.",
 					content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 							schema = @Schema(implementation = ApiResponse.class),
 							examples = @ExampleObject(name = "조회 불가", value = MatchDiscoveryExamples.MATCH_NOT_FOUND)))

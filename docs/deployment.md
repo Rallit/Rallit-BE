@@ -102,7 +102,8 @@ chmod 600 .env
 | `REDIS_PASSWORD`, `REDIS_DATABASE` | Redis 인증 비밀번호와 논리 DB 번호. 앱 접속 주소는 Compose의 `redis:6379`로 고정 |
 | `REDIS_MEM_LIMIT`, `REDIS_MAXMEMORY` | 컨테이너 한도와 Redis 데이터 상한 |
 | `JWT_SERVICE_KEY`, `JWT_ADMIN_KEY` | 일반·운영자 인증용 독립된 서명 키 |
-| `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI` | 카카오 앱의 키 및 BE 콜백. Client Secret 활성화 앱은 해당 값 필수 |
+| `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI` | 카카오 앱의 키 및 BE 콜백. Client Secret 활성화 앱은 해당 값 필수. 코트 검색(카카오 로컬)도 같은 REST API 키를 사용하며, 카카오 개발자 콘솔에서 카카오맵 사용을 활성화해야 함 |
+| `KAKAO_LOCAL_REST_API_KEY`, `KAKAO_LOCAL_REQUESTS_PER_MINUTE` | 선택. 코트 검색에 별도 키를 쓸 때 지정하고, 회원별 분당 검색 한도(기본 30)를 조정 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google OAuth 클라이언트 ID, 비밀 키 및 BE 콜백 주소를 모두 입력 |
 | `FRONTEND_CALLBACK_URL`, `ADMIN_FRONTEND_CALLBACK_URL` | 배포된 일반·운영자 FE의 로그인 완료 주소 |
 | `SERVICE_ORIGINS`, `ADMIN_ORIGINS` | 배포된 FE의 정확한 Origin. 여러 개면 쉼표로 구분 |
@@ -187,14 +188,14 @@ flock -w 600 .deploy.lock bash deploy.sh <이미지>:<이전 태그>
 
 ## 5. S3 이미지 저장소
 
-프로필 사진과 코트 대표 사진은 S3에 저장합니다. 브라우저는 Presigned POST 폼으로 업로드하고 만료형 Presigned GET URL로 조회합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
+프로필 사진, 코트 대표 사진, 코트 예약 증빙 사진은 S3에 저장합니다. 브라우저는 Presigned POST 폼으로 업로드하고 만료형 Presigned GET URL로 조회합니다. 실제 버킷 이름, 계정 ID, 액세스 키, 서명된 URL은 문서·이슈·PR에 남기지 않습니다.
 
 ### 사전 준비
 
 | 항목 | 내용 |
 | --- | --- |
-| 버킷 | 서울 리전, 퍼블릭 액세스 차단. 최종 사진은 `profile-images/`와 `court-thumbnails/`에 저장하고 임시 경로 `image-uploads/`에는 수명 주기 규칙을 설정 |
-| IAM 역할 | 이미지 버킷에 `s3:ListBucket`을 부여하고, 세 접두사에 필요한 객체 읽기·쓰기·삭제 권한을 EC2 앱 역할에 부여 |
+| 버킷 | 서울 리전, 퍼블릭 액세스 차단. 최종 사진은 `profile-images/`, `court-thumbnails/`, `reservation-evidence/`에 저장하고 임시 경로 `image-uploads/`에는 수명 주기 규칙을 설정 |
+| IAM 역할 | 이미지 버킷에 `s3:ListBucket`을 부여하고, 네 접두사에 필요한 객체 읽기·쓰기·삭제 권한을 EC2 앱 역할에 부여 |
 | CORS | 버킷에서 일반·운영자 프론트 Origin과 브라우저의 `POST` 업로드, `GET` 조회를 허용 |
 
 ### 환경변수

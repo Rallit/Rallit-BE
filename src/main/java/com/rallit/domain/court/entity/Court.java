@@ -62,9 +62,13 @@ public class Court extends BaseEntity {
 	@Column(length = 500)
 	private String thumbnailImageKey;
 
+	@Column(length = 30, unique = true)
+	private String kakaoPlaceId;
+
 	@Builder
 	private Court(String name, String address, BigDecimal latitude, BigDecimal longitude, Area area, boolean hasParking,
-			boolean hasShower, String facilityNotes, String parkingNote, String showerNote, String thumbnailImageKey) {
+			boolean hasShower, String facilityNotes, String parkingNote, String showerNote, String thumbnailImageKey,
+			String kakaoPlaceId) {
 		this.name = name;
 		this.address = address;
 		this.latitude = latitude;
@@ -76,6 +80,7 @@ public class Court extends BaseEntity {
 		this.parkingNote = parkingNote;
 		this.showerNote = showerNote;
 		this.thumbnailImageKey = thumbnailImageKey;
+		this.kakaoPlaceId = kakaoPlaceId;
 	}
 
 	public String replaceThumbnail(String key) {

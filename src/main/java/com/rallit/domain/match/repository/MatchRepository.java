@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-import com.rallit.domain.court.enums.CourtSlotStatus;
 import com.rallit.domain.match.entity.Match;
 import com.rallit.domain.match.enums.MatchApplicationStatus;
 import com.rallit.domain.match.enums.MatchStatus;
@@ -37,7 +36,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
 	// Keep the final deadline aligned with MatchApplicationEligibility.finalDeadline.
 	String RECRUITING_FILTER = """
-			where s.status = :slotStatus and m.status = :matchStatus
+			where m.status = :matchStatus
 			and s.startsAt > timestampadd(hour, 1, :now) and m.recruitmentDeadline > :now
 			""";
 
@@ -94,7 +93,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch s.court
 			""" + DISCOVERY_FILTER + "order by s.startsAt, m.id",
 			countQuery = "select count(m) from Match m join m.courtSlot s " + DISCOVERY_FILTER)
-	Page<Match> findRecruitingMatches(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
+	Page<Match> findRecruitingMatches(MatchStatus matchStatus, Instant now,
 			Instant from, Instant before, Instant endsBy, boolean allTypes,
 			Collection<MatchType> types, Pageable pageable);
 
@@ -104,7 +103,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch s.court
 			""" + DISCOVERY_FILTER + APPLICANT_FILTER + "order by s.startsAt, m.id",
 			countQuery = "select count(m) from Match m join m.courtSlot s " + DISCOVERY_FILTER + APPLICANT_FILTER)
-	Page<Match> findApplicableMatches(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
+	Page<Match> findApplicableMatches(MatchStatus matchStatus, Instant now,
 			Instant from, Instant before, Instant endsBy, boolean allTypes,
 			Collection<MatchType> types, Long applicantId, Gender gender,
 			Collection<MatchApplicationStatus> activeStatuses, Pageable pageable);
@@ -121,7 +120,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			""", countQuery = """
 			select count(m) from Match m join m.courtSlot s join s.court c join c.area area
 			""" + HOME_RECOMMENDATION_FILTER)
-	Page<Match> findHomeRecommendations(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
+	Page<Match> findHomeRecommendations(MatchStatus matchStatus, Instant now,
 			boolean allTypes, Collection<MatchType> types, Long applicantId, Gender gender,
 			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly, Collection<String> areaCodes,
 			Collection<String> timeSlots, BigDecimal ntrp, Pageable pageable);
@@ -141,7 +140,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			and (m.maxNtrp is null or m.maxNtrp >= :minimumNtrp)
 			order by s.startsAt, m.id
 			""")
-	List<Match> findSearchCandidates(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
+	List<Match> findSearchCandidates(MatchStatus matchStatus, Instant now,
 			Instant from, Instant before, Collection<LocalDate> dates, LocalTime startTime, long endMinute,
 			Collection<MatchType> types, Long applicantId, Gender gender,
 			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly,
@@ -152,9 +151,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			join fetch m.courtSlot s
 			join fetch s.court
 			join fetch m.host
-			where m.id = :id and s.status = :slotStatus and m.status = :matchStatus and s.startsAt > :now
+			where m.id = :id and m.status = :matchStatus and s.startsAt > :now
 			""")
-	Optional<Match> findDiscoveryDetail(Long id, CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now);
+	Optional<Match> findDiscoveryDetail(Long id, MatchStatus matchStatus, Instant now);
 
 	@Query("select m.host.id from Match m where m.id = :id")
 	Optional<Long> findHostIdById(@Param("id") Long id);
