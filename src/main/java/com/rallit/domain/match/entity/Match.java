@@ -102,11 +102,10 @@ public class Match extends BaseEntity {
 	private Match(CourtSlot courtSlot, User host, Set<MatchType> matchTypes, Integer maleRecruitCount,
 			Integer femaleRecruitCount, BigDecimal minNtrp, BigDecimal maxNtrp, Integer participationFee,
 			Instant recruitmentDeadline, Set<AgeGroup> preferredAgeGroups, boolean sameGenderOnly) {
-		validateNtrp(minNtrp);
-		validateNtrp(maxNtrp);
+		validateNtrpRange(minNtrp, maxNtrp);
 		this.courtSlot = courtSlot;
 		this.host = host;
-		this.status = MatchStatus.PENDING_APPROVAL;
+		this.status = MatchStatus.RECRUITING;
 		this.maleRecruitCount = maleRecruitCount;
 		this.femaleRecruitCount = femaleRecruitCount;
 		this.minNtrp = minNtrp;
@@ -122,8 +121,9 @@ public class Match extends BaseEntity {
 		}
 	}
 
-	private static void validateNtrp(BigDecimal value) {
-		if (value != null && !Ntrp.isSupported(value)) {
+	public static void validateNtrpRange(BigDecimal min, BigDecimal max) {
+		if ((min != null && !Ntrp.isSupported(min)) || (max != null && !Ntrp.isSupported(max))
+				|| (min != null && max != null && min.compareTo(max) > 0)) {
 			throw new InvalidMatchNtrpException();
 		}
 	}

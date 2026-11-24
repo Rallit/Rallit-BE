@@ -31,6 +31,13 @@ rallit:
       upload-expiry-seconds: ${S3_PRESIGNED_UPLOAD_EXPIRY:300}
       download-expiry-seconds: ${S3_PRESIGNED_DOWNLOAD_EXPIRY:600}
     endpoint: ${S3_ENDPOINT:}
+  kakao:
+    local:
+      rest-api-key: ${KAKAO_LOCAL_REST_API_KEY:${KAKAO_REST_API_KEY:}}
+      base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
+      connect-timeout: ${KAKAO_LOCAL_CONNECT_TIMEOUT:2s}
+      read-timeout: ${KAKAO_LOCAL_READ_TIMEOUT:3s}
+      requests-per-minute: ${KAKAO_LOCAL_REQUESTS_PER_MINUTE:30}
   auth:
     service-origins: ${SERVICE_ORIGINS:https://rallit.co.kr,https://dev.rallit.co.kr}
     admin-origins: ${ADMIN_ORIGINS:https://admin.rallit.co.kr}

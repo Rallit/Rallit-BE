@@ -50,7 +50,11 @@ class MatchApplicationEligibility {
 	}
 
 	static Instant finalDeadline(Match match) {
-		return match.getCourtSlot().getStartsAt().minus(FINAL_DEADLINE_BEFORE_START);
+		return finalDeadline(match.getCourtSlot().getStartsAt());
+	}
+
+	static Instant finalDeadline(Instant startsAt) {
+		return startsAt.minus(FINAL_DEADLINE_BEFORE_START);
 	}
 
 	static boolean isWithinRecruitmentWindow(Match match, Instant now) {

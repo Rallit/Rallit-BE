@@ -57,7 +57,6 @@ public final class EntityFixtures {
 				.courtNumber(courtNumber)
 				.startsAt(startsAt)
 				.endsAt(startsAt.plus(Duration.ofHours(2)))
-				.rentalFee(14000)
 				.evidenceFileKey("court-slot/evidence.png")
 				.build();
 	}

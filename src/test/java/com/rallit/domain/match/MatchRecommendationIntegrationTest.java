@@ -578,7 +578,6 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.participationFee(10000).recruitmentDeadline(startsAt.minus(1, ChronoUnit.HOURS)).build();
 		entityManager.persist(match);
 		entityManager.flush();
-		jdbc.update("update court_slot set status = 'APPROVED' where id = ?", slot.getId());
 		jdbc.update("update match set status = 'RECRUITING' where id = ?", match.getId());
 		return match.getId();
 	}

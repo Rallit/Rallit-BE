@@ -2,7 +2,7 @@ package com.rallit.domain.court.entity;
 
 import java.time.Instant;
 
-import com.rallit.domain.court.enums.CourtSlotStatus;
+import com.rallit.domain.court.enums.EvidenceReviewStatus;
 import com.rallit.domain.user.entity.User;
 import com.rallit.global.entity.BaseEntity;
 import jakarta.persistence.Column;
@@ -48,15 +48,12 @@ public class CourtSlot extends BaseEntity {
 	@Column(nullable = false)
 	private Instant endsAt;
 
-	@Column(nullable = false)
-	private Integer rentalFee;
-
-	@Column(nullable = false, length = 500)
+	@Column(length = 500)
 	private String evidenceFileKey;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
-	private CourtSlotStatus status;
+	private EvidenceReviewStatus evidenceReviewStatus;
 
 	@Column(length = 500)
 	private String rejectionReason;
@@ -65,14 +62,18 @@ public class CourtSlot extends BaseEntity {
 
 	@Builder
 	private CourtSlot(Court court, User registrant, String courtNumber, Instant startsAt, Instant endsAt,
-			Integer rentalFee, String evidenceFileKey) {
+			String evidenceFileKey) {
 		this.court = court;
 		this.registrant = registrant;
 		this.courtNumber = courtNumber;
 		this.startsAt = startsAt;
 		this.endsAt = endsAt;
-		this.rentalFee = rentalFee;
 		this.evidenceFileKey = evidenceFileKey;
-		this.status = CourtSlotStatus.PENDING;
+		this.evidenceReviewStatus = evidenceFileKey == null
+				? EvidenceReviewStatus.NOT_SUBMITTED : EvidenceReviewStatus.PENDING;
+	}
+
+	public boolean isEvidenceVerified() {
+		return evidenceReviewStatus == EvidenceReviewStatus.APPROVED;
 	}
 }

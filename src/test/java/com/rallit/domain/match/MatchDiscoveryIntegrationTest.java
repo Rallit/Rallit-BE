@@ -271,7 +271,7 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void checksOnboardingAndHidesUnapprovedMatches() throws Exception {
+	void checksOnboardingAndShowsRecruitingMatchesRegardlessOfEvidenceReview() throws Exception {
 		mvc.perform(get("/api/v1/matches")).andExpect(status().isUnauthorized());
 		String suffix = UUID.randomUUID().toString().substring(0, 8);
 		User onboarding = User.signUp("대기" + suffix, "pending-" + suffix + "@example.test");
@@ -279,15 +279,25 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("MATCH_ONBOARDING_REQUIRED"));
 
-		String bearer = bearer(activeUser());
+		String bearer = bearer(activeUser(Gender.FEMALE));
 		LocalDate date = LocalDate.ofInstant(clock.instant(), SEOUL).plusDays(7);
-		long matchId = createRecruitingMatches(date).singlesId();
-		jdbc.update("update court_slot set status = 'PENDING' where id = (select court_slot_id from match where id = ?)",
-				matchId);
+		var matches = createRecruitingMatches(date);
+		approveEvidence(matches.rallyId());
+		jdbc.update("update court_slot set evidence_file_key = null, evidence_review_status = 'NOT_SUBMITTED' "
+				+ "where id = (select court_slot_id from match where id = ?)", matches.doublesId());
+		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString())
+						.param("applicableOnly", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(3));
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.canApply").value(true));
+
+		jdbc.update("update match set status = 'CANCELED' where id = ?", matches.singlesId());
 		mvc.perform(get("/api/v1/matches").header("Authorization", bearer).param("date", date.toString()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.totalElements").value(2));
-		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer))
+		mvc.perform(get("/api/v1/matches/{matchId}", matches.singlesId()).header("Authorization", bearer))
 				.andExpect(status().isNotFound());
 	}
 
@@ -377,7 +387,6 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 		var doubles = createMatch(host, court, date, 18, MatchType.MIXED_DOUBLES, 1, 2);
 		entityManager.flush();
 
-		jdbc.update("update court_slot set status = 'APPROVED' where court_id = ?", court.getId());
 		jdbc.update("update match set status = 'RECRUITING' where id in (?, ?, ?)",
 				singles.getId(), rally.getId(), doubles.getId());
 		entityManager.clear();
@@ -402,6 +411,13 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.build();
 		entityManager.persist(match);
 		return match;
+	}
+
+	private void approveEvidence(long matchId) {
+		jdbc.update("""
+				update court_slot set evidence_review_status = 'APPROVED', reviewed_at = localtimestamp
+				where id = (select court_slot_id from match where id = ?)
+				""", matchId);
 	}
 
 	private User activeUser() {

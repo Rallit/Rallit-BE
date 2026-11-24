@@ -74,8 +74,11 @@ public class ImageNormalizer {
         var source = validatedSize(reader);
         int orientation = readOrientation(original, format);
         var target = new ImageSize(purpose.getOutputWidth(), purpose.getOutputHeight());
-        var crop = source.oriented(orientation).cropTo(target);
-        var outputSize = new ImageSize(Math.min(crop.width(), target.width()), Math.min(crop.height(), target.height()));
+        var oriented = source.oriented(orientation);
+        var crop = purpose.isCropped() ? oriented.cropTo(target) : oriented;
+        var outputSize = purpose.isCropped()
+            ? new ImageSize(Math.min(crop.width(), target.width()), Math.min(crop.height(), target.height()))
+            : crop.fitWithin(target);
         var pixels = readPixels(reader, crop, outputSize);
         var image = render(pixels, orientation, outputSize, format.equals("png") && pixels.getColorModel().hasAlpha());
         return encode(image, format, purpose);
@@ -228,6 +231,12 @@ public class ImageNormalizer {
       int cropWidth = Math.min(width, Math.max(1, Math.round((float) height * target.width / target.height)));
       int cropHeight = Math.min(height, Math.max(1, Math.round((float) width * target.height / target.width)));
       return new ImageSize(cropWidth, cropHeight);
+    }
+
+    ImageSize fitWithin(ImageSize bounds) {
+      double scale = Math.min(1.0, Math.min((double) bounds.width / width, (double) bounds.height / height));
+      return new ImageSize(Math.max(1, (int) Math.round(width * scale)),
+          Math.max(1, (int) Math.round(height * scale)));
     }
   }
 

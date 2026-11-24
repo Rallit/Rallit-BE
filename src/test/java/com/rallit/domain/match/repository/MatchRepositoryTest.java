@@ -2,6 +2,7 @@ package com.rallit.domain.match.repository;
 
 import static com.rallit.support.EntityFixtures.MATCH_STARTS_AT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
@@ -12,7 +13,7 @@ import java.util.Set;
 
 import com.rallit.domain.court.entity.Court;
 import com.rallit.domain.court.entity.CourtSlot;
-import com.rallit.domain.court.enums.CourtSlotStatus;
+import com.rallit.domain.court.enums.EvidenceReviewStatus;
 import com.rallit.domain.court.repository.CourtRepository;
 import com.rallit.domain.court.repository.CourtSlotRepository;
 import com.rallit.domain.match.entity.Match;
@@ -81,9 +82,9 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 
 		Match found = matchRepository.findById(match.getId()).orElseThrow();
 
-		assertThat(found.getStatus()).isEqualTo(MatchStatus.PENDING_APPROVAL);
+		assertThat(found.getStatus()).isEqualTo(MatchStatus.RECRUITING);
 		assertThat(found.getMatchTypes()).containsExactly(MatchType.MIXED_DOUBLES);
-		assertThat(found.getCourtSlot().getStatus()).isEqualTo(CourtSlotStatus.PENDING);
+		assertThat(found.getCourtSlot().getEvidenceReviewStatus()).isEqualTo(EvidenceReviewStatus.PENDING);
 		assertThat(found.getHost().getId()).isEqualTo(host.getId());
 		assertThat(found.getPreferredAgeGroups()).containsExactlyInAnyOrder(AgeGroup.TWENTIES, AgeGroup.THIRTIES);
 		assertThat(jdbcTemplate.queryForObject("SELECT match_type FROM match_match_type WHERE match_id = ?", String.class,
@@ -123,14 +124,32 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void allowsOverlappingCourtSlotAfterRejection() {
+	void releasesRejectedEvidenceSlotFromTheOverlapConstraint() {
 		CourtSlot rejected = courtSlotRepository.saveAndFlush(
 				EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
-		jdbcTemplate.update("UPDATE court_slot SET status = 'REJECTED' WHERE id = ?", rejected.getId());
+		jdbcTemplate.update("UPDATE court_slot SET evidence_review_status = 'REJECTED', rejection_reason = '확인 불가', "
+				+ "reviewed_at = now() WHERE id = ?", rejected.getId());
 
-		courtSlotRepository.saveAndFlush(EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT));
+		assertThatCode(() -> courtSlotRepository.saveAndFlush(
+				EntityFixtures.courtSlot(court, host, "3", MATCH_STARTS_AT))).doesNotThrowAnyException();
+	}
 
-		assertThat(courtSlotRepository.count()).isEqualTo(2);
+	@Test
+	void storesSlotWithoutEvidenceAsNotSubmittedAndRejectsMismatchedEvidenceState() {
+		CourtSlot slot = courtSlotRepository.saveAndFlush(CourtSlot.builder()
+				.court(court)
+				.registrant(host)
+				.courtNumber("3")
+				.startsAt(MATCH_STARTS_AT)
+				.endsAt(MATCH_STARTS_AT.plus(Duration.ofHours(2)))
+				.build());
+
+		assertThat(jdbcTemplate.queryForMap("SELECT evidence_file_key, evidence_review_status FROM court_slot WHERE id = ?",
+				slot.getId())).containsEntry("evidence_file_key", null).containsEntry("evidence_review_status", "NOT_SUBMITTED");
+		assertThatThrownBy(() -> jdbcTemplate.update(
+				"UPDATE court_slot SET evidence_review_status = 'PENDING' WHERE id = ?", slot.getId()))
+				.isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_court_slot_evidence_review");
 	}
 
 	@Test
@@ -155,7 +174,6 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 				.participationFee(7000)
 				.recruitmentDeadline(MATCH_STARTS_AT)
 				.build());
-		jdbcTemplate.update("UPDATE court_slot SET status = 'APPROVED' WHERE id = ?", courtSlot.getId());
 		jdbcTemplate.update("UPDATE match SET status = 'RECRUITING' WHERE id = ?", match.getId());
 		entityManager.clear();
 
@@ -255,7 +273,7 @@ class MatchRepositoryTest extends IntegrationTestSupport {
 	}
 
 	private List<Long> recruitingMatchIds(Instant now) {
-		return matchRepository.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, null,
+		return matchRepository.findRecruitingMatches(MatchStatus.RECRUITING, now, null,
 				null, null, true, EnumSet.allOf(MatchType.class), PageRequest.of(0, 100)).map(Match::getId).getContent();
 	}
 }

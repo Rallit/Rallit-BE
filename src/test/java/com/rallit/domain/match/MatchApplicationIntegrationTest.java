@@ -251,12 +251,13 @@ class MatchApplicationIntegrationTest extends IntegrationTestSupport {
 	void rejectsMatchThatIsNotRecruitingOrPastDeadline() throws Exception {
 		User host = activeUser(Gender.MALE);
 		User applicant = activeUser(Gender.FEMALE);
-		Match pendingApproval = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, clock.instant().plus(1, ChronoUnit.DAYS));
+		Match canceled = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, clock.instant().plus(1, ChronoUnit.DAYS));
+		jdbcTemplate.update("UPDATE match SET status = 'CANCELED' WHERE id = ?", canceled.getId());
 		Match closed = match(host, Set.of(MatchType.MIXED_DOUBLES), 1, 2, clock.instant().minus(1, ChronoUnit.MINUTES));
 		recruit(closed);
 		Match started = recruitingMatch(host, clock.instant().minus(1, ChronoUnit.MINUTES));
 
-		apply(applicant, pendingApproval.getId(), AGREED)
+		apply(applicant, canceled.getId(), AGREED)
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("MATCH_NOT_RECRUITING"));
 		apply(applicant, closed.getId(), AGREED)

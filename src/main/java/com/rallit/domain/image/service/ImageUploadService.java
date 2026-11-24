@@ -20,6 +20,7 @@ import java.time.Clock;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -68,22 +69,62 @@ public class ImageUploadService {
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void complete(Long ownerId, Long targetId, ImageUploadPurpose purpose, UUID uploadId) {
+    if (purpose == ImageUploadPurpose.RESERVATION_EVIDENCE) {
+      throw new IllegalArgumentException("Reservation evidence is attached when its match is opened");
+    }
     var upload = checkTicket(uploads.findById(uploadId), ownerId, targetId, purpose);
     if (upload.isCompleted()) return;
 
-    String stagedKey = stagingKey(uploadId);
-    try {
-      var staged = presigned.readUpload(stagedKey, ImageNormalizer.MAX_BYTES);
-      if (staged.isEmpty()) {
-        if (checkTicket(uploads.findById(uploadId), ownerId, targetId, purpose).isCompleted()) return;
-        throw new GeneralException(ImageUploadErrorStatus.IMAGE_UPLOAD_NOT_READY);
-      }
-      var normalized = normalize(upload, staged.orElseThrow());
-      String finalKey = UUID.randomUUID() + normalized.extension();
-      writeFinalObject(purpose, finalKey, normalized.contents());
+    var finalKey = writeStagedImage(upload);
+    if (finalKey.isEmpty()) {
+      if (checkTicket(uploads.findById(uploadId), ownerId, targetId, purpose).isCompleted()) return;
+      throw new GeneralException(ImageUploadErrorStatus.IMAGE_UPLOAD_NOT_READY);
+    }
+    finish(ownerId, targetId, purpose, uploadId, finalKey.get());
+    deleteStagingObject(stagingKey(uploadId));
+  }
 
-      finish(ownerId, targetId, purpose, uploadId, finalKey);
-      deleteStagingObject(stagedKey);
+  // The stored image is deleted unless the transaction that consumes the ticket commits.
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public <T> T attach(Long ownerId, Long targetId, ImageUploadPurpose purpose, UUID uploadId,
+      Function<String, T> attachment) {
+    var upload = checkTicket(uploads.findById(uploadId), ownerId, targetId, purpose);
+    if (upload.isCompleted()) throw new GeneralException(ImageUploadErrorStatus.IMAGE_UPLOAD_ALREADY_USED);
+    var written = writeStagedImage(upload);
+    if (written.isEmpty()) {
+      var status = checkTicket(uploads.findById(uploadId), ownerId, targetId, purpose).isCompleted()
+          ? ImageUploadErrorStatus.IMAGE_UPLOAD_ALREADY_USED : ImageUploadErrorStatus.IMAGE_UPLOAD_NOT_READY;
+      throw new GeneralException(status);
+    }
+    String finalKey = written.get();
+
+    var update = new ImageKeyUpdate();
+    T result;
+    try {
+      result = new TransactionTemplate(transactions).execute(status -> {
+        update.register();
+        var ticket = checkTicket(uploads.findByIdForUpdate(uploadId), ownerId, targetId, purpose);
+        if (ticket.isCompleted()) throw new GeneralException(ImageUploadErrorStatus.IMAGE_UPLOAD_ALREADY_USED);
+        T attached = attachment.apply(finalKey);
+        update.replaced(null);
+        ticket.complete(clock.instant());
+        return attached;
+      });
+    } finally {
+      deleteFinalObject(purpose, update.unreferencedKey(finalKey));
+    }
+    deleteStagingObject(stagingKey(uploadId));
+    return result;
+  }
+
+  private Optional<String> writeStagedImage(ImageUpload upload) {
+    try {
+      var staged = presigned.readUpload(stagingKey(upload.getId()), ImageNormalizer.MAX_BYTES);
+      if (staged.isEmpty()) return Optional.empty();
+      var normalized = normalize(upload, staged.get());
+      String finalKey = UUID.randomUUID() + normalized.extension();
+      writeFinalObject(upload.getPurpose(), finalKey, normalized.contents());
+      return Optional.of(finalKey);
     } catch (PresignedImageStorage.UploadTooLargeException oversized) {
       throw new GeneralException(ErrorStatus._UPLOAD_TOO_LARGE, oversized);
     } catch (IOException failure) {
@@ -115,6 +156,8 @@ public class ImageUploadService {
               .orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED)).replaceProfileImage(finalKey);
           case COURT -> courts.findByIdForUpdate(targetId)
               .orElseThrow(() -> new GeneralException(CourtErrorStatus.COURT_NOT_FOUND)).replaceThumbnail(finalKey);
+          case RESERVATION_EVIDENCE ->
+              throw new IllegalArgumentException("Reservation evidence is attached when its match is opened");
         };
         update.replaced(previous);
         ticket.complete(clock.instant());

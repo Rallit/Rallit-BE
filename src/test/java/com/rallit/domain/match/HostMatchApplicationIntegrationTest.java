@@ -389,15 +389,16 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 	@Test
 	void acceptRequiresRecruitingMatchBeforeDeadline() throws Exception {
 		User host = activeUser(Gender.MALE);
-		Match pendingApproval = match(host, 1, 2, clock.instant().plus(1, ChronoUnit.DAYS),
+		Match canceled = match(host, 1, 2, clock.instant().plus(1, ChronoUnit.DAYS),
 				clock.instant().plus(3, ChronoUnit.DAYS));
+		jdbcTemplate.update("UPDATE match SET status = 'CANCELED' WHERE id = ?", canceled.getId());
 		Match closed = recruitingMatch(host, 1, 2);
-		long pendingApprovalApplicationId = insertPendingApplication(pendingApproval, activeUser(Gender.FEMALE));
+		long canceledApplicationId = insertPendingApplication(canceled, activeUser(Gender.FEMALE));
 		long closedApplicationId = apply(activeUser(Gender.FEMALE), closed);
 		jdbcTemplate.update("UPDATE match SET recruitment_deadline = ? WHERE id = ?",
 				Timestamp.from(clock.instant().minus(1, ChronoUnit.MINUTES)), closed.getId());
 
-		accept(host, pendingApproval, pendingApprovalApplicationId)
+		accept(host, canceled, canceledApplicationId)
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("MATCH_NOT_RECRUITING"));
 		accept(host, closed, closedApplicationId)
@@ -408,7 +409,7 @@ class HostMatchApplicationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("MATCH_NOT_FOUND"));
 
-		assertThat(applicationStatus(pendingApprovalApplicationId)).isEqualTo("PENDING");
+		assertThat(applicationStatus(canceledApplicationId)).isEqualTo("PENDING");
 		assertThat(applicationStatus(closedApplicationId)).isEqualTo("PENDING");
 	}
 

@@ -240,7 +240,10 @@ public class SecurityConfig {
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{cityCode}/areas")
                 .authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/courts/{courtId}/thumbnail/url")
+                .requestMatchers(HttpMethod.GET, "/api/v1/courts/{courtId}/thumbnail/url", "/api/v1/courts/search")
+                .authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/v1/courts", "/api/v1/matches",
+                    "/api/v1/host/reservation-evidence/uploads")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/matches", "/api/v1/matches/{matchId}",
                     "/api/v1/matches/recommendations")

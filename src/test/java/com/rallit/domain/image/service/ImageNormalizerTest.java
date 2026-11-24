@@ -66,6 +66,19 @@ class ImageNormalizerTest {
     assertThat(image.getRGB(16, 9) >>> 24).isEqualTo(transparent ? 0 : 255);
   }
 
+  @ParameterizedTest
+  @CsvSource({"1000, 3000, 683, 2048", "3000, 1000, 2048, 683", "600, 900, 600, 900"})
+  void keepsTheWholeReservationEvidenceAndOnlyScalesItDown(int width, int height, int expectedWidth,
+      int expectedHeight) throws IOException {
+    var normalized = normalizer.normalizeUpload(png(width, height), "receipt.png",
+        ImageUploadPurpose.RESERVATION_EVIDENCE);
+
+    assertThat(normalized.extension()).isEqualTo(".jpg");
+    var image = ImageIO.read(new ByteArrayInputStream(normalized.contents()));
+    assertThat(image.getWidth()).isEqualTo(expectedWidth);
+    assertThat(image.getHeight()).isEqualTo(expectedHeight);
+  }
+
   @Test
   void rejectsASecondConcurrentImageAndReleasesTheSlot() throws Exception {
     var slot = (Semaphore) ReflectionTestUtils.getField(normalizer, "normalizationSlots");
