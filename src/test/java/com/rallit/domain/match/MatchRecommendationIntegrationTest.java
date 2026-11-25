@@ -419,6 +419,62 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void blocksReapplicationAfterHostRejectionButKeepsTheMatchInTheGeneralList() throws Exception {
+		var date = saturday();
+		var host = member(Gender.MALE, "3.0");
+		var original = court(MAPO, "37.560", "126.900");
+		long matchId = match(host, original, date, "14:00", "2.5", "4.0", MatchType.SINGLES, false);
+		String auth = bearer(viewer());
+		String created = mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId)
+						.header("Authorization", auth)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"refundPolicyAgreed\":true}"))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long applicationId = ((Number) JsonPath.read(created, "$.result.applicationId")).longValue();
+		mvc.perform(post("/api/v1/host/matches/{matchId}/applications/{id}/reject", matchId, applicationId)
+						.header("Authorization", bearer(host)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.status").value("REJECTED"));
+
+		mvc.perform(post("/api/v1/matches/{matchId}/applications", matchId).header("Authorization", auth)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"refundPolicyAgreed\":true}"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("APPLICATION_REJECTED"));
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.canApply").value(false))
+				.andExpect(jsonPath("$.result.applicationBlockReason").value("APPLICATION_REJECTED"));
+		mvc.perform(get("/api/v1/matches").header("Authorization", auth).param("date", date.toString()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(1))
+				.andExpect(jsonPath("$.result.items[0].matchId").value(matchId));
+		mvc.perform(get("/api/v1/matches").header("Authorization", auth).param("date", date.toString())
+						.param("applicableOnly", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(0));
+		mvc.perform(get("/api/v1/matches/recommendations").header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.totalElements").value(0));
+		search(auth, date)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.hasResults").value(false));
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer(viewer())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.canApply").value(true));
+
+		for (int i = 0; i < 2; i++) {
+			jdbc.update("""
+					insert into match_application (match_id, applicant_user_id, applicant_gender, status,
+						refund_policy_agreed_at, created_at, updated_at)
+					values (?, ?, 'FEMALE', 'CONFIRMED', now(), now(), now())
+					""", matchId, viewer().getId());
+		}
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.applicationBlockReason").value("APPLICATION_REJECTED"));
+	}
+
+	@Test
 	void ordersRelaxedTimeByRequiredChangeToTheSearchWindow() throws Exception {
 		var date = saturday();
 		var host = member(Gender.MALE, "3.0");

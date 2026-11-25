@@ -68,7 +68,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 					then m.maleRecruitCount else m.femaleRecruitCount end)
 			and not exists (
 				select a.id from MatchApplication a
-				where a.match.id = m.id and a.applicant.id = :applicantId and a.status in :activeStatuses
+				where a.match.id = m.id and a.applicant.id = :applicantId
+				and (a.status in :activeStatuses
+					or a.status = com.rallit.domain.match.enums.MatchApplicationStatus.REJECTED)
 			)
 			""";
 

@@ -75,7 +75,7 @@ public interface MatchDiscoverySwagger {
 			@Parameter(description = "경기 방식 중 하나 이상이 일치하면 포함합니다. "
 					+ "`matchTypes=SINGLES&matchTypes=RALLY` 또는 `matchTypes=SINGLES,RALLY`로 전달할 수 있습니다.")
 			List<@NotNull MatchType> matchTypes,
-			@Parameter(description = "true이면 본인 개설, 진행 중인 신청, 모집 성별과 확정 인원 기준 정원을 확인해 "
+			@Parameter(description = "true이면 본인 개설, 진행 중이거나 거절된 신청, 모집 성별과 확정 인원 기준 정원을 확인해 "
 					+ "내가 신청할 수 있는 매치만 목록과 전체 건수에 포함합니다.")
 			boolean applicableOnly,
 			@Parameter(description = "0부터 시작하는 페이지. 첫 페이지 이후 결과 범위를 벗어나면 400입니다.")
