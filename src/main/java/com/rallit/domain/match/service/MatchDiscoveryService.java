@@ -64,8 +64,8 @@ public class MatchDiscoveryService {
 		if (applicableOnly) {
 			var applicant = users.findById(userId).orElseThrow(() -> new GeneralException(ErrorStatus._UNAUTHORIZED));
 			result = matches.findApplicableMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
-					before, endsBy, allTypes, types, userId, applicant.getGender(), MatchApplicationStatus.ACTIVE,
-					pageable);
+					before, endsBy, allTypes, types, userId, applicant.getGender(),
+					MatchApplicationStatus.REAPPLY_BLOCKING, pageable);
 		} else {
 			result = matches.findRecruitingMatches(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now, from,
 					before, endsBy, allTypes, types, pageable);

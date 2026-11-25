@@ -355,6 +355,9 @@ class MatchDiscoveryIntegrationTest extends IntegrationTestSupport {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.result.currentParticipantCount").value(2))
 				.andExpect(jsonPath("$.result.applicationBlockReason").value("RECRUITMENT_FULL"));
+		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", bearer(accepted)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.result.applicationBlockReason").value("APPLICATION_DUPLICATED"));
 
 		jdbc.update("update match set recruitment_deadline = ? where id = ?",
 				Timestamp.from(date.minusDays(8).atStartOfDay(SEOUL).toInstant()), matchId);

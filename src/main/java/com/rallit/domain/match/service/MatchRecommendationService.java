@@ -67,8 +67,8 @@ public class MatchRecommendationService {
 			result = Page.empty(pageable);
 		} else {
 			result = matches.findHomeRecommendations(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now(),
-					false, types, userId, user.getGender(), MatchApplicationStatus.ACTIVE, user.isSameGenderOnly(),
-					areaCodes, timeSlots, user.getNtrp(), pageable);
+					false, types, userId, user.getGender(), MatchApplicationStatus.REAPPLY_BLOCKING,
+					user.isSameGenderOnly(), areaCodes, timeSlots, user.getNtrp(), pageable);
 		}
 		MatchPageRange.requireInRange(result);
 		var counts = occupiedSeats(result.getContent());
@@ -131,7 +131,7 @@ public class MatchRecommendationService {
 		var startTime = LocalTime.ofInstant(firstWindow.expandedFrom(), TimeConfig.SERVICE_ZONE);
 		return matches.findSearchCandidates(CourtSlotStatus.APPROVED, MatchStatus.RECRUITING, now,
 				firstWindow.expandedFrom(), lastWindow.dayEnd(), windows.navigableKeySet(),
-				startTime, endMinute, types, user.getId(), user.getGender(), MatchApplicationStatus.ACTIVE,
+				startTime, endMinute, types, user.getId(), user.getGender(), MatchApplicationStatus.REAPPLY_BLOCKING,
 				request.sameGenderOnly(), request.minNtrp(), request.maxNtrp());
 	}
 

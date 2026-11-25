@@ -39,12 +39,17 @@ class MatchApplicationEligibility {
 		if (recruitCount <= 0 || (match.isSameGenderOnly() && match.getHost().getGender() != applicant.getGender())) {
 			return Optional.of(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
 		}
+		var statuses = applications.findStatusesByMatchIdAndApplicantIdAndStatusIn(match.getId(), applicant.getId(),
+				MatchApplicationStatus.REAPPLY_BLOCKING);
+		if (statuses.stream().anyMatch(MatchApplicationStatus.ACTIVE::contains)) {
+			return Optional.of(MatchApplicationErrorStatus.APPLICATION_DUPLICATED);
+		}
+		if (statuses.contains(MatchApplicationStatus.REJECTED)) {
+			return Optional.of(MatchApplicationErrorStatus.APPLICATION_REJECTED);
+		}
 		if (applications.countByMatchIdAndApplicantGenderAndStatusIn(match.getId(),
 				applicant.getGender(), MatchApplicationStatus.SEAT_OCCUPYING) >= recruitCount) {
 			return Optional.of(MatchApplicationErrorStatus.RECRUITMENT_FULL);
-		}
-		if (applications.existsActiveApplication(match.getId(), applicant.getId())) {
-			return Optional.of(MatchApplicationErrorStatus.APPLICATION_DUPLICATED);
 		}
 		return Optional.empty();
 	}

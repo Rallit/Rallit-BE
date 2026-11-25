@@ -94,7 +94,7 @@ public interface HostMatchApplicationSwagger {
 
 	@Operation(summary = "새 신청 거절",
 			description = """
-					새 신청을 거절합니다. 거절 사유는 선택이며 본문 없이 호출해도 됩니다.
+					새 신청을 거절합니다. 거절 사유는 선택이며 본문 없이 호출해도 됩니다. 거절된 회원은 같은 매치에 다시 신청할 수 없습니다.
 
 					성공하면 조회 API를 다시 호출해 화면을 갱신하세요.
 					""")

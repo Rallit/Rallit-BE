@@ -18,15 +18,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface MatchApplicationRepository extends JpaRepository<MatchApplication, Long> {
 
-	boolean existsByMatchIdAndApplicantIdAndStatusIn(Long matchId, Long applicantId,
-			Collection<MatchApplicationStatus> statuses);
-
 	long countByMatchIdAndApplicantGenderAndStatusIn(Long matchId, Gender applicantGender,
 			Collection<MatchApplicationStatus> statuses);
 
-	default boolean existsActiveApplication(Long matchId, Long applicantId) {
-		return existsByMatchIdAndApplicantIdAndStatusIn(matchId, applicantId, MatchApplicationStatus.ACTIVE);
-	}
+	@Query("""
+			select a.status from MatchApplication a
+			where a.match.id = :matchId and a.applicant.id = :applicantId and a.status in :statuses
+			""")
+	List<MatchApplicationStatus> findStatusesByMatchIdAndApplicantIdAndStatusIn(@Param("matchId") Long matchId,
+			@Param("applicantId") Long applicantId, @Param("statuses") Collection<MatchApplicationStatus> statuses);
 
 	@Query(value = """
 			select a from MatchApplication a

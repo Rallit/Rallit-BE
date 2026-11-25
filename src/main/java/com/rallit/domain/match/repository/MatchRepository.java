@@ -68,7 +68,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 					then m.maleRecruitCount else m.femaleRecruitCount end)
 			and not exists (
 				select a.id from MatchApplication a
-				where a.match.id = m.id and a.applicant.id = :applicantId and a.status in :activeStatuses
+				where a.match.id = m.id and a.applicant.id = :applicantId and a.status in :blockingStatuses
 			)
 			""";
 
@@ -107,7 +107,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 	Page<Match> findApplicableMatches(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
 			Instant from, Instant before, Instant endsBy, boolean allTypes,
 			Collection<MatchType> types, Long applicantId, Gender gender,
-			Collection<MatchApplicationStatus> activeStatuses, Pageable pageable);
+			Collection<MatchApplicationStatus> blockingStatuses, Pageable pageable);
 
 	@Query(value = """
 			select m from Match m
@@ -123,7 +123,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 			""" + HOME_RECOMMENDATION_FILTER)
 	Page<Match> findHomeRecommendations(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
 			boolean allTypes, Collection<MatchType> types, Long applicantId, Gender gender,
-			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly, Collection<String> areaCodes,
+			Collection<MatchApplicationStatus> blockingStatuses, boolean sameGenderOnly, Collection<String> areaCodes,
 			Collection<String> timeSlots, BigDecimal ntrp, Pageable pageable);
 
 	@Query("""
@@ -144,7 +144,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 	List<Match> findSearchCandidates(CourtSlotStatus slotStatus, MatchStatus matchStatus, Instant now,
 			Instant from, Instant before, Collection<LocalDate> dates, LocalTime startTime, long endMinute,
 			Collection<MatchType> types, Long applicantId, Gender gender,
-			Collection<MatchApplicationStatus> activeStatuses, boolean sameGenderOnly,
+			Collection<MatchApplicationStatus> blockingStatuses, boolean sameGenderOnly,
 			BigDecimal minimumNtrp, BigDecimal maximumNtrp);
 
 	@Query("""

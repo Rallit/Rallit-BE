@@ -15,4 +15,7 @@ public enum MatchApplicationStatus {
 	public static final Set<MatchApplicationStatus> CLOSED = Set.of(REJECTED, CANCELED, EXPIRED);
 
 	public static final Set<MatchApplicationStatus> SEAT_OCCUPYING = Set.of(PAYMENT_PENDING, CONFIRMED);
+
+	public static final Set<MatchApplicationStatus> REAPPLY_BLOCKING = Set.of(PENDING, PAYMENT_PENDING, CONFIRMED,
+			REJECTED);
 }
