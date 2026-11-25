@@ -463,11 +463,12 @@ class MatchRecommendationIntegrationTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.result.canApply").value(true));
 
 		for (int i = 0; i < 2; i++) {
+			var otherApplicant = viewer();
 			jdbc.update("""
 					insert into match_application (match_id, applicant_user_id, applicant_gender, status,
 						refund_policy_agreed_at, created_at, updated_at)
 					values (?, ?, 'FEMALE', 'CONFIRMED', now(), now(), now())
-					""", matchId, viewer().getId());
+					""", matchId, otherApplicant.getId());
 		}
 		mvc.perform(get("/api/v1/matches/{matchId}", matchId).header("Authorization", auth))
 				.andExpect(status().isOk())

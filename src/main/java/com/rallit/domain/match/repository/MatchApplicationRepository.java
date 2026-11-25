@@ -25,7 +25,7 @@ public interface MatchApplicationRepository extends JpaRepository<MatchApplicati
 			select a.status from MatchApplication a
 			where a.match.id = :matchId and a.applicant.id = :applicantId and a.status in :statuses
 			""")
-	List<MatchApplicationStatus> findStatusesByMatchIdAndApplicantId(@Param("matchId") Long matchId,
+	List<MatchApplicationStatus> findStatusesByMatchIdAndApplicantIdAndStatusIn(@Param("matchId") Long matchId,
 			@Param("applicantId") Long applicantId, @Param("statuses") Collection<MatchApplicationStatus> statuses);
 
 	@Query(value = """

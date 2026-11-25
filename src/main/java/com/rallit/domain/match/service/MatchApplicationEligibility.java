@@ -39,7 +39,7 @@ class MatchApplicationEligibility {
 		if (recruitCount <= 0 || (match.isSameGenderOnly() && match.getHost().getGender() != applicant.getGender())) {
 			return Optional.of(MatchApplicationErrorStatus.GENDER_NOT_RECRUITED);
 		}
-		var statuses = applications.findStatusesByMatchIdAndApplicantId(match.getId(), applicant.getId(),
+		var statuses = applications.findStatusesByMatchIdAndApplicantIdAndStatusIn(match.getId(), applicant.getId(),
 				MatchApplicationStatus.REAPPLY_BLOCKING);
 		if (statuses.stream().anyMatch(MatchApplicationStatus.ACTIVE::contains)) {
 			return Optional.of(MatchApplicationErrorStatus.APPLICATION_DUPLICATED);
